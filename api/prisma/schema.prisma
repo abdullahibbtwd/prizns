@@ -1,0 +1,256 @@
+// https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  EDITOR
+}
+
+enum ArticleSection {
+  featured
+  human_stories @map("human-stories")
+  places
+  traditions
+  discover
+  voices
+  sports
+  events
+  video
+  campaigns
+  gallery
+}
+
+enum ArticleStatus {
+  DRAFT
+  REVIEW
+  SCHEDULED
+  PUBLISHED
+  ARCHIVED
+}
+
+enum TranslationStatus {
+  PENDING
+  RUNNING
+  READY
+  FAILED
+}
+
+enum MediaKind {
+  IMAGE
+  AUDIO
+  VIDEO
+}
+
+model User {
+  id            String         @id @default(cuid())
+  email         String         @unique
+  passwordHash  String         @map("password_hash")
+  name          String?
+  role          Role           @default(EDITOR)
+  isActive      Boolean        @default(true) @map("is_active")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+  files         FileObject[]
+  refreshTokens RefreshToken[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique @map("token_hash")
+  sessionId String    @map("session_id")
+  userId    String    @map("user_id")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  userAgent String?   @map("user_agent")
+  ip        String?
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([sessionId])
+  @@map("refresh_tokens")
+}
+
+model FileObject {
+  id           String   @id @default(cuid())
+  key          String   @unique
+  bucket       String
+  originalName String   @map("original_name")
+  mimeType     String   @map("mime_type")
+  size         Int
+  url          String?
+  userId       String?  @map("user_id")
+  user         User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@map("file_objects")
+}
+
+model Author {
+  id                String            @id @default(cuid())
+  slug              String            @unique
+  nameBg            String            @map("name_bg")
+  nameEn            String?           @map("name_en")
+  roleBg            String            @map("role_bg")
+  roleEn            String?           @map("role_en")
+  locationBg        String?           @map("location_bg")
+  locationEn        String?           @map("location_en")
+  quoteBg           String?           @map("quote_bg")
+  quoteEn           String?           @map("quote_en")
+  bioBg             String?           @map("bio_bg")
+  bioEn             String?           @map("bio_en")
+  imageUrl          String?           @map("image_url")
+  aliases           String[]          @default([])
+  isActive          Boolean           @default(true) @map("is_active")
+  translationStatus TranslationStatus @default(PENDING) @map("translation_status")
+  translationError  String?           @map("translation_error")
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+  articles          Article[]
+
+  @@map("authors")
+}
+
+model MediaAsset {
+  id           String    @id @default(cuid())
+  key          String    @unique
+  url          String
+  mimeType     String    @map("mime_type")
+  kind         MediaKind @default(IMAGE)
+  originalName String?   @map("original_name")
+  size         Int?
+  titleBg      String?   @map("title_bg")
+  titleEn      String?   @map("title_en")
+  locationBg   String?   @map("location_bg")
+  locationEn   String?   @map("location_en")
+  creditBg     String?   @map("credit_bg")
+  creditEn     String?   @map("credit_en")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  heroArticles  Article[]            @relation("ArticleHero")
+  audioArticles Article[]            @relation("ArticleAudio")
+  videoArticles Article[]            @relation("ArticleVideo")
+  galleryItems  ArticleGalleryItem[]
+  seriesCovers  Series[]
+
+  @@map("media_assets")
+}
+
+model ArticleGalleryItem {
+  id        String     @id @default(cuid())
+  articleId String     @map("article_id")
+  mediaId   String     @map("media_id")
+  sortOrder Int        @default(0) @map("sort_order")
+  article   Article    @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  media     MediaAsset @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  createdAt DateTime   @default(now()) @map("created_at")
+
+  @@unique([articleId, mediaId])
+  @@index([articleId, sortOrder])
+  @@map("article_gallery_items")
+}
+
+model Article {
+  id                String               @id @default(cuid())
+  section           ArticleSection
+  slug              String
+  path              String
+  status            ArticleStatus        @default(DRAFT)
+  publishedAt       DateTime?            @map("published_at")
+  categoryBg        String               @map("category_bg")
+  categoryEn        String?              @map("category_en")
+  titleBg           String               @map("title_bg")
+  titleEn           String?              @map("title_en")
+  subtitleBg        String               @default("") @map("subtitle_bg")
+  subtitleEn        String?              @map("subtitle_en")
+  readTimeBg        String               @default("") @map("read_time_bg")
+  readTimeEn        String?              @map("read_time_en")
+  locationBg        String               @default("") @map("location_bg")
+  locationEn        String?              @map("location_en")
+  dateBg            String               @default("") @map("date_bg")
+  dateEn            String?              @map("date_en")
+  photoCreditBg     String               @default("") @map("photo_credit_bg")
+  photoCreditEn     String?              @map("photo_credit_en")
+  endLabelBg        String               @default("Край") @map("end_label_bg")
+  endLabelEn        String?              @map("end_label_en")
+  speakerBg         String?              @map("speaker_bg")
+  speakerEn         String?              @map("speaker_en")
+  audioDuration     String?              @map("audio_duration")
+  /**
+   * External playback URL (YouTube, Vimeo, direct file URL).
+   */
+  videoUrl          String?              @map("video_url")
+  body              Json                 @default("[]")
+  featured          Boolean              @default(false)
+  sponsored         Boolean              @default(false)
+  translationStatus TranslationStatus    @default(PENDING) @map("translation_status")
+  translationError  String?              @map("translation_error")
+  authorId          String?              @map("author_id")
+  author            Author?              @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  heroMediaId       String?              @map("hero_media_id")
+  heroMedia         MediaAsset?          @relation("ArticleHero", fields: [heroMediaId], references: [id], onDelete: SetNull)
+  audioMediaId      String?              @map("audio_media_id")
+  audioMedia        MediaAsset?          @relation("ArticleAudio", fields: [audioMediaId], references: [id], onDelete: SetNull)
+  videoMediaId      String?              @map("video_media_id")
+  videoMedia        MediaAsset?          @relation("ArticleVideo", fields: [videoMediaId], references: [id], onDelete: SetNull)
+  galleryItems      ArticleGalleryItem[]
+  seriesEpisodes    SeriesEpisode[]
+  createdAt         DateTime             @default(now()) @map("created_at")
+  updatedAt         DateTime             @updatedAt @map("updated_at")
+
+  @@unique([section, slug])
+  @@index([status, section])
+  @@index([authorId])
+  @@map("articles")
+}
+
+enum SeriesStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+model Series {
+  id                String            @id @default(cuid())
+  slug              String            @unique
+  titleBg           String            @map("title_bg")
+  titleEn           String?           @map("title_en")
+  descriptionBg     String            @default("") @map("description_bg")
+  descriptionEn     String?           @map("description_en")
+  status            SeriesStatus      @default(DRAFT)
+  coverMediaId      String?           @map("cover_media_id")
+  coverMedia        MediaAsset?       @relation(fields: [coverMediaId], references: [id], onDelete: SetNull)
+  translationStatus TranslationStatus @default(PENDING) @map("translation_status")
+  translationError  String?           @map("translation_error")
+  episodes          SeriesEpisode[]
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+
+  @@map("series")
+}
+
+model SeriesEpisode {
+  id        String   @id @default(cuid())
+  seriesId  String   @map("series_id")
+  articleId String   @map("article_id")
+  sortOrder Int      @default(0) @map("sort_order")
+  series    Series   @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([seriesId, articleId])
+  @@index([seriesId, sortOrder])
+  @@map("series_episodes")
+}

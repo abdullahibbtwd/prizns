@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+
+# Builds
+dist/
+coverage/
+*.tsbuildinfo
+
+# Env (shared at root — never commit secrets)
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Logs / OS
+logs/
+*.log
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Prisma
+api/generated/
+
+# Docker
+*.pid

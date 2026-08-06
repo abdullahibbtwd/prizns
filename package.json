@@ -1,0 +1,16 @@
+{
+  "name": "prizns",
+  "private": true,
+  "version": "0.0.1",
+  "scripts": {
+    "dev:infra": "docker compose up -d postgres redis minio minio-init",
+    "dev:api": "npm run start:dev --prefix api",
+    "dev:web": "npm run dev --prefix prizn",
+    "docker:up": "docker compose up -d --build",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f",
+    "prisma:migrate": "npm run prisma:migrate --prefix api",
+    "prisma:generate": "npm run prisma:generate --prefix api",
+    "prisma:seed": "npm run prisma:seed --prefix api"
+  }
+}

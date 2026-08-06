@@ -1,0 +1,123 @@
+{
+  "human-stories": {
+    "label": {
+      "bg": "Човешки истории",
+      "en": "Human stories"
+    },
+    "publicLabel": {
+      "bg": "Човешки истории",
+      "en": "Human stories"
+    },
+    "categoryBg": "Човешки истории"
+  },
+  "featured": {
+    "label": {
+      "bg": "Избрано",
+      "en": "Featured"
+    },
+    "publicLabel": {
+      "bg": "Избрано",
+      "en": "Featured"
+    },
+    "categoryBg": "Избрано"
+  },
+  "places": {
+    "label": {
+      "bg": "Места",
+      "en": "Places"
+    },
+    "publicLabel": {
+      "bg": "Места",
+      "en": "Places"
+    },
+    "categoryBg": "Места"
+  },
+  "traditions": {
+    "label": {
+      "bg": "Традиции",
+      "en": "Traditions"
+    },
+    "publicLabel": {
+      "bg": "Традиции",
+      "en": "Traditions"
+    },
+    "categoryBg": "Традиции"
+  },
+  "discover": {
+    "label": {
+      "bg": "Открийте",
+      "en": "Discover"
+    },
+    "publicLabel": {
+      "bg": "Открийте",
+      "en": "Discover"
+    },
+    "categoryBg": "Открийте"
+  },
+  "voices": {
+    "label": {
+      "bg": "Гласове",
+      "en": "Voices"
+    },
+    "publicLabel": {
+      "bg": "Гласове",
+      "en": "Voices"
+    },
+    "categoryBg": "Гласове"
+  },
+  "sports": {
+    "label": {
+      "bg": "Спорт",
+      "en": "Sports"
+    },
+    "publicLabel": {
+      "bg": "Спорт",
+      "en": "Sports"
+    },
+    "categoryBg": "Спорт"
+  },
+  "events": {
+    "label": {
+      "bg": "Събития",
+      "en": "Events"
+    },
+    "publicLabel": {
+      "bg": "Събития",
+      "en": "Events"
+    },
+    "categoryBg": "Събития"
+  },
+  "video": {
+    "label": {
+      "bg": "Видео",
+      "en": "Video"
+    },
+    "publicLabel": {
+      "bg": "Видео",
+      "en": "Video"
+    },
+    "categoryBg": "Видео"
+  },
+  "campaigns": {
+    "label": {
+      "bg": "Кампании",
+      "en": "Campaigns"
+    },
+    "publicLabel": {
+      "bg": "Кампании",
+      "en": "Campaigns"
+    },
+    "categoryBg": "Кампании"
+  },
+  "gallery": {
+    "label": {
+      "bg": "Медия",
+      "en": "Media"
+    },
+    "publicLabel": {
+      "bg": "Галерия",
+      "en": "Gallery"
+    },
+    "categoryBg": "Галерия"
+  }
+}
