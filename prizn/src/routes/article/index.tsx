@@ -68,7 +68,10 @@ function toJournalArticle(api: CmsArticle): JournalArticle {
       ? {
           id: api.series.id,
           slug: api.series.slug,
-          title: api.series.title,
+          title:
+            api.series.title ||
+            api.series.titleEn ||
+            api.series.titleBg,
           titleBg: api.series.titleBg,
           titleEn: api.series.titleEn,
           episodeNumber: api.series.episodeNumber,
