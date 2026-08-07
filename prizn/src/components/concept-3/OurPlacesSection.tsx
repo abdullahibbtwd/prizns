@@ -1,8 +1,6 @@
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ArrowUpRight } from 'lucide-react'
-import { journalContent } from '@/data/concept-3/content'
-import { getArticleBySourceId } from '@/data/concept-3/articles'
 import { ViewAllLink } from '@/components/concept-3/ViewAllLink'
 import {
   articlePath,
@@ -21,10 +19,6 @@ export function OurPlacesSection({ lang }: OurPlacesSectionProps) {
     data?.map((article) => ({
       ...toPlaceCard(article),
       path: articlePath(article),
-    })),
-    journalContent.places.map((place) => ({
-      ...place,
-      path: getArticleBySourceId(place.id)?.path ?? `/places/${place.id}`,
     })),
   ).slice(0, 2)
 

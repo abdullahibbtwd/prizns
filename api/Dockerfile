@@ -13,6 +13,7 @@ COPY . .
 ENV DATABASE_URL="postgresql://prizn:prizn@localhost:5432/prizn?schema=public"
 RUN npx prisma generate
 RUN npm run build
+RUN npm run prisma:seed:build
 RUN npm prune --omit=dev
 
 FROM node:24-alpine AS runner

@@ -1,8 +1,6 @@
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { CalendarDays } from 'lucide-react'
-import { journalContent } from '@/data/concept-3/content'
-import { getArticleBySourceId } from '@/data/concept-3/articles'
 import { ViewAllLink } from '@/components/concept-3/ViewAllLink'
 import {
   articlePath,
@@ -32,13 +30,7 @@ function toEventsCard(article: CmsArticle) {
 
 export function EventsSection({ lang }: EventsSectionProps) {
   const { data } = usePublicArticles('events')
-  const items = preferApi(
-    data?.map(toEventsCard),
-    journalContent.events.map((item) => ({
-      ...item,
-      path: getArticleBySourceId(item.id)?.path ?? `/events/${item.id}`,
-    })),
-  ).slice(0, 4)
+  const items = preferApi(data?.map(toEventsCard)).slice(0, 4)
 
   return (
     <section id="events" className="border-t border-[#EAE6DF] bg-[#FDFBF7] px-6 py-20 md:px-12 md:py-28">

@@ -1,8 +1,6 @@
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ArrowRight } from 'lucide-react'
-import { journalContent } from '@/data/concept-3/content'
-import { getArticleBySourceId } from '@/data/concept-3/articles'
 import { ViewAllLink } from '@/components/concept-3/ViewAllLink'
 import {
   articlePath,
@@ -30,13 +28,7 @@ function toCampaignsCard(article: CmsArticle) {
 
 export function CampaignsSection({ lang }: CampaignsSectionProps) {
   const { data } = usePublicArticles('campaigns')
-  const items = preferApi(
-    data?.map(toCampaignsCard),
-    journalContent.campaigns.map((item) => ({
-      ...item,
-      path: getArticleBySourceId(item.id)?.path ?? `/campaigns/${item.id}`,
-    })),
-  )
+  const items = preferApi(data?.map(toCampaignsCard))
   const [featured, ...rest] = items
   const side = rest.slice(0, 2)
 

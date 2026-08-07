@@ -9,7 +9,7 @@ import {
   PrismaClient,
   TranslationStatus,
 } from '@prisma/client';
-import { buildArticlePath } from '../src/articles/section.util';
+import { buildArticlePath } from './seed-path';
 
 type SeedBlock =
   | { type: 'paragraph'; textBg: string; textEn: string }

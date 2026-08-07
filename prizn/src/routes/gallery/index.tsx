@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Maximize2, X, MapPin, Camera } from 'lucide-react'
 import { JournalShell } from '@/components/concept-3/JournalShell'
 import { ListingHeader } from '@/components/concept-3/ListingHeader'
-import { journalContent } from '@/data/concept-3/content'
 import { preferApi, usePublicMedia } from '@/lib/public-content'
 import { getSectionPublicLabel } from '@/lib/section-i18n'
 
@@ -38,21 +37,6 @@ export default function GalleryPage() {
               (lang === 'bg'
                 ? 'Северозападна България'
                 : 'Northwestern Bulgaria'),
-          })),
-          (journalContent.gallery as readonly {
-            id: string
-            title: string
-            caption: string
-            image: string
-          }[]).map((item) => ({
-            id: item.id,
-            title: item.title,
-            caption: item.caption,
-            image: item.image,
-            location:
-              lang === 'bg'
-                ? 'Северозападна България'
-                : 'Northwestern Bulgaria',
           })),
         )
 

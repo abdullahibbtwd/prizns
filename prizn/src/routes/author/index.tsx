@@ -3,11 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft, ArrowRight, MapPin, PenLine } from 'lucide-react'
 import { JournalShell } from '@/components/concept-3/JournalShell'
 import { Logo } from '@/components/Logo'
-import {
-  getAuthorBySlug,
-  getArticlesByAuthor,
-  type JournalAuthor,
-} from '@/data/concept-3/authors'
+import type { JournalAuthor } from '@/data/concept-3/authors'
 import type { JournalArticle } from '@/data/concept-3/articleTypes'
 import type { JournalLang } from '@/components/concept-3/JournalShell'
 import { useJournalLang } from '@/hooks/useJournalLang'
@@ -190,7 +186,6 @@ function AuthorContent({
 export default function AuthorPage() {
   const { slug } = useParams<{ slug: string }>()
   const { lang, setLang } = useJournalLang()
-  const staticAuthor = slug ? getAuthorBySlug(slug) : undefined
 
   const authorQuery = useQuery({
     queryKey: ['public-author', slug],
@@ -225,7 +220,7 @@ export default function AuthorPage() {
         bioBg: apiAuthor.bioBg,
         aliases: apiAuthor.aliases,
       }
-    : staticAuthor
+    : undefined
 
   if (!slug || (!author && !authorQuery.isLoading && !authorQuery.isFetching)) {
     return <Navigate to="/authors" replace />
@@ -246,38 +241,35 @@ export default function AuthorPage() {
   const apiStories = (articlesQuery.data ?? []).filter(
     (article) => article.authorSlug === author.slug,
   )
-  const stories: JournalArticle[] =
-    apiStories.length > 0
-      ? apiStories.map((article) => ({
-          slug: article.slug,
-          sourceId: article.id,
-          section: (article.section === 'human_stories'
-            ? 'human-stories'
-            : article.section) as JournalArticle['section'],
-          path: article.path,
-          category: article.category,
-          categoryBg: article.categoryBg,
-          title: article.title,
-          titleBg: article.titleBg,
-          subtitle: article.subtitle,
-          subtitleBg: article.subtitleBg,
-          readTime: article.readTime,
-          readTimeBg: article.readTimeBg,
-          location: article.location,
-          locationBg: article.locationBg,
-          author: article.author,
-          authorBg: article.authorBg,
-          authorSlug: article.authorSlug,
-          date: article.date,
-          dateBg: article.dateBg,
-          image: article.image,
-          photoCredit: article.photoCredit,
-          photoCreditBg: article.photoCreditBg,
-          body: (article.body ?? []) as JournalArticle['body'],
-          endLabel: article.endLabel,
-          endLabelBg: article.endLabelBg,
-        }))
-      : getArticlesByAuthor(author)
+  const stories: JournalArticle[] = apiStories.map((article) => ({
+    slug: article.slug,
+    sourceId: article.id,
+    section: (article.section === 'human_stories'
+      ? 'human-stories'
+      : article.section) as JournalArticle['section'],
+    path: article.path,
+    category: article.category,
+    categoryBg: article.categoryBg,
+    title: article.title,
+    titleBg: article.titleBg,
+    subtitle: article.subtitle,
+    subtitleBg: article.subtitleBg,
+    readTime: article.readTime,
+    readTimeBg: article.readTimeBg,
+    location: article.location,
+    locationBg: article.locationBg,
+    author: article.author,
+    authorBg: article.authorBg,
+    authorSlug: article.authorSlug,
+    date: article.date,
+    dateBg: article.dateBg,
+    image: article.image,
+    photoCredit: article.photoCredit,
+    photoCreditBg: article.photoCreditBg,
+    body: (article.body ?? []) as JournalArticle['body'],
+    endLabel: article.endLabel,
+    endLabelBg: article.endLabelBg,
+  }))
 
   return (
     <JournalShell navVariant="solid" hideChrome>

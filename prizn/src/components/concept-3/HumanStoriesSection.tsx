@@ -1,8 +1,6 @@
 ﻿import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ArrowRight, Clock, MapPin } from 'lucide-react'
-import { journalContent } from '@/data/concept-3/content'
-import { getArticleBySourceId } from '@/data/concept-3/articles'
 import { ViewAllLink } from '@/components/concept-3/ViewAllLink'
 import { EpisodeBadge } from '@/components/concept-3/EpisodeBadge'
 import {
@@ -22,11 +20,6 @@ export function HumanStoriesSection({ lang }: HumanStoriesSectionProps) {
     data?.map((article) => ({
       ...toHumanStoryCard(article),
       path: articlePath(article),
-    })),
-    journalContent.humanStories.map((story) => ({
-      ...story,
-      path: getArticleBySourceId(story.id)?.path ?? `/stories/${story.id}`,
-      series: null as null,
     })),
   ).slice(0, 3)
 

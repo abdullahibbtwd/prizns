@@ -2,10 +2,6 @@ import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { JournalShell } from '@/components/concept-3/JournalShell'
 import { ListingHeader } from '@/components/concept-3/ListingHeader'
-import {
-  getArticlesByAuthor,
-  journalAuthors,
-} from '@/data/concept-3/authors'
 import { preferApi, usePublicAuthors } from '@/lib/public-content'
 
 export default function AuthorsPage() {
@@ -18,24 +14,6 @@ export default function AuthorsPage() {
           data?.map((author) => ({
             ...author,
             path: `/authors/${author.slug}`,
-          })),
-          journalAuthors.map((author) => ({
-            id: author.slug,
-            slug: author.slug,
-            path: `/authors/${author.slug}`,
-            name: author.name,
-            nameBg: author.nameBg,
-            role: author.role,
-            roleBg: author.roleBg,
-            location: author.location,
-            locationBg: author.locationBg,
-            quote: author.quote,
-            quoteBg: author.quoteBg,
-            bio: author.bio,
-            bioBg: author.bioBg,
-            image: author.image,
-            aliases: author.aliases ?? [],
-            storyCount: getArticlesByAuthor(author).length,
           })),
         )
 

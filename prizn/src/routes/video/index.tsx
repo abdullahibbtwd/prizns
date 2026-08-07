@@ -4,8 +4,6 @@ import { motion } from 'framer-motion'
 import { JournalShell } from '@/components/concept-3/JournalShell'
 import { ListingHeader } from '@/components/concept-3/ListingHeader'
 import { LuxuryVideoPlayer } from '@/components/concept-3/LuxuryVideoPlayer'
-import { journalContent } from '@/data/concept-3/content'
-import { getArticleBySourceId } from '@/data/concept-3/articles'
 import {
   articlePath,
   preferApi,
@@ -35,14 +33,7 @@ export default function VideoPage() {
   return (
     <JournalShell>
       {({ lang }) => {
-        const items = preferApi(
-          data?.map(toVideoCard),
-          journalContent.video.map((item) => ({
-            ...item,
-            path: getArticleBySourceId(item.id)?.path ?? `/video/${item.id}`,
-            videoUrl: '',
-          })),
-        )
+        const items = preferApi(data?.map(toVideoCard))
 
         return (
           <main>

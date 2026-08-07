@@ -1,5 +1,4 @@
 import { Headphones, Radio } from 'lucide-react'
-import { journalContent } from '@/data/concept-3/content'
 import { ViewAllLink } from '@/components/concept-3/ViewAllLink'
 import {
   VoicesPlayerGrid,
@@ -13,10 +12,7 @@ interface VoicesAudioSectionProps {
 
 export function VoicesAudioSection({ lang }: VoicesAudioSectionProps) {
   const { data } = usePublicArticles('voices')
-  const voices = preferApi(
-    data?.map(toVoiceItem),
-    journalContent.voices.map((voice) => ({ ...voice })),
-  ).slice(0, 3)
+  const voices = preferApi(data?.map(toVoiceItem)).slice(0, 3)
 
   return (
     <section id="voices" className="relative overflow-hidden bg-[#1A1A1A] px-6 py-24 text-white md:px-12 md:py-36">

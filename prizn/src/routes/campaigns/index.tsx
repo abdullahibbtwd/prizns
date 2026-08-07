@@ -2,8 +2,6 @@ import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { JournalShell } from '@/components/concept-3/JournalShell'
 import { ListingHeader } from '@/components/concept-3/ListingHeader'
-import { journalContent } from '@/data/concept-3/content'
-import { getArticleBySourceId } from '@/data/concept-3/articles'
 import {
   articlePath,
   preferApi,
@@ -30,13 +28,7 @@ export default function CampaignsPage() {
   return (
     <JournalShell>
       {({ lang }) => {
-        const items = preferApi(
-          data?.map(toCampaignsCard),
-          journalContent.campaigns.map((item) => ({
-            ...item,
-            path: getArticleBySourceId(item.id)?.path ?? `/campaigns/${item.id}`,
-          })),
-        )
+        const items = preferApi(data?.map(toCampaignsCard))
 
         return (
           <main>

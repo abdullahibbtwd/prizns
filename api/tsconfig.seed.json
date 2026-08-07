@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "target": "ES2023",
+    "outDir": "./dist/prisma",
+    "rootDir": "./prisma",
+    "strict": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "declaration": false,
+    "sourceMap": false
+  },
+  "include": ["prisma/seed.ts", "prisma/seed-journal.ts", "prisma/seed-path.ts"]
+}

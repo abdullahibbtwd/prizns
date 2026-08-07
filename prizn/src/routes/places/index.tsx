@@ -3,8 +3,6 @@ import { motion } from 'framer-motion'
 import { ArrowUpRight } from 'lucide-react'
 import { JournalShell } from '@/components/concept-3/JournalShell'
 import { ListingHeader } from '@/components/concept-3/ListingHeader'
-import { journalContent } from '@/data/concept-3/content'
-import { getArticleBySourceId } from '@/data/concept-3/articles'
 import {
   articlePath,
   preferApi,
@@ -22,10 +20,6 @@ export default function PlacesPage() {
           data?.map((article) => ({
             ...toPlaceCard(article),
             path: articlePath(article),
-          })),
-          journalContent.places.map((place) => ({
-            ...place,
-            path: getArticleBySourceId(place.id)?.path ?? `/places/${place.id}`,
           })),
         )
 

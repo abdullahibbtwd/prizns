@@ -1,8 +1,6 @@
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ArrowRight, MapPin } from 'lucide-react'
-import { journalContent } from '@/data/concept-3/content'
-import { getArticleBySourceId } from '@/data/concept-3/articles'
 import { ViewAllLink } from '@/components/concept-3/ViewAllLink'
 import {
   articlePath,
@@ -34,13 +32,7 @@ function toSportsCard(article: CmsArticle) {
 
 export function SportsSection({ lang }: SportsSectionProps) {
   const { data } = usePublicArticles('sports')
-  const items = preferApi(
-    data?.map(toSportsCard),
-    journalContent.sports.map((item) => ({
-      ...item,
-      path: getArticleBySourceId(item.id)?.path ?? `/sports/${item.id}`,
-    })),
-  ).slice(0, 3)
+  const items = preferApi(data?.map(toSportsCard)).slice(0, 3)
 
   return (
     <section id="sports" className="border-t border-[#EAE6DF] bg-[#FDFBF7] px-6 py-20 md:px-12 md:py-28">

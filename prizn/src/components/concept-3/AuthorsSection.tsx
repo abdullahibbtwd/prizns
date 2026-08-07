@@ -1,9 +1,5 @@
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import {
-  getArticlesByAuthor,
-  journalAuthors,
-} from '@/data/concept-3/authors'
 import { ViewAllLink } from '@/components/concept-3/ViewAllLink'
 import { preferApi, usePublicAuthors } from '@/lib/public-content'
 
@@ -17,24 +13,6 @@ export function AuthorsSection({ lang }: AuthorsSectionProps) {
     data?.map((author) => ({
       ...author,
       path: `/authors/${author.slug}`,
-    })),
-    journalAuthors.map((author) => ({
-      id: author.slug,
-      slug: author.slug,
-      path: `/authors/${author.slug}`,
-      name: author.name,
-      nameBg: author.nameBg,
-      role: author.role,
-      roleBg: author.roleBg,
-      location: author.location,
-      locationBg: author.locationBg,
-      quote: author.quote,
-      quoteBg: author.quoteBg,
-      bio: author.bio,
-      bioBg: author.bioBg,
-      image: author.image,
-      aliases: author.aliases ?? [],
-      storyCount: getArticlesByAuthor(author).length,
     })),
   ).slice(0, 4)
 

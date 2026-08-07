@@ -60,10 +60,9 @@ export function getPublicSeries(slug: string) {
   return api.get<PublicSeries>(`/series/${encodeURIComponent(slug)}`);
 }
 
-/** Prefer live API rows when the request succeeded (including empty arrays).
- * Fall back to static fixtures only when the API result is unavailable. */
-export function preferApi<T>(apiItems: T[] | undefined, fallback: T[]): T[] {
-  return apiItems !== undefined ? apiItems : fallback;
+/** Use API rows only (including empty). No static fixtures. */
+export function preferApi<T>(apiItems: T[] | undefined): T[] {
+  return apiItems ?? [];
 }
 
 export function usePublicArticles(section: string, series?: string) {

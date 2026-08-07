@@ -5,7 +5,6 @@ import {
   VoicesPlayerGrid,
   toVoiceItem,
 } from '@/components/concept-3/VoicesPlayerGrid'
-import { journalContent } from '@/data/concept-3/content'
 import { preferApi, usePublicArticles } from '@/lib/public-content'
 
 export default function VoicesPage() {
@@ -14,10 +13,7 @@ export default function VoicesPage() {
   return (
     <JournalShell>
       {({ lang }) => {
-        const voices = preferApi(
-          data?.map(toVoiceItem),
-          journalContent.voices.map((voice) => ({ ...voice })),
-        )
+        const voices = preferApi(data?.map(toVoiceItem))
 
         return (
           <main className="bg-[#1A1A1A] text-white">

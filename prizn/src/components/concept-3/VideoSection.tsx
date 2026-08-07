@@ -1,8 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { journalContent } from '@/data/concept-3/content'
-import { getArticleBySourceId } from '@/data/concept-3/articles'
 import { ViewAllLink } from '@/components/concept-3/ViewAllLink'
 import { LuxuryVideoPlayer } from '@/components/concept-3/LuxuryVideoPlayer'
 import {
@@ -33,14 +31,7 @@ function toVideoCard(article: CmsArticle) {
 
 export function VideoSection({ lang }: VideoSectionProps) {
   const { data } = usePublicArticles('video')
-  const items = preferApi(
-    data?.map(toVideoCard),
-    journalContent.video.map((item) => ({
-      ...item,
-      path: getArticleBySourceId(item.id)?.path ?? `/video/${item.id}`,
-      videoUrl: '',
-    })),
-  )
+  const items = preferApi(data?.map(toVideoCard))
   const [featured, ...rest] = items
   const side = rest.slice(0, 2)
   const [activeId, setActiveId] = useState<string | null>(null)

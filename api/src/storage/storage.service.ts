@@ -119,12 +119,7 @@ export class StorageService implements OnModuleInit {
       : '';
     const key = `${folder}/${randomUUID()}${ext}`;
 
-    await this.client.putObject(
-      this.bucket,
-      key,
-      file.buffer,
-      file.size,
-      {
+    await this.client.putObject(this.bucket, key, file.buffer, file.size, {
         'Content-Type': file.mimetype,
       },
     );

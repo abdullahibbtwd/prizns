@@ -6,8 +6,6 @@ import { JournalShell } from '@/components/concept-3/JournalShell'
 import { ListingHeader } from '@/components/concept-3/ListingHeader'
 import { EpisodeBadge } from '@/components/concept-3/EpisodeBadge'
 import { JournalSelect } from '@/components/ui/JournalSelect'
-import { journalContent } from '@/data/concept-3/content'
-import { getArticleBySourceId } from '@/data/concept-3/articles'
 import {
   articlePath,
   preferApi,
@@ -35,14 +33,6 @@ export default function StoriesPage() {
       ...toHumanStoryCard(article),
       path: articlePath(article),
     })),
-    selectedSeries
-      ? []
-      : journalContent.humanStories.map((story) => ({
-          ...story,
-          path:
-            getArticleBySourceId(story.id)?.path ?? `/stories/${story.id}`,
-          series: null as null,
-        })),
   )
 
   const seriesOptions = (seriesQuery.data ?? []).map((item) => ({

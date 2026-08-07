@@ -1,8 +1,6 @@
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { BookOpen, ChevronRight } from 'lucide-react'
-import { journalContent } from '@/data/concept-3/content'
-import { getArticleBySourceId } from '@/data/concept-3/articles'
 import { ViewAllLink } from '@/components/concept-3/ViewAllLink'
 import {
   articlePath,
@@ -40,17 +38,12 @@ export function CuratedCollections({ lang }: CuratedCollectionsProps) {
     path: articlePath(article),
   }))
 
-  const staticCards = journalContent.collections.map((item) => ({
-    ...item,
-    path: getArticleBySourceId(item.id)?.path ?? `/discover/${item.id}`,
-  }))
-
   const collections = (
     seriesCards.length > 0
       ? seriesCards
       : discoverCards.length > 0
         ? discoverCards
-        : staticCards
+        : []
   ).slice(0, 3)
 
   return (

@@ -3,8 +3,6 @@ import { motion } from 'framer-motion'
 import { BookOpen, ChevronRight } from 'lucide-react'
 import { JournalShell } from '@/components/concept-3/JournalShell'
 import { ListingHeader } from '@/components/concept-3/ListingHeader'
-import { journalContent } from '@/data/concept-3/content'
-import { getArticleBySourceId } from '@/data/concept-3/articles'
 import {
   articlePath,
   usePublicArticles,
@@ -40,17 +38,12 @@ export default function DiscoverPage() {
           path: articlePath(article),
         }))
 
-        const staticCards = journalContent.collections.map((item) => ({
-          ...item,
-          path: getArticleBySourceId(item.id)?.path ?? `/discover/${item.id}`,
-        }))
-
         const collections =
           seriesCards.length > 0
             ? seriesCards
             : discoverCards.length > 0
               ? discoverCards
-              : staticCards
+              : []
 
         return (
           <main>

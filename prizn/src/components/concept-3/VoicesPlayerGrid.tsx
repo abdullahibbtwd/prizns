@@ -2,7 +2,6 @@ import { useState, useRef, type MouseEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Play, Pause, Volume2, Headphones, Sparkles, ArrowUpRight } from 'lucide-react'
-import { getArticleBySourceId } from '@/data/concept-3/articles'
 import { articlePath } from '@/lib/public-content'
 import type { CmsArticle } from '@/lib/cms-types'
 
@@ -54,7 +53,7 @@ export function VoicesPlayerGrid({
   const activeVoice = voices.find((v) => v.id === activeVoiceId) || voices[0]
 
   const getHref = (voice: VoiceItem) =>
-    voice.path ?? getArticleBySourceId(voice.id)?.path ?? `/voices/${voice.id}`
+    voice.path ?? `/voices/${voice.id}`
 
   const togglePlay = (event: MouseEvent, id: string) => {
     event.preventDefault()

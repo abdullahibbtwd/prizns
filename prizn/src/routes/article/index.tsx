@@ -5,7 +5,6 @@ import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Clock, MapPin, Share2, Bookmark, Headphones, Globe } from 'lucide-react'
 import { JournalShell } from '@/components/concept-3/JournalShell'
 import { Logo } from '@/components/Logo'
-import { getArticleBySlug } from '@/data/concept-3/articles'
 import { getAuthorForArticle } from '@/data/concept-3/authors'
 import type { ArticleBlock, JournalArticle } from '@/data/concept-3/articleTypes'
 import type { JournalLang } from '@/components/concept-3/JournalShell'
@@ -399,15 +398,9 @@ export default function ArticlePage() {
     retry: false,
   })
 
-  const staticArticle = slug ? getArticleBySlug(decodePath(slug)) : undefined
-  const article =
-    apiQuery.data
-      ? toJournalArticle(apiQuery.data)
-      : staticArticle && pathsMatch(staticArticle.path, pathname)
-        ? staticArticle
-        : undefined
+  const article = apiQuery.data ? toJournalArticle(apiQuery.data) : undefined
 
-  if (apiQuery.isLoading && !staticArticle) {
+  if (apiQuery.isLoading) {
     return (
       <JournalShell navVariant="solid" hideChrome>
         {() => (

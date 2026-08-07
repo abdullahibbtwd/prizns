@@ -1,8 +1,6 @@
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Clock, MapPin } from 'lucide-react'
-import { journalContent } from '@/data/concept-3/content'
-import { getArticleBySourceId } from '@/data/concept-3/articles'
 import {
   articlePath,
   preferApi,
@@ -15,31 +13,24 @@ interface FeaturedStoryCardProps {
 
 export function FeaturedStoryCard({ lang }: FeaturedStoryCardProps) {
   const { data } = usePublicArticles('featured')
-  const apiStory = preferApi(data, [])[0]
-  const fallback = journalContent.featuredStory
-  const fallbackHref =
-    getArticleBySourceId('featured')?.path ?? '/stories/along-the-walnut-paths'
+  const apiStory = preferApi(data)[0]
 
-  const story = apiStory
-    ? {
-        category: apiStory.category,
-        categoryBg: apiStory.categoryBg,
-        title: apiStory.title,
-        titleBg: apiStory.titleBg,
-        subtitle: lang === 'bg' ? apiStory.subtitleBg : apiStory.subtitle,
-        readTime: apiStory.readTime,
-        readTimeBg: apiStory.readTimeBg,
-        author: lang === 'bg' ? apiStory.authorBg : apiStory.author,
-        date: lang === 'bg' ? apiStory.dateBg : apiStory.date,
-        location: lang === 'bg' ? apiStory.locationBg : apiStory.location,
-        image: apiStory.image,
-        href: articlePath(apiStory),
-      }
-    : {
-        ...fallback,
-        subtitle: fallback.subtitle,
-        href: fallbackHref,
-      }
+  if (!apiStory) return null
+
+  const story = {
+    category: apiStory.category,
+    categoryBg: apiStory.categoryBg,
+    title: apiStory.title,
+    titleBg: apiStory.titleBg,
+    subtitle: lang === 'bg' ? apiStory.subtitleBg : apiStory.subtitle,
+    readTime: apiStory.readTime,
+    readTimeBg: apiStory.readTimeBg,
+    author: lang === 'bg' ? apiStory.authorBg : apiStory.author,
+    date: lang === 'bg' ? apiStory.dateBg : apiStory.date,
+    location: lang === 'bg' ? apiStory.locationBg : apiStory.location,
+    image: apiStory.image,
+    href: articlePath(apiStory),
+  }
 
   return (
     <section id="featured-story" className="bg-[#FDFBF7] py-20 md:py-32 px-6 md:px-12">

@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Maximize2, X, MapPin, Camera } from 'lucide-react'
-import { journalContent } from '@/data/concept-3/content'
 import { ViewAllLink } from '@/components/concept-3/ViewAllLink'
 import { preferApi, usePublicMedia } from '@/lib/public-content'
 import { getSectionPublicLabel } from '@/lib/section-i18n'
@@ -54,23 +53,6 @@ export function PhotographyGallery({ lang }: PhotographyGalleryProps) {
         ...layout,
       } satisfies PhotoItem
     }),
-    (journalContent.gallery as readonly {
-      id: string
-      title: string
-      caption: string
-      image: string
-      span: string
-      aspect: string
-    }[]).map((item) => ({
-      id: item.id,
-      title: item.title,
-      caption: item.caption,
-      image: item.image,
-      location:
-        lang === 'bg' ? 'Северозападна България' : 'Northwestern Bulgaria',
-      span: item.span,
-      aspect: item.aspect,
-    })),
   ).slice(0, 6)
 
   const [selectedPhoto, setSelectedPhoto] = useState<PhotoItem | null>(null)
