@@ -86,8 +86,10 @@ services:
       context: ./prizn
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: ${VITE_API_URL}
-        VITE_APP_NAME: ${VITE_APP_NAME}
+        # Default `/api` so Coolify/docker builds don't bake localhost into JS.
+        # Override with full URL only for special setups.
+        VITE_API_URL: ${VITE_API_URL:-/api}
+        VITE_APP_NAME: ${VITE_APP_NAME:-Prizn}
     restart: unless-stopped
     ports:
       - "${WEB_PORT:-5173}:80"

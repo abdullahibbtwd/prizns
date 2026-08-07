@@ -5,7 +5,9 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 COPY . .
-ARG VITE_API_URL=http://localhost:3000/api
+# Prefer same-origin `/api` in Docker (nginx proxies to the api service).
+# Local Vite dev should set VITE_API_URL=http://localhost:3003/api in root .env.
+ARG VITE_API_URL=/api
 ARG VITE_APP_NAME=Prizn
 ENV VITE_API_URL=$VITE_API_URL
 ENV VITE_APP_NAME=$VITE_APP_NAME

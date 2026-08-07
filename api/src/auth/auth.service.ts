@@ -33,10 +33,11 @@ export class AuthService {
   }
 
   private isSecureCookies() {
-    return (
-      this.config.get<string>('COOKIE_SECURE') === 'true' ||
-      this.config.get<string>('NODE_ENV') === 'production'
-    );
+    // Explicit override wins (needed for http:// Coolify/IP deploys).
+    const explicit = this.config.get<string>('COOKIE_SECURE');
+    if (explicit === 'true') return true;
+    if (explicit === 'false') return false;
+    return this.config.get<string>('NODE_ENV') === 'production';
   }
 
   private accessTtlSeconds() {
