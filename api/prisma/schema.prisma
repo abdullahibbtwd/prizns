@@ -196,6 +196,7 @@ model Article {
   body              Json                 @default("[]")
   featured          Boolean              @default(false)
   sponsored         Boolean              @default(false)
+  sponsorName       String?              @map("sponsor_name")
   translationStatus TranslationStatus    @default(PENDING) @map("translation_status")
   translationError  String?              @map("translation_error")
   authorId          String?              @map("author_id")

@@ -329,6 +329,7 @@ export class ArticlesService {
       translationStatus: article.translationStatus,
       featured: article.featured,
       sponsored: article.sponsored,
+      sponsorName: article.sponsorName,
       series: (() => {
         const membership = article.seriesEpisodes?.[0];
         if (!membership) return null;
@@ -498,6 +499,7 @@ export class ArticlesService {
         body: (dto.body ?? []) as unknown as Prisma.InputJsonValue,
         featured: dto.featured ?? false,
         sponsored: dto.sponsored ?? false,
+        sponsorName: dto.sponsorName?.trim() || null,
         authorId: dto.authorId,
         heroMediaId,
         audioMediaId: dto.audioMediaId,
@@ -615,6 +617,9 @@ export class ArticlesService {
             : undefined,
         featured: dto.featured,
         sponsored: dto.sponsored,
+        ...(dto.sponsorName !== undefined
+          ? { sponsorName: dto.sponsorName?.trim() || null }
+          : {}),
         authorId: dto.authorId,
         heroMediaId: dto.heroMediaId,
         audioMediaId: dto.audioMediaId,

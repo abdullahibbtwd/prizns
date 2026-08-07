@@ -38,6 +38,8 @@ export type HumanStoryCard = {
   location: string
   image: string
   excerpt: string
+  sponsored?: boolean
+  sponsorName?: string | null
   series?: {
     id: string
     slug?: string
@@ -109,6 +111,8 @@ export function toHumanStoryCard(article: CmsArticle): HumanStoryCard {
     location: article.location || article.locationBg,
     image: article.image || '',
     excerpt: article.subtitle || article.subtitleBg,
+    sponsored: Boolean(article.sponsored),
+    sponsorName: article.sponsorName ?? null,
     series: series
       ? {
           id: series.id,

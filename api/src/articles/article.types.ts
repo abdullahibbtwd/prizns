@@ -80,6 +80,7 @@ export type PublicArticleDto = {
   translationStatus: string;
   featured: boolean;
   sponsored: boolean;
+  sponsorName?: string | null;
   series?: {
     id: string;
     slug: string;

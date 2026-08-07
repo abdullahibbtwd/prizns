@@ -85,6 +85,9 @@ export interface JournalArticle {
   /** YouTube / Vimeo / uploaded video playback URL */
   videoUrl?: string
 
+  sponsored?: boolean
+  sponsorName?: string | null
+
   /** Present when the story belongs to a series */
   series?: {
     id: string

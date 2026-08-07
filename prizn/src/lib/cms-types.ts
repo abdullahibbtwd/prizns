@@ -87,6 +87,7 @@ export type CmsArticle = {
   bodyRaw?: BodyBlock[];
   featured: boolean;
   sponsored: boolean;
+  sponsorName?: string | null;
   translationStatus: TranslationStatus;
   translationError?: string | null;
   publishedAt?: string | null;
@@ -226,6 +227,7 @@ export type ArticleFormValues = {
   videoMediaId: string;
   featured: boolean;
   sponsored: boolean;
+  sponsorName: string;
   body: BodyBlock[];
   seriesMode: "standalone" | "series";
   seriesId: string;

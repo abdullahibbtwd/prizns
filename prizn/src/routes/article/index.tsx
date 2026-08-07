@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Clock, MapPin, Share2, Bookmark, Headphones, Globe } from 'lucide-react'
 import { JournalShell } from '@/components/concept-3/JournalShell'
 import { Logo } from '@/components/Logo'
+import { SponsoredBadge } from '@/components/concept-3/SponsoredBadge'
 import { getAuthorForArticle } from '@/data/concept-3/authors'
 import type { ArticleBlock, JournalArticle } from '@/data/concept-3/articleTypes'
 import type { JournalLang } from '@/components/concept-3/JournalShell'
@@ -64,6 +65,8 @@ function toJournalArticle(api: CmsArticle): JournalArticle {
     audioUrl: api.audioUrl,
     audioDuration: api.audioDuration,
     videoUrl: api.videoUrl,
+    sponsored: Boolean(api.sponsored),
+    sponsorName: api.sponsorName ?? null,
     series: api.series
       ? {
           id: api.series.id,
@@ -272,6 +275,16 @@ function ArticleContent({
             {pick(lang, article.location, article.locationBg)}
           </span>
         </div>
+
+        {article.sponsored ? (
+          <div className="mb-5 flex justify-center">
+            <SponsoredBadge
+              lang={lang}
+              sponsorName={article.sponsorName}
+              tone="onLight"
+            />
+          </div>
+        ) : null}
 
         {article.series ? (
           <p className="mb-4 text-center font-sans text-[11px] uppercase tracking-[0.2em] text-[#0C2686]">

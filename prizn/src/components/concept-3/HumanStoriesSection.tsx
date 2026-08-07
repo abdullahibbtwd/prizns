@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import { ArrowRight, Clock, MapPin } from 'lucide-react'
 import { ViewAllLink } from '@/components/concept-3/ViewAllLink'
 import { EpisodeBadge } from '@/components/concept-3/EpisodeBadge'
+import { SponsoredBadge } from '@/components/concept-3/SponsoredBadge'
 import {
   articlePath,
   preferApi,
@@ -63,11 +64,18 @@ export function HumanStoriesSection({ lang }: HumanStoriesSectionProps) {
                       className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent" />
-                    {story.series ? (
-                      <div className="absolute left-3 top-3 right-3">
+                    <div className="absolute left-3 top-3 right-3 flex flex-wrap items-start gap-2">
+                      {story.sponsored ? (
+                        <SponsoredBadge
+                          lang={lang}
+                          sponsorName={story.sponsorName}
+                          tone="onDark"
+                        />
+                      ) : null}
+                      {story.series ? (
                         <EpisodeBadge lang={lang} series={story.series} />
-                      </div>
-                    ) : null}
+                      ) : null}
+                    </div>
                     <div className="absolute bottom-4 left-4 flex items-center gap-1.5 font-sans text-[11px] text-white/85">
                       <MapPin className="size-3" />
                       {story.location}

@@ -98,6 +98,10 @@ export class CreateArticleDto {
   @IsBoolean()
   sponsored?: boolean;
 
+  @IsOptional()
+  @IsString()
+  sponsorName?: string | null;
+
   /** Block array validated lightly — shape enforced in service/CMS form. */
   @IsOptional()
   @IsArray()

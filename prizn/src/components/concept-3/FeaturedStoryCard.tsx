@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Clock, MapPin } from 'lucide-react'
+import { SponsoredBadge } from '@/components/concept-3/SponsoredBadge'
 import {
   articlePath,
   preferApi,
@@ -30,6 +31,8 @@ export function FeaturedStoryCard({ lang }: FeaturedStoryCardProps) {
     location: lang === 'bg' ? apiStory.locationBg : apiStory.location,
     image: apiStory.image,
     href: articlePath(apiStory),
+    sponsored: Boolean(apiStory.sponsored),
+    sponsorName: apiStory.sponsorName,
   }
 
   return (
@@ -60,6 +63,15 @@ export function FeaturedStoryCard({ lang }: FeaturedStoryCardProps) {
                   className="absolute inset-0 h-full w-full object-cover transition-transform duration-1000 ease-out group-hover:scale-105"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-60" />
+                {story.sponsored ? (
+                  <div className="absolute left-6 top-6">
+                    <SponsoredBadge
+                      lang={lang}
+                      sponsorName={story.sponsorName}
+                      tone="onDark"
+                    />
+                  </div>
+                ) : null}
                 <div className="absolute bottom-6 left-6 flex items-center gap-2 rounded-full bg-white/90 backdrop-blur-md px-3.5 py-1.5 text-xs text-[#1A1A1A] font-sans font-medium">
                   <MapPin className="size-3.5 text-[#0C2686]" />
                   <span>{story.location}</span>
@@ -68,28 +80,35 @@ export function FeaturedStoryCard({ lang }: FeaturedStoryCardProps) {
 
               <div className="lg:col-span-5 p-8 md:p-12 lg:p-16 flex flex-col justify-between bg-white">
                 <div>
-                  <div className="flex items-center gap-3 mb-6">
-                    <span className="inline-block px-3 py-1 bg-[#F5F2EB] text-[#0C2686] text-[11px] font-sans uppercase tracking-[0.2em] font-medium rounded-full">
+                  <div className="mb-6 flex flex-wrap items-center gap-3">
+                    <span className="inline-block rounded-full bg-[#F5F2EB] px-3 py-1 font-sans text-[11px] font-medium uppercase tracking-[0.2em] text-[#0C2686]">
                       {lang === 'bg' ? story.categoryBg : story.category}
                     </span>
-                    <span className="flex items-center gap-1 text-xs text-[#1A1A1A]/50 font-sans">
+                    {story.sponsored ? (
+                      <SponsoredBadge
+                        lang={lang}
+                        sponsorName={story.sponsorName}
+                        tone="onLight"
+                      />
+                    ) : null}
+                    <span className="flex items-center gap-1 font-sans text-xs text-[#1A1A1A]/50">
                       <Clock className="size-3" />
                       {lang === 'bg' ? story.readTimeBg : story.readTime}
                     </span>
                   </div>
 
-                  <h2 className="font-heading text-3xl md:text-4xl lg:text-5xl text-[#1A1A1A] font-normal leading-[1.15] mb-6 group-hover:text-[#0C2686] transition-colors duration-300">
+                  <h2 className="mb-6 font-heading text-3xl font-normal leading-[1.15] text-[#1A1A1A] transition-colors duration-300 group-hover:text-[#0C2686] md:text-4xl lg:text-5xl">
                     {lang === 'bg' ? story.titleBg : story.title}
                   </h2>
 
-                  <p className="font-sans text-sm md:text-base text-[#1A1A1A]/70 font-light leading-relaxed mb-8">
+                  <p className="mb-8 font-sans text-sm font-light leading-relaxed text-[#1A1A1A]/70 md:text-base">
                     {story.subtitle}
                   </p>
                 </div>
 
-                <div className="pt-6 border-t border-[#EAE6DF] flex items-center justify-between">
+                <div className="flex items-center justify-between border-t border-[#EAE6DF] pt-6">
                   <div>
-                    <span className="block font-sans text-xs text-[#1A1A1A]/40 uppercase tracking-widest">
+                    <span className="block font-sans text-xs uppercase tracking-widest text-[#1A1A1A]/40">
                       {lang === 'bg' ? 'Автор' : 'Author'}
                     </span>
                     <span className="font-heading text-base text-[#1A1A1A]">
@@ -97,7 +116,7 @@ export function FeaturedStoryCard({ lang }: FeaturedStoryCardProps) {
                     </span>
                   </div>
 
-                  <div className="inline-flex items-center gap-2 font-sans text-xs uppercase tracking-[0.25em] font-medium text-[#0C2686] group-hover:translate-x-1 transition-transform duration-300">
+                  <div className="inline-flex items-center gap-2 font-sans text-xs font-medium uppercase tracking-[0.25em] text-[#0C2686] transition-transform duration-300 group-hover:translate-x-1">
                     <span>{lang === 'bg' ? 'Прочетете →' : 'Read Story →'}</span>
                   </div>
                 </div>

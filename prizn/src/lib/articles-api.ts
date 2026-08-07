@@ -41,7 +41,7 @@ export function getCmsArticle(id: string) {
 export function createCmsArticle(
   body: Omit<
     Partial<ArticleFormValues>,
-    "seriesId" | "seriesMode" | "videoUrl" | "videoMediaId"
+    "seriesId" | "seriesMode" | "videoUrl" | "videoMediaId" | "sponsorName"
   > & {
     titleBg: string;
     categoryBg: string;
@@ -49,6 +49,7 @@ export function createCmsArticle(
     seriesId?: string | null;
     videoUrl?: string | null;
     videoMediaId?: string | null;
+    sponsorName?: string | null;
   },
 ) {
   return api.post<CmsArticle>("/cms/articles", body);
@@ -58,11 +59,12 @@ export function updateCmsArticle(
   id: string,
   body: Omit<
     Partial<ArticleFormValues>,
-    "seriesId" | "seriesMode" | "videoUrl" | "videoMediaId"
+    "seriesId" | "seriesMode" | "videoUrl" | "videoMediaId" | "sponsorName"
   > & {
     seriesId?: string | null;
     videoUrl?: string | null;
     videoMediaId?: string | null;
+    sponsorName?: string | null;
   },
 ) {
   return api.patch<CmsArticle>(`/cms/articles/${id}`, body);

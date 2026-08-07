@@ -5,6 +5,7 @@ import { ArrowRight, Clock, MapPin } from 'lucide-react'
 import { JournalShell } from '@/components/concept-3/JournalShell'
 import { ListingHeader } from '@/components/concept-3/ListingHeader'
 import { EpisodeBadge } from '@/components/concept-3/EpisodeBadge'
+import { SponsoredBadge } from '@/components/concept-3/SponsoredBadge'
 import { JournalSelect } from '@/components/ui/JournalSelect'
 import {
   articlePath,
@@ -162,11 +163,18 @@ export default function StoriesPage() {
                           />
                         ) : null}
                         <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent" />
-                        {story.series ? (
-                          <div className="absolute left-3 top-3 right-3">
+                        <div className="absolute left-3 top-3 right-3 flex flex-wrap items-start gap-2">
+                          {story.sponsored ? (
+                            <SponsoredBadge
+                              lang={lang}
+                              sponsorName={story.sponsorName}
+                              tone="onDark"
+                            />
+                          ) : null}
+                          {story.series ? (
                             <EpisodeBadge lang={lang} series={story.series} />
-                          </div>
-                        ) : null}
+                          ) : null}
+                        </div>
                         <div className="absolute bottom-4 left-4 flex items-center gap-1.5 font-sans text-[11px] text-white/85">
                           <MapPin className="size-3" />
                           {story.location}

@@ -48,6 +48,7 @@ import {
 import { ApiError } from '@/lib/api'
 import { useJournalLang } from '@/hooks/useJournalLang'
 import { pickLang } from '@/lib/pick-lang'
+import { cn } from '@/lib/utils'
 import { getSectionProfile } from '@/cms/section-profiles'
 import {
   captureVideoPosterBlob,
@@ -110,6 +111,7 @@ const schema = z.object({
   videoMediaId: z.string(),
   featured: z.boolean(),
   sponsored: z.boolean(),
+  sponsorName: z.string(),
   body: z.array(blockSchema).min(1),
   seriesMode: z.enum(['standalone', 'series']),
   seriesId: z.string(),
@@ -136,6 +138,7 @@ const emptyDefaults: ArticleFormValues = {
   videoMediaId: '',
   featured: false,
   sponsored: false,
+  sponsorName: '',
   body: [{ type: 'paragraph', textBg: '' }],
   seriesMode: 'standalone',
   seriesId: '',
@@ -182,7 +185,7 @@ function formatDateBg(iso: string) {
   }).format(date)
 }
 
-type GalleryItem = { id: string; url: string }
+type GalleryItem = { id: string; url: string; uploading?: boolean }
 
 export default function CmsStoryEditorPage() {
   const { id } = useParams()
@@ -287,6 +290,7 @@ export default function CmsStoryEditorPage() {
       videoMediaId: article.videoMediaId ?? '',
       featured: article.featured,
       sponsored: article.sponsored,
+      sponsorName: article.sponsorName ?? '',
       body:
         article.bodyRaw && article.bodyRaw.length > 0
           ? article.bodyRaw
@@ -379,6 +383,9 @@ export default function CmsStoryEditorPage() {
         videoMediaId: values.videoMediaId || null,
         featured: values.featured,
         sponsored: values.sponsored,
+        sponsorName: values.sponsored
+          ? values.sponsorName.trim() || null
+          : null,
         body: values.body,
         seriesId:
           values.seriesMode === 'series' && values.seriesId
@@ -425,24 +432,60 @@ export default function CmsStoryEditorPage() {
 
   const uploadImages = async (files: FileList | null) => {
     if (!files?.length) return
-    const uploaded: GalleryItem[] = []
-    for (const file of Array.from(files)) {
-      const media = await uploadCmsMedia(file, form.getValues('photoCreditBg'))
-      uploaded.push({ id: media.id, url: media.url })
-      if (!form.getValues('photoCreditBg') && media.creditBg) {
-        form.setValue('photoCreditBg', media.creditBg)
-      }
+    const list = Array.from(files)
+    const temps: GalleryItem[] = list.map((file) => ({
+      id: `temp-${crypto.randomUUID()}`,
+      url: URL.createObjectURL(file),
+      uploading: true,
+    }))
+    setGallery((prev) => [...prev, ...temps])
+
+    const credit = form.getValues('photoCreditBg')
+    const results = await Promise.all(
+      list.map(async (file, index) => {
+        try {
+          const media = await uploadCmsMedia(file, credit)
+          return { tempId: temps[index].id, media, error: null as Error | null }
+        } catch (error) {
+          return {
+            tempId: temps[index].id,
+            media: null,
+            error: error as Error,
+          }
+        }
+      }),
+    )
+
+    for (const temp of temps) {
+      URL.revokeObjectURL(temp.url)
     }
-    setGallery((prev) => [...prev, ...uploaded])
+
+    setGallery((prev) =>
+      prev.flatMap((item) => {
+        const match = results.find((r) => r.tempId === item.id)
+        if (!match) return [item]
+        if (!match.media) return []
+        if (!form.getValues('photoCreditBg') && match.media.creditBg) {
+          form.setValue('photoCreditBg', match.media.creditBg)
+        }
+        return [{ id: match.media.id, url: match.media.url }]
+      }),
+    )
   }
 
   const uploadPoster = async (files: FileList | null) => {
     const file = files?.[0]
     if (!file) return
-    const media = await uploadCmsMedia(file, form.getValues('photoCreditBg'))
-    setGallery([{ id: media.id, url: media.url }])
-    if (!form.getValues('photoCreditBg') && media.creditBg) {
-      form.setValue('photoCreditBg', media.creditBg)
+    const tempUrl = URL.createObjectURL(file)
+    setGallery([{ id: `temp-${crypto.randomUUID()}`, url: tempUrl, uploading: true }])
+    try {
+      const media = await uploadCmsMedia(file, form.getValues('photoCreditBg'))
+      setGallery([{ id: media.id, url: media.url }])
+      if (!form.getValues('photoCreditBg') && media.creditBg) {
+        form.setValue('photoCreditBg', media.creditBg)
+      }
+    } finally {
+      URL.revokeObjectURL(tempUrl)
     }
   }
 
@@ -600,7 +643,9 @@ export default function CmsStoryEditorPage() {
   const onSubmit = form.handleSubmit(async (values) => {
     await saveMutation.mutateAsync({
       ...values,
-      galleryMediaIds: gallery.map((item) => item.id),
+      galleryMediaIds: gallery
+        .filter((item) => !item.uploading && !item.id.startsWith('temp-'))
+        .map((item) => item.id),
     })
   })
 
@@ -1223,9 +1268,17 @@ export default function CmsStoryEditorPage() {
                         <img
                           src={item.url}
                           alt=""
-                          className="h-full w-full object-cover"
+                          className={cn(
+                            'h-full w-full object-cover',
+                            item.uploading && 'opacity-60',
+                          )}
                         />
-                        {index === 0 && (
+                        {item.uploading && (
+                          <span className="absolute inset-0 flex items-center justify-center bg-black/25 text-[9px] font-semibold uppercase tracking-wider text-white">
+                            …
+                          </span>
+                        )}
+                        {index === 0 && !item.uploading && (
                           <span className="absolute inset-x-0 bottom-0 bg-[#0C2686]/90 py-0.5 text-center text-[9px] font-semibold uppercase text-white">
                             {t('cms.editor.heroLabel')}
                           </span>
@@ -1250,9 +1303,17 @@ export default function CmsStoryEditorPage() {
                     <img
                       src={item.url}
                       alt=""
-                      className="h-full w-full object-cover transition group-hover:scale-105"
+                      className={cn(
+                        'h-full w-full object-cover transition group-hover:scale-105',
+                        item.uploading && 'opacity-60',
+                      )}
                     />
-                    {index === 0 && (
+                    {item.uploading && (
+                      <span className="absolute inset-0 flex items-center justify-center bg-black/30 text-[10px] font-semibold uppercase tracking-wider text-white">
+                        …
+                      </span>
+                    )}
+                    {index === 0 && !item.uploading && (
                       <span className="absolute left-2 top-2 rounded-md bg-[#0C2686] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white">
                         {t('cms.editor.heroLabel')}
                       </span>
@@ -1582,6 +1643,16 @@ export default function CmsStoryEditorPage() {
               <input type="checkbox" {...form.register('sponsored')} />{' '}
               {t('cms.editor.sponsored')}
             </label>
+            {form.watch('sponsored') ? (
+              <label className="block space-y-1 text-xs">
+                {t('cms.editor.sponsorName')}
+                <input
+                  className="w-full border border-[#E8E4DC] bg-white px-2 py-2"
+                  placeholder={t('cms.editor.sponsorNamePlaceholder')}
+                  {...form.register('sponsorName')}
+                />
+              </label>
+            ) : null}
           </CmsCard>
 
           <CmsCard className="space-y-3 p-5">
