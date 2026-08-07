@@ -49,7 +49,7 @@ import {
 import { ApiError } from '@/lib/api'
 import { useJournalLang } from '@/hooks/useJournalLang'
 import { pickLang } from '@/lib/pick-lang'
-import { cn } from '@/lib/utils'
+import { cn, randomId } from '@/lib/utils'
 import { getSectionProfile } from '@/cms/section-profiles'
 import {
   captureVideoPosterBlob,
@@ -517,7 +517,7 @@ export default function CmsStoryEditorPage() {
     try {
       const list = Array.from(files)
       const items: GalleryItem[] = list.map((file) => ({
-        id: `local-${crypto.randomUUID()}`,
+        id: `local-${randomId()}`,
         url: URL.createObjectURL(file),
         file,
       }))
@@ -542,7 +542,7 @@ export default function CmsStoryEditorPage() {
         for (const item of prev) revokeIfBlob(item.url)
         return [
           {
-            id: `local-${crypto.randomUUID()}`,
+            id: `local-${randomId()}`,
             url,
             file,
           },
@@ -563,7 +563,7 @@ export default function CmsStoryEditorPage() {
       for (const item of prev) revokeIfBlob(item.url)
       return [
         {
-          id: `local-${crypto.randomUUID()}`,
+          id: `local-${randomId()}`,
           url,
           file,
         },

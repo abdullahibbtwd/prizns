@@ -1,3 +1,5 @@
+import { randomId } from '@/lib/utils'
+
 const CONSENT_KEY = 'prizni-cookie-consent'
 export const VISITOR_KEY = 'prizni-visitor-key'
 export const SESSION_KEY = 'prizni-analytics-session'
@@ -5,10 +7,7 @@ export const SESSION_KEY = 'prizni-analytics-session'
 export type CookieConsent = 'accepted' | 'declined' | null
 
 function uuid() {
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
-    return crypto.randomUUID()
-  }
-  return `v_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
+  return randomId()
 }
 
 export function getCookieConsent(): CookieConsent {

@@ -101,9 +101,12 @@ export class StorageService implements OnModuleInit {
         await new Promise((resolve) => setTimeout(resolve, delayMs));
       }
     }
-    throw lastError instanceof Error
-      ? lastError
-      : new Error('Failed to initialize MinIO bucket');
+    // Do not crash the API — media uploads will fail until MinIO is reachable.
+    this.logger.error(
+      `MinIO still unreachable after ${attempts} attempts: ${
+        lastError instanceof Error ? lastError.message : String(lastError)
+      }. Check MINIO_PORT (host API → published port, usually 9010; in-compose → 9000).`,
+    );
   }
 
   private async ensureBucket() {
