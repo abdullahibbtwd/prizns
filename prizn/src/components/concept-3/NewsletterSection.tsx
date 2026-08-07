@@ -1,7 +1,10 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Check, ArrowRight } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
+import { Alert, type AlertVariant } from '@/components/ui/Alert'
 import { journalContent } from '@/data/concept-3/content'
+import { ApiError } from '@/lib/api'
+import { subscribeNewsletter } from '@/lib/newsletter-api'
 
 interface NewsletterSectionProps {
   lang: 'bg' | 'en'
@@ -10,12 +13,65 @@ interface NewsletterSectionProps {
 export function NewsletterSection({ lang }: NewsletterSectionProps) {
   const newsletter = journalContent.newsletter
   const [email, setEmail] = useState('')
-  const [submitted, setSubmitted] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [alertOpen, setAlertOpen] = useState(false)
+  const [alertVariant, setAlertVariant] = useState<AlertVariant>('success')
+  const [alertTitle, setAlertTitle] = useState('')
+  const [alertMessage, setAlertMessage] = useState('')
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const showAlert = (
+    variant: AlertVariant,
+    title: string,
+    message: string,
+  ) => {
+    setAlertVariant(variant)
+    setAlertTitle(title)
+    setAlertMessage(message)
+    setAlertOpen(true)
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (email.trim()) {
-      setSubmitted(true)
+    const value = email.trim()
+    if (!value || submitting) return
+
+    setSubmitting(true)
+    try {
+      await subscribeNewsletter(value, 'website')
+      setEmail('')
+      showAlert(
+        'success',
+        lang === 'bg' ? 'Успешно абониране' : 'Subscribed',
+        lang === 'bg'
+          ? 'Благодарим ви! Всяка неделя сутрин ще получавате нов разказ.'
+          : 'Thank you. You will receive one calm story every Sunday morning.',
+      )
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 409) {
+        showAlert(
+          'info',
+          lang === 'bg' ? 'Вече сте абонирани' : 'Already subscribed',
+          lang === 'bg'
+            ? 'Този имейл вече е в нашия списък.'
+            : 'This email is already on our list.',
+        )
+      } else {
+        const message =
+          err instanceof ApiError
+            ? err.message
+            : err instanceof Error
+              ? err.message
+              : lang === 'bg'
+                ? 'Нещо се обърка. Опитайте отново.'
+                : 'Something went wrong. Please try again.'
+        showAlert(
+          'error',
+          lang === 'bg' ? 'Грешка' : 'Error',
+          message,
+        )
+      }
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -40,44 +96,46 @@ export function NewsletterSection({ lang }: NewsletterSectionProps) {
             {newsletter.subtitle}
           </p>
 
-          {submitted ? (
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              className="p-6 rounded-2xl bg-[#0C2686]/5 border border-[#0C2686]/20 text-[#0C2686] font-sans text-sm flex items-center justify-center gap-3"
-            >
-              <div className="size-8 rounded-full bg-[#0C2686] text-white flex items-center justify-center">
-                <Check className="size-4 stroke-[2]" />
-              </div>
-              <p>
-                {lang === 'bg'
-                  ? 'Благодарим ви! Всяка неделя сутрин ще получавате нов разказ.'
-                  : 'Thank you. You will receive one calm story every Sunday morning.'}
-              </p>
-            </motion.div>
-          ) : (
-            <form onSubmit={handleSubmit} className="relative max-w-md mx-auto">
-              <div className="relative border-b-2 border-[#1A1A1A] pb-2 flex items-center gap-2">
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder={newsletter.emailPlaceholder}
-                  className="w-full bg-transparent font-sans text-sm md:text-base text-[#1A1A1A] placeholder:text-[#1A1A1A]/30 outline-none"
-                />
-                <button
-                  type="submit"
-                  className="shrink-0 flex items-center gap-2 font-sans text-xs uppercase tracking-[0.25em] font-medium text-[#0C2686] hover:text-[#1A1A1A] transition-colors py-2 px-3"
-                >
-                  <span>{lang === 'bg' ? newsletter.buttonTextBg : newsletter.buttonText}</span>
-                  <ArrowRight className="size-3.5 stroke-[1.5]" />
-                </button>
-              </div>
-            </form>
-          )}
+          <form onSubmit={handleSubmit} className="relative max-w-md mx-auto">
+            <div className="relative border-b-2 border-[#1A1A1A] pb-2 flex items-center gap-2">
+              <input
+                type="email"
+                name="email"
+                required
+                value={email}
+                disabled={submitting}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder={newsletter.emailPlaceholder}
+                className="w-full bg-transparent font-sans text-sm md:text-base text-[#1A1A1A] placeholder:text-[#1A1A1A]/30 outline-none disabled:opacity-60"
+              />
+              <button
+                type="submit"
+                disabled={submitting}
+                className="shrink-0 flex items-center gap-2 font-sans text-xs uppercase tracking-[0.25em] font-medium text-[#0C2686] hover:text-[#1A1A1A] transition-colors py-2 px-3 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <span>
+                  {submitting
+                    ? lang === 'bg'
+                      ? 'Изпращане…'
+                      : 'Sending…'
+                    : lang === 'bg'
+                      ? newsletter.buttonTextBg
+                      : newsletter.buttonText}
+                </span>
+                <ArrowRight className="size-3.5 stroke-[1.5]" />
+              </button>
+            </div>
+          </form>
         </motion.div>
       </div>
+
+      <Alert
+        open={alertOpen}
+        variant={alertVariant}
+        title={alertTitle}
+        message={alertMessage}
+        onClose={() => setAlertOpen(false)}
+      />
     </section>
   )
 }

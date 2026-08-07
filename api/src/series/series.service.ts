@@ -6,6 +6,7 @@ import {
 import { ArticleStatus, TranslationStatus } from '@prisma/client';
 import { ensureUniqueSlug } from '../common/slug.util';
 import { PrismaService } from '../prisma/prisma.service';
+import { StorageService } from '../storage/storage.service';
 import {
   CreateSeriesDto,
   SetSeriesEpisodesDto,
@@ -23,13 +24,13 @@ const episodeInclude = {
       titleBg: true,
       titleEn: true,
       categoryBg: true,
-      heroMedia: { select: { id: true, url: true } },
+      heroMedia: { select: { id: true, key: true, url: true } },
     },
   },
 } as const;
 
 const seriesInclude = {
-  coverMedia: { select: { id: true, url: true } },
+  coverMedia: { select: { id: true, key: true, url: true } },
   episodes: {
     orderBy: { sortOrder: 'asc' as const },
     include: episodeInclude,
@@ -39,7 +40,10 @@ const seriesInclude = {
 
 @Injectable()
 export class SeriesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storage: StorageService,
+  ) {}
 
   list() {
     return this.prisma.series
@@ -47,7 +51,9 @@ export class SeriesService {
         orderBy: { updatedAt: 'desc' },
         include: seriesInclude,
       })
-      .then((rows) => rows.map((row) => this.withEpisodeStats(row)));
+      .then((rows) =>
+        rows.map((row) => this.withEpisodeStats(this.withResolvedUrls(row))),
+      );
   }
 
   async listPublic() {
@@ -55,7 +61,7 @@ export class SeriesService {
       where: { status: 'ACTIVE' },
       orderBy: { updatedAt: 'desc' },
       include: {
-        coverMedia: { select: { id: true, url: true } },
+        coverMedia: { select: { id: true, key: true, url: true } },
         episodes: {
           where: { article: { status: ArticleStatus.PUBLISHED } },
           orderBy: { sortOrder: 'asc' },
@@ -77,7 +83,7 @@ export class SeriesService {
     const row = await this.prisma.series.findFirst({
       where: { slug, status: 'ACTIVE' },
       include: {
-        coverMedia: { select: { id: true, url: true } },
+        coverMedia: { select: { id: true, key: true, url: true } },
         episodes: {
           where: { article: { status: ArticleStatus.PUBLISHED } },
           orderBy: { sortOrder: 'asc' },
@@ -95,6 +101,41 @@ export class SeriesService {
     return row ? this.toPublicDto(row) : null;
   }
 
+  private mediaUrl(media: { key: string } | null | undefined) {
+    if (!media) return '';
+    return this.storage.publicUrlFor(media.key);
+  }
+
+  private withResolvedUrls<
+    T extends {
+      coverMedia: { id: string; key: string; url: string } | null;
+      episodes: Array<{
+        article: {
+          heroMedia?: { id: string; key: string; url: string } | null;
+        };
+      }>;
+    },
+  >(row: T): T {
+    return {
+      ...row,
+      coverMedia: row.coverMedia
+        ? { ...row.coverMedia, url: this.mediaUrl(row.coverMedia) }
+        : null,
+      episodes: row.episodes.map((ep) => ({
+        ...ep,
+        article: {
+          ...ep.article,
+          heroMedia: ep.article.heroMedia
+            ? {
+                ...ep.article.heroMedia,
+                url: this.mediaUrl(ep.article.heroMedia),
+              }
+            : null,
+        },
+      })),
+    };
+  }
+
   private toPublicDto(row: {
     id: string;
     slug: string;
@@ -102,7 +143,7 @@ export class SeriesService {
     titleEn: string | null;
     descriptionBg: string;
     descriptionEn: string | null;
-    coverMedia: { id: string; url: string } | null;
+    coverMedia: { id: string; key: string; url: string } | null;
     episodes: Array<{
       sortOrder: number;
       article: {
@@ -112,7 +153,7 @@ export class SeriesService {
         titleBg: string;
         titleEn: string | null;
         status: string;
-        heroMedia?: { id: string; url: string } | null;
+        heroMedia?: { id: string; key: string; url: string } | null;
       };
     }>;
     _count: { episodes: number };
@@ -126,7 +167,8 @@ export class SeriesService {
       titleBg: row.titleBg,
       description: row.descriptionEn ?? row.descriptionBg,
       descriptionBg: row.descriptionBg,
-      image: row.coverMedia?.url ?? first?.heroMedia?.url ?? '',
+      image:
+        this.mediaUrl(row.coverMedia) || this.mediaUrl(first?.heroMedia) || '',
       count: `${count} Stories`,
       countBg: `${count} Истории`,
       episodeCount: count,
@@ -148,7 +190,7 @@ export class SeriesService {
       include: seriesInclude,
     });
     if (!row) throw new NotFoundException('Series not found');
-    return this.withEpisodeStats(row);
+    return this.withEpisodeStats(this.withResolvedUrls(row));
   }
 
   private withEpisodeStats<
@@ -201,7 +243,7 @@ export class SeriesService {
         translationError: null,
       },
       include: seriesInclude,
-    }).then((row) => this.withEpisodeStats(row));
+    }).then((row) => this.withEpisodeStats(this.withResolvedUrls(row)));
   }
 
   async update(id: string, dto: UpdateSeriesDto) {
@@ -245,7 +287,7 @@ export class SeriesService {
           : {}),
       },
       include: seriesInclude,
-    }).then((row) => this.withEpisodeStats(row));
+    }).then((row) => this.withEpisodeStats(this.withResolvedUrls(row)));
   }
 
   async setEpisodes(id: string, dto: SetSeriesEpisodesDto) {

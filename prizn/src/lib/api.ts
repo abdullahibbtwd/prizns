@@ -81,4 +81,6 @@ export const api = {
       : ''
     return request<T>(`${path}${qs}`, { method: 'POST', body: form })
   },
+  uploadForm: <T,>(path: string, form: FormData) =>
+    request<T>(path, { method: 'POST', body: form }),
 }

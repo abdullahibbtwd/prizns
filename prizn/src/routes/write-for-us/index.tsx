@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
   BookOpen,
@@ -24,6 +24,8 @@ import {
   TextArea,
   TextInput,
 } from '@/components/concept-3/contribute/shared'
+import { ApiError } from '@/lib/api'
+import { createPublicSubmission } from '@/lib/submissions-api'
 
 const whyCards = [
   {
@@ -95,6 +97,53 @@ const workflow = [
 
 export default function WriteForUsPage() {
   const [submitted, setSubmitted] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
+  const [photoNames, setPhotoNames] = useState<string[]>([])
+  const [documentNames, setDocumentNames] = useState<string[]>([])
+  const photosRef = useRef<HTMLInputElement>(null)
+  const documentsRef = useRef<HTMLInputElement>(null)
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setError('')
+    setSubmitting(true)
+
+    const form = e.currentTarget
+    const data = new FormData(form)
+
+    try {
+      await createPublicSubmission({
+        name: String(data.get('name') ?? '').trim(),
+        email: String(data.get('email') ?? '').trim(),
+        phone: String(data.get('phone') ?? '').trim() || undefined,
+        place: String(data.get('place') ?? '').trim(),
+        title: String(data.get('title') ?? '').trim(),
+        category: String(data.get('category') ?? '').trim(),
+        description: String(data.get('description') ?? '').trim(),
+        story: String(data.get('story') ?? '').trim(),
+        links: String(data.get('links') ?? '').trim() || undefined,
+        ownWork: data.get('ownWork') === 'on',
+        photos: photosRef.current?.files
+          ? Array.from(photosRef.current.files)
+          : [],
+        documents: documentsRef.current?.files
+          ? Array.from(documentsRef.current.files)
+          : [],
+      })
+      setSubmitted(true)
+    } catch (err) {
+      const message =
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : 'Something went wrong. Please try again.'
+      setError(message)
+    } finally {
+      setSubmitting(false)
+    }
+  }
 
   return (
     <JournalShell>
@@ -240,13 +289,12 @@ export default function WriteForUsPage() {
                 </p>
               </motion.div>
             ) : (
-              <form
-                className="max-w-3xl space-y-8"
-                onSubmit={(e) => {
-                  e.preventDefault()
-                  setSubmitted(true)
-                }}
-              >
+              <form className="max-w-3xl space-y-8" onSubmit={handleSubmit}>
+                {error && (
+                  <div className="border border-rose-200 bg-rose-50 px-4 py-3 font-sans text-sm text-rose-800">
+                    {error}
+                  </div>
+                )}
                 <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
                   <div>
                     <FieldLabel>{lang === 'bg' ? 'Име' : 'Name'} *</FieldLabel>
@@ -307,8 +355,26 @@ export default function WriteForUsPage() {
                         <Upload className="size-3.5" />
                         {lang === 'bg' ? 'Изберете файлове' : 'Choose files'}
                       </span>
-                      <input type="file" name="photos" accept="image/*" multiple className="sr-only" />
-                      <span className="font-sans text-xs text-[#1A1A1A]/40">JPG, PNG · max 20MB</span>
+                      <input
+                        ref={photosRef}
+                        type="file"
+                        name="photos"
+                        accept="image/*"
+                        multiple
+                        className="sr-only"
+                        onChange={(e) =>
+                          setPhotoNames(
+                            e.target.files
+                              ? Array.from(e.target.files).map((f) => f.name)
+                              : [],
+                          )
+                        }
+                      />
+                      <span className="font-sans text-xs text-[#1A1A1A]/40">
+                        {photoNames.length
+                          ? photoNames.join(', ')
+                          : 'JPG, PNG · max 20MB'}
+                      </span>
                     </label>
                   </div>
                   <div className="border border-dashed border-[#EAE6DF] bg-[#FDFBF7] px-5 py-6">
@@ -318,8 +384,26 @@ export default function WriteForUsPage() {
                         <Upload className="size-3.5" />
                         {lang === 'bg' ? 'Изберете файлове' : 'Choose files'}
                       </span>
-                      <input type="file" name="documents" accept=".pdf,.doc,.docx,.txt" multiple className="sr-only" />
-                      <span className="font-sans text-xs text-[#1A1A1A]/40">PDF, DOC · optional</span>
+                      <input
+                        ref={documentsRef}
+                        type="file"
+                        name="documents"
+                        accept=".pdf,.doc,.docx,.txt"
+                        multiple
+                        className="sr-only"
+                        onChange={(e) =>
+                          setDocumentNames(
+                            e.target.files
+                              ? Array.from(e.target.files).map((f) => f.name)
+                              : [],
+                          )
+                        }
+                      />
+                      <span className="font-sans text-xs text-[#1A1A1A]/40">
+                        {documentNames.length
+                          ? documentNames.join(', ')
+                          : 'PDF, DOC · optional'}
+                      </span>
                     </label>
                   </div>
                 </div>
@@ -362,10 +446,17 @@ export default function WriteForUsPage() {
 
                 <button
                   type="submit"
-                  className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-[#0C2686] px-8 py-3.5 font-sans text-xs font-medium uppercase tracking-[0.22em] text-white transition-colors hover:bg-[#1A1A1A]"
+                  disabled={submitting}
+                  className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-[#0C2686] px-8 py-3.5 font-sans text-xs font-medium uppercase tracking-[0.22em] text-white transition-colors hover:bg-[#1A1A1A] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <PenLine className="size-3.5" />
-                  {lang === 'bg' ? 'Изпратете историята' : 'Submit Story'}
+                  {submitting
+                    ? lang === 'bg'
+                      ? 'Изпращане…'
+                      : 'Submitting…'
+                    : lang === 'bg'
+                      ? 'Изпратете историята'
+                      : 'Submit Story'}
                 </button>
               </form>
             )}

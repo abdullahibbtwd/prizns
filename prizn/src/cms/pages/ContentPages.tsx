@@ -7,26 +7,19 @@ import {
   ComingSoon,
   GhostButton,
   PrimaryButton,
-  StatCard,
 } from '@/cms/components/CmsUI'
 import {
   Bot,
-  BookOpen,
-  ChartColumn,
   Film,
   ImagePlus,
-  Mail,
   MapPin,
   Package,
   Search,
   Settings,
   Share2,
   ShoppingBag,
-  Shield,
-  Users,
   Sparkles,
   Copy,
-  TrendingUp,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { listCmsMedia, uploadCmsMedia } from '@/lib/articles-api'
@@ -288,24 +281,6 @@ export function CmsMediaPage() {
   )
 }
 
-export function CmsNewsletterPage() {
-  return (
-    <div>
-      <CmsPageHeader title="Newsletter Hub" description="Subscribers list, email editions, and readership analytics." badge="4,812 Readers" />
-      <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatCard title="Active Subscribers" value="4,812" trend="+14.2%" trendType="up" icon={Mail} sparklineData={[30, 42, 55, 68, 80]} />
-        <StatCard title="Recent Campaigns" value="3 Sent" trend="100% Delivered" trendType="up" icon={BookOpen} sparklineData={[1, 2, 2, 3]} />
-        <StatCard title="Average Open Rate" value="41.8%" trend="+5.1%" trendType="up" icon={TrendingUp} sparklineData={[35, 38, 40, 41.8]} />
-      </div>
-      <ComingSoon
-        icon={Mail}
-        title="Newsletter Campaign Studio"
-        blurb="Design, preview, and dispatch rich HTML newsletters directly to subscriber tiers."
-      />
-    </div>
-  )
-}
-
 export function CmsSocialPage() {
   return (
     <div>
@@ -327,19 +302,6 @@ export function CmsSeoPage() {
         icon={Search}
         title="Automated SEO Audit & Meta Generator"
         blurb="Identifies missing meta descriptions and alt text across stories with one-click AI auto-fill."
-      />
-    </div>
-  )
-}
-
-export function CmsAnalyticsPage() {
-  return (
-    <div>
-      <CmsPageHeader title="Editorial Analytics" description="Reader engagement, dwell time, and geographical reach." badge="Live Metrics" />
-      <ComingSoon
-        icon={ChartColumn}
-        title="Custom Editorial Analytics Engine"
-        blurb="Real-time visitor heatmaps, story completion rates, and reader origin distribution."
       />
     </div>
   )
@@ -368,24 +330,6 @@ export function CmsProductsPage() {
     <div>
       <CmsPageHeader title="Product Catalog" description="SKUs, print journals, and traditional artisan crafts." badge="12 Products" />
       <ComingSoon icon={Package} title="Artisan Product Catalog" blurb="Manage pricing, variants, and high-res photography for store items." />
-    </div>
-  )
-}
-
-export function CmsUsersPage() {
-  return (
-    <div>
-      <CmsPageHeader title="User Directory & Access" description="Staff editors, columnists, and contributor permissions." badge="8 Team Members" />
-      <ComingSoon icon={Users} title="Team Management & Auth" blurb="Invite editors, assign role permissions, and track active sessions." />
-    </div>
-  )
-}
-
-export function CmsRolesPage() {
-  return (
-    <div>
-      <CmsPageHeader title="Role Access Matrix" description="Define custom access privileges for each editorial role." badge="6 Defined Roles" />
-      <ComingSoon icon={Shield} title="Role-Based Security Matrix" blurb="Granular control over publishing, editing, deleting, and managing finances." />
     </div>
   )
 }

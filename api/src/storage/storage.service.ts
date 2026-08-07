@@ -35,9 +35,12 @@ export class StorageService implements OnModuleInit {
     const useSSL = this.config.get<string>('MINIO_USE_SSL') === 'true';
 
     this.bucket = this.config.getOrThrow<string>('MINIO_BUCKET');
-    this.publicUrl =
+    // Browser-facing base. Prefer a public host/path (e.g. /media via nginx),
+    // never the Docker-internal `minio:9000` hostname.
+    this.publicUrl = (
       this.config.get<string>('MINIO_PUBLIC_URL') ??
-      `${useSSL ? 'https' : 'http'}://${endPoint}:${port}`;
+      `${useSSL ? 'https' : 'http'}://${endPoint}:${port}`
+    ).replace(/\/$/, '');
 
     this.client = new Minio.Client({
       endPoint,
@@ -46,6 +49,11 @@ export class StorageService implements OnModuleInit {
       accessKey: this.config.getOrThrow<string>('MINIO_ACCESS_KEY'),
       secretKey: this.config.getOrThrow<string>('MINIO_SECRET_KEY'),
     });
+  }
+
+  /** Always rebuild browser URLs from key + current MINIO_PUBLIC_URL. */
+  publicUrlFor(key: string, bucket = this.bucket): string {
+    return `${this.publicUrl}/${bucket}/${key}`;
   }
 
   async onModuleInit() {
@@ -124,7 +132,7 @@ export class StorageService implements OnModuleInit {
       },
     );
 
-    const url = `${this.publicUrl}/${this.bucket}/${key}`;
+    const url = this.publicUrlFor(key);
 
     const record = await this.prisma.fileObject.create({
       data: {
@@ -144,7 +152,7 @@ export class StorageService implements OnModuleInit {
       originalName: record.originalName,
       mimeType: record.mimeType,
       size: record.size,
-      url: record.url!,
+      url: this.publicUrlFor(record.key, record.bucket),
     };
   }
 

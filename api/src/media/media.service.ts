@@ -10,21 +10,23 @@ export class MediaService {
     private readonly storage: StorageService,
   ) {}
 
-  list(opts?: { kind?: MediaKind; take?: number }) {
-    return this.prisma.mediaAsset.findMany({
+  async list(opts?: { kind?: MediaKind; take?: number }) {
+    const rows = await this.prisma.mediaAsset.findMany({
       where: opts?.kind ? { kind: opts.kind } : undefined,
       orderBy: { createdAt: 'desc' },
       take: opts?.take ?? 100,
     });
+    return rows.map((row) => this.withPublicUrl(row));
   }
 
-  listPublic(opts?: { kind?: MediaKind; take?: number }) {
-    return this.prisma.mediaAsset.findMany({
+  async listPublic(opts?: { kind?: MediaKind; take?: number }) {
+    const rows = await this.prisma.mediaAsset.findMany({
       where: { kind: opts?.kind ?? MediaKind.IMAGE },
       orderBy: { createdAt: 'desc' },
       take: opts?.take ?? 60,
       select: {
         id: true,
+        key: true,
         url: true,
         kind: true,
         originalName: true,
@@ -37,6 +39,7 @@ export class MediaService {
         createdAt: true,
       },
     });
+    return rows.map((row) => this.withPublicUrl(row));
   }
 
   async createFromUpload(
@@ -53,7 +56,7 @@ export class MediaService {
     const titleBg = opts?.titleBg?.trim() || null;
     const locationBg = opts?.locationBg?.trim() || null;
 
-    return this.prisma.mediaAsset.create({
+    const created = await this.prisma.mediaAsset.create({
       data: {
         key: uploaded.key,
         url: uploaded.url,
@@ -66,6 +69,11 @@ export class MediaService {
         creditBg: opts?.creditBg?.trim() || null,
       },
     });
+    return this.withPublicUrl(created);
+  }
+
+  withPublicUrl<T extends { key: string; url: string }>(row: T): T {
+    return { ...row, url: this.storage.publicUrlFor(row.key) };
   }
 
   private detectKind(mime: string): MediaKind {

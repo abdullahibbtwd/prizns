@@ -12,6 +12,7 @@ import { useJournalLang } from '@/hooks/useJournalLang'
 import { LuxuryVideoPlayer } from '@/components/concept-3/LuxuryVideoPlayer'
 import { getPublicArticle } from '@/lib/articles-api'
 import type { CmsArticle } from '@/lib/cms-types'
+import { useAnalyticsMeta } from '@/hooks/usePageAnalytics'
 
 function pick(lang: JournalLang, en: string, bg: string) {
   return lang === 'bg' ? bg : en
@@ -399,6 +400,11 @@ export default function ArticlePage() {
   })
 
   const article = apiQuery.data ? toJournalArticle(apiQuery.data) : undefined
+
+  useAnalyticsMeta({
+    articleId: apiQuery.data?.id ?? null,
+    title: article ? (lang === 'bg' ? article.titleBg || article.title : article.title) : null,
+  })
 
   if (apiQuery.isLoading) {
     return (

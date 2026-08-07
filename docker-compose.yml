@@ -66,7 +66,9 @@ services:
       REDIS_URL: redis://redis:6379
       MINIO_ENDPOINT: minio
       MINIO_PORT: 9000
-      MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL:-http://localhost:9010}
+      # Browser-facing URL. Use `/media` (proxied by web nginx) on Coolify/Docker.
+      # Local API outside Docker: http://localhost:9010
+      MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL:-/media}
       API_PORT: 3000
     ports:
       - "${API_PORT:-3000}:3000"
@@ -95,6 +97,7 @@ services:
       - "${WEB_PORT:-5173}:80"
     depends_on:
       - api
+      - minio
 
 volumes:
   postgres_data:

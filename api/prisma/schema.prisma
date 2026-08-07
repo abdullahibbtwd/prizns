@@ -59,6 +59,7 @@ model User {
   updatedAt     DateTime       @updatedAt @map("updated_at")
   files         FileObject[]
   refreshTokens RefreshToken[]
+  todos         EditorialTodo[]
 
   @@map("users")
 }
@@ -253,4 +254,93 @@ model SeriesEpisode {
   @@unique([seriesId, articleId])
   @@index([seriesId, sortOrder])
   @@map("series_episodes")
+}
+
+enum SubmissionStatus {
+  NEW
+  REVIEW
+  CHANGES
+  APPROVED
+  REJECTED
+}
+
+model Submission {
+  id           String           @id @default(cuid())
+  name         String
+  email        String
+  phone        String?
+  place        String
+  title        String
+  category     String
+  description  String
+  story        String
+  links        String?
+  ownWork      Boolean          @default(true) @map("own_work")
+  status       SubmissionStatus @default(NEW)
+  photoUrls    Json             @default("[]") @map("photo_urls")
+  documentUrls Json             @default("[]") @map("document_urls")
+  notes        String?
+  articleId    String?          @map("article_id")
+  createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @updatedAt @map("updated_at")
+
+  @@index([status, createdAt])
+  @@index([email])
+  @@map("submissions")
+}
+
+model NewsletterSubscriber {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  source    String?  @default("website")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([createdAt])
+  @@map("newsletter_subscribers")
+}
+
+model EditorialTodo {
+  id        String    @id @default(cuid())
+  userId    String    @map("user_id")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  done      Boolean   @default(false)
+  dueAt     DateTime? @map("due_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  @@index([userId, done, createdAt])
+  @@map("editorial_todos")
+}
+
+model AnalyticsSession {
+  id         String     @id @default(cuid())
+  visitorKey String     @map("visitor_key")
+  startedAt  DateTime   @default(now()) @map("started_at")
+  lastSeenAt DateTime   @default(now()) @map("last_seen_at")
+  userAgent  String?    @map("user_agent")
+  pageViews  PageView[]
+
+  @@index([visitorKey, startedAt])
+  @@index([startedAt])
+  @@map("analytics_sessions")
+}
+
+model PageView {
+  id        String           @id @default(cuid())
+  sessionId String           @map("session_id")
+  session   AnalyticsSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  path      String
+  articleId String?          @map("article_id")
+  title     String?
+  startedAt DateTime         @default(now()) @map("started_at")
+  dwellMs   Int              @default(0) @map("dwell_ms")
+  endedAt   DateTime?        @map("ended_at")
+
+  @@index([startedAt])
+  @@index([path, startedAt])
+  @@index([articleId, startedAt])
+  @@index([sessionId])
+  @@map("page_views")
 }

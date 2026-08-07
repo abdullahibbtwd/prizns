@@ -11,21 +11,21 @@ import CmsAuthorEditorPage from '@/cms/pages/AuthorEditorPage'
 import CmsSeriesPage from '@/cms/pages/SeriesPage'
 import CmsSeriesEditorPage from '@/cms/pages/SeriesEditorPage'
 import CmsSubmissionsPage from '@/cms/pages/SubmissionsPage'
+import CmsSubmissionDetailPage from '@/cms/pages/SubmissionDetailPage'
 import CmsDonationsPage from '@/cms/pages/DonationsPage'
 import CmsPartnershipsPage from '@/cms/pages/PartnershipsPage'
+import CmsNewsletterPage from '@/cms/pages/NewsletterPage'
+import CmsUsersPage from '@/cms/pages/UsersPage'
+import CmsAnalyticsPage from '@/cms/pages/AnalyticsPage'
 import {
   CmsAiPage,
-  CmsAnalyticsPage,
   CmsMediaPage,
-  CmsNewsletterPage,
   CmsOrdersPage,
   CmsProductsPage,
-  CmsRolesPage,
   CmsSeoPage,
   CmsSettingsPage,
   CmsShopPage,
   CmsSocialPage,
-  CmsUsersPage,
 } from '@/cms/pages/ContentPages'
 
 export default function CmsApp() {
@@ -45,6 +45,7 @@ export default function CmsApp() {
             <Route path="authors/:id" element={<CmsAuthorEditorPage />} />
             <Route path="media" element={<CmsMediaPage />} />
             <Route path="submissions" element={<CmsSubmissionsPage />} />
+            <Route path="submissions/:id" element={<CmsSubmissionDetailPage />} />
             <Route path="donations" element={<CmsDonationsPage />} />
             <Route path="partnerships" element={<CmsPartnershipsPage />} />
             <Route path="newsletter" element={<CmsNewsletterPage />} />
@@ -55,7 +56,7 @@ export default function CmsApp() {
             <Route path="orders" element={<CmsOrdersPage />} />
             <Route path="products" element={<CmsProductsPage />} />
             <Route path="users" element={<CmsUsersPage />} />
-            <Route path="roles" element={<CmsRolesPage />} />
+            <Route path="roles" element={<Navigate to="/cms/users" replace />} />
             <Route path="settings" element={<CmsSettingsPage />} />
             <Route path="ai" element={<CmsAiPage />} />
             <Route path="*" element={<Navigate to="/cms" replace />} />

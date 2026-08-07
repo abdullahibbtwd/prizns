@@ -23,7 +23,6 @@ import {
   Library,
   Layers,
   Mail,
-  Shield,
   Bot,
   ExternalLink,
   ChevronRight,
@@ -37,6 +36,7 @@ import { cn } from '@/lib/utils'
 import { cmsStories, cmsAuthors, cmsSubmissions } from '@/cms/data/mock'
 import { listCmsArticles } from '@/lib/articles-api'
 import { listCmsAuthors, listCmsSeries } from '@/lib/cms-content-api'
+import { useAuth } from '@/lib/auth'
 
 export interface CmsNavItem {
   labelKey: string
@@ -94,7 +94,6 @@ export const cmsNavGroups: CmsNavGroup[] = [
     labelKey: 'cms.nav.system',
     items: [
       { labelKey: 'cms.nav.users', to: '/cms/users', icon: Users },
-      { labelKey: 'cms.nav.roles', to: '/cms/roles', icon: Shield },
       { labelKey: 'cms.nav.settings', to: '/cms/settings', icon: Settings },
       { labelKey: 'cms.nav.ai', to: '/cms/ai', icon: Bot },
     ],
@@ -108,6 +107,21 @@ interface CmsSidebarProps {
 
 export function CmsSidebar({ onNavigate }: CmsSidebarProps) {
   const { t } = useTranslation()
+  const { user } = useAuth()
+  const displayName = user?.name?.trim() || user?.email || t('cms.editorRole')
+  const displayRole =
+    user?.role === 'ADMIN'
+      ? t('cms.roles.admin')
+      : user?.role === 'EDITOR'
+        ? t('cms.roles.editor')
+        : t('cms.editorRole')
+  const initials = displayName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? '')
+    .join('') || 'P'
+
   const storiesCountQuery = useQuery({
     queryKey: ['cms-articles-count'],
     queryFn: () => listCmsArticles({ page: 1, pageSize: 1 }),
@@ -243,17 +257,18 @@ export function CmsSidebar({ onNavigate }: CmsSidebarProps) {
       <div className="border-t border-[#E8E4DC] p-3.5 bg-white/50 backdrop-blur-xs space-y-2">
         <div className="flex items-center gap-3 rounded-xl border border-[#E8E4DC] bg-white p-2.5 shadow-xs">
           <div className="relative">
-            <img
-              src="/woman.jpg"
-              alt="Albena Nikolova"
-              className="size-9 rounded-full object-cover border border-[#0C2686]/20 shadow-xs"
-            />
+            <div
+              aria-hidden
+              className="flex size-9 items-center justify-center rounded-full border border-[#0C2686]/20 bg-[#0C2686] text-[11px] font-bold tracking-wide text-white shadow-xs"
+            >
+              {initials}
+            </div>
             <span className="absolute bottom-0 right-0 size-2.5 rounded-full bg-emerald-500 ring-2 ring-white" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-xs font-bold text-stone-900">Albena Nikolova</p>
+            <p className="truncate text-xs font-bold text-stone-900">{displayName}</p>
             <p className="truncate text-[10px] font-medium uppercase tracking-wider text-amber-800">
-              {t('cms.editorInChief')}
+              {displayRole}
             </p>
           </div>
         </div>
@@ -348,6 +363,8 @@ export function StatusPill({ status }: { status: string }) {
     changes: { style: 'bg-orange-50 text-orange-800 border-orange-200/80', dot: 'bg-orange-500' },
     approved: { style: 'bg-emerald-50 text-emerald-800 border-emerald-200/80', dot: 'bg-emerald-500' },
     rejected: { style: 'bg-rose-50 text-rose-800 border-rose-200/80', dot: 'bg-rose-500' },
+    admin: { style: 'bg-violet-50 text-violet-800 border-violet-200/80', dot: 'bg-violet-500' },
+    editor: { style: 'bg-sky-50 text-sky-800 border-sky-200/80', dot: 'bg-sky-500' },
     completed: { style: 'bg-emerald-50 text-emerald-800 border-emerald-200/80', dot: 'bg-emerald-500' },
     contacted: { style: 'bg-sky-50 text-sky-800 border-sky-200/80', dot: 'bg-sky-500' },
     negotiating: { style: 'bg-amber-50 text-amber-800 border-amber-200/80', dot: 'bg-amber-500' },

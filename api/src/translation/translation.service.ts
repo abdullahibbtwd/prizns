@@ -16,6 +16,8 @@ const SERIES_QUEUE = 'jobs:translate:series';
 const CHUNK_SIZE = 25;
 const CHUNK_DELAY_MS = 700;
 
+type Lang = 'bg' | 'en';
+
 @Injectable()
 export class TranslationService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(TranslationService.name);
@@ -29,7 +31,7 @@ export class TranslationService implements OnModuleInit, OnModuleDestroy {
 
   onModuleInit() {
     this.logger.log(
-      'Translation worker ready (google-translate-api-x, bg → en)',
+      'Translation worker ready (google-translate-api-x, auto bg ↔ en)',
     );
     this.timer = setInterval(() => {
       void this.tick();
@@ -138,9 +140,33 @@ export class TranslationService implements OnModuleInit, OnModuleDestroy {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
-  private async translateMany(texts: string[]): Promise<Map<string, string>> {
+  /** Detect whether editor text is primarily Bulgarian or English. */
+  private detectSourceLang(texts: string[]): Lang {
+    const sample = texts
+      .map((t) => t?.trim() ?? '')
+      .filter(Boolean)
+      .join(' ')
+      .slice(0, 4000);
+    if (!sample) return 'bg';
+
+    const cyrillic = (sample.match(/\p{Script=Cyrillic}/gu) ?? []).length;
+    const latin = (sample.match(/[A-Za-z]/g) ?? []).length;
+
+    if (cyrillic === 0 && latin === 0) return 'bg';
+    // Prefer BG when Cyrillic is at least half as common as Latin (mixed copy)
+    if (cyrillic > 0 && cyrillic >= latin * 0.35) return 'bg';
+    if (latin > cyrillic) return 'en';
+    return 'bg';
+  }
+
+  private async translateMany(
+    texts: string[],
+    from: Lang,
+    to: Lang,
+  ): Promise<Map<string, string>> {
     const unique = [...new Set(texts.map((t) => t.trim()).filter(Boolean))];
     const map = new Map<string, string>();
+    if (unique.length === 0) return map;
 
     for (let i = 0; i < unique.length; i += CHUNK_SIZE) {
       const chunk = unique.slice(i, i + CHUNK_SIZE);
@@ -153,8 +179,8 @@ export class TranslationService implements OnModuleInit, OnModuleDestroy {
       while (attempts < 4) {
         try {
           const result = await translate(payload, {
-            from: 'bg',
-            to: 'en',
+            from,
+            to,
             forceBatch: true,
             forceFrom: true,
             forceTo: true,
@@ -176,7 +202,7 @@ export class TranslationService implements OnModuleInit, OnModuleDestroy {
           attempts += 1;
           const wait = CHUNK_DELAY_MS * attempts * 2;
           this.logger.warn(
-            `Translate batch failed (attempt ${attempts}), waiting ${wait}ms`,
+            `Translate batch failed ${from}→${to} (attempt ${attempts}), waiting ${wait}ms`,
           );
           await this.sleep(wait);
           if (attempts >= 4) throw error;
@@ -200,6 +226,25 @@ export class TranslationService implements OnModuleInit, OnModuleDestroy {
     return map.get(value) ?? value;
   }
 
+  /**
+   * Editor fields are stored under *Bg. After translation:
+   * - source bg → keep Bg, fill En with translation
+   * - source en → move original into En, put BG translation into Bg
+   */
+  private pair(
+    map: Map<string, string>,
+    sourceText: string | null | undefined,
+    sourceLang: Lang,
+  ): { bg: string; en: string } {
+    const original = sourceText?.trim() ?? '';
+    if (!original) return { bg: '', en: '' };
+    const translated = this.tr(map, original);
+    if (sourceLang === 'bg') {
+      return { bg: original, en: translated };
+    }
+    return { bg: translated, en: original };
+  }
+
   private collectFromBody(body: StoredArticleBlock[]): string[] {
     const out: string[] = [];
     for (const block of body) {
@@ -218,25 +263,36 @@ export class TranslationService implements OnModuleInit, OnModuleDestroy {
   private translateBody(
     body: StoredArticleBlock[],
     map: Map<string, string>,
+    sourceLang: Lang,
   ): StoredArticleBlock[] {
     return body.map((block) => {
       if (block.type === 'pullquote') {
+        const text = this.pair(map, block.textBg, sourceLang);
+        const cite = this.pair(map, block.citeBg, sourceLang);
         return {
           ...block,
-          textEn: this.tr(map, block.textBg),
-          citeEn: this.tr(map, block.citeBg),
+          textBg: text.bg,
+          textEn: text.en,
+          citeBg: cite.bg,
+          citeEn: cite.en,
         };
       }
       if (block.type === 'note') {
+        const label = this.pair(map, block.labelBg, sourceLang);
+        const text = this.pair(map, block.textBg, sourceLang);
         return {
           ...block,
-          labelEn: this.tr(map, block.labelBg),
-          textEn: this.tr(map, block.textBg),
+          labelBg: label.bg,
+          labelEn: label.en,
+          textBg: text.bg,
+          textEn: text.en,
         };
       }
+      const text = this.pair(map, block.textBg, sourceLang);
       return {
         ...block,
-        textEn: this.tr(map, block.textBg),
+        textBg: text.bg,
+        textEn: text.en,
       };
     });
   }
@@ -266,8 +322,30 @@ export class TranslationService implements OnModuleInit, OnModuleDestroy {
         ...this.collectFromBody(body),
       ];
 
-      const map = await this.translateMany(sources);
-      const translatedBody = this.translateBody(body, map);
+      const sourceLang = this.detectSourceLang([
+        article.titleBg,
+        article.subtitleBg,
+        ...this.collectFromBody(body).slice(0, 3),
+      ]);
+      const targetLang: Lang = sourceLang === 'bg' ? 'en' : 'bg';
+      this.logger.log(
+        `Article ${articleId}: detected ${sourceLang} → translating to ${targetLang}`,
+      );
+
+      const map = await this.translateMany(sources, sourceLang, targetLang);
+      const translatedBody = this.translateBody(body, map, sourceLang);
+
+      const category = this.pair(map, article.categoryBg, sourceLang);
+      const title = this.pair(map, article.titleBg, sourceLang);
+      const subtitle = this.pair(map, article.subtitleBg, sourceLang);
+      const readTime = this.pair(map, article.readTimeBg, sourceLang);
+      const location = this.pair(map, article.locationBg, sourceLang);
+      const date = this.pair(map, article.dateBg, sourceLang);
+      const photoCredit = this.pair(map, article.photoCreditBg, sourceLang);
+      const endLabel = this.pair(map, article.endLabelBg, sourceLang);
+      const speaker = article.speakerBg
+        ? this.pair(map, article.speakerBg, sourceLang)
+        : null;
 
       const latest = await this.prisma.article.findUnique({
         where: { id: articleId },
@@ -285,19 +363,28 @@ export class TranslationService implements OnModuleInit, OnModuleDestroy {
         data: {
           translationStatus: TranslationStatus.READY,
           translationError: null,
-          categoryEn: this.tr(map, article.categoryBg),
-          titleEn: this.tr(map, article.titleBg),
-          subtitleEn: this.tr(map, article.subtitleBg),
-          readTimeEn: this.tr(map, article.readTimeBg),
-          locationEn: this.tr(map, article.locationBg),
-          dateEn: this.tr(map, article.dateBg),
-          photoCreditEn: this.tr(map, article.photoCreditBg),
-          endLabelEn: this.tr(map, article.endLabelBg),
-          speakerEn: article.speakerBg ? this.tr(map, article.speakerBg) : null,
+          categoryBg: category.bg,
+          categoryEn: category.en,
+          titleBg: title.bg,
+          titleEn: title.en,
+          subtitleBg: subtitle.bg,
+          subtitleEn: subtitle.en,
+          readTimeBg: readTime.bg,
+          readTimeEn: readTime.en,
+          locationBg: location.bg,
+          locationEn: location.en,
+          dateBg: date.bg,
+          dateEn: date.en,
+          photoCreditBg: photoCredit.bg,
+          photoCreditEn: photoCredit.en,
+          endLabelBg: endLabel.bg,
+          endLabelEn: endLabel.en,
+          speakerBg: speaker?.bg || null,
+          speakerEn: speaker?.en || null,
           body: translatedBody,
         },
       });
-      this.logger.log(`Translated article ${articleId}`);
+      this.logger.log(`Translated article ${articleId} (${sourceLang}→${targetLang})`);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       await this.prisma.article.update({
@@ -331,7 +418,25 @@ export class TranslationService implements OnModuleInit, OnModuleDestroy {
         author.quoteBg ?? '',
         author.bioBg ?? '',
       ];
-      const map = await this.translateMany(sources);
+      const sourceLang = this.detectSourceLang(sources);
+      const targetLang: Lang = sourceLang === 'bg' ? 'en' : 'bg';
+      this.logger.log(
+        `Author ${authorId}: detected ${sourceLang} → translating to ${targetLang}`,
+      );
+
+      const map = await this.translateMany(sources, sourceLang, targetLang);
+
+      const name = this.pair(map, author.nameBg, sourceLang);
+      const role = this.pair(map, author.roleBg, sourceLang);
+      const location = author.locationBg
+        ? this.pair(map, author.locationBg, sourceLang)
+        : null;
+      const quote = author.quoteBg
+        ? this.pair(map, author.quoteBg, sourceLang)
+        : null;
+      const bio = author.bioBg
+        ? this.pair(map, author.bioBg, sourceLang)
+        : null;
 
       const latest = await this.prisma.author.findUnique({
         where: { id: authorId },
@@ -349,16 +454,19 @@ export class TranslationService implements OnModuleInit, OnModuleDestroy {
         data: {
           translationStatus: TranslationStatus.READY,
           translationError: null,
-          nameEn: this.tr(map, author.nameBg) || null,
-          roleEn: this.tr(map, author.roleBg) || null,
-          locationEn: author.locationBg
-            ? this.tr(map, author.locationBg)
-            : null,
-          quoteEn: author.quoteBg ? this.tr(map, author.quoteBg) : null,
-          bioEn: author.bioBg ? this.tr(map, author.bioBg) : null,
+          nameBg: name.bg,
+          nameEn: name.en || null,
+          roleBg: role.bg,
+          roleEn: role.en || null,
+          locationBg: location?.bg || null,
+          locationEn: location?.en || null,
+          quoteBg: quote?.bg || null,
+          quoteEn: quote?.en || null,
+          bioBg: bio?.bg || null,
+          bioEn: bio?.en || null,
         },
       });
-      this.logger.log(`Translated author ${authorId}`);
+      this.logger.log(`Translated author ${authorId} (${sourceLang}→${targetLang})`);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       await this.prisma.author.update({
@@ -386,7 +494,17 @@ export class TranslationService implements OnModuleInit, OnModuleDestroy {
       });
 
       const sources = [series.titleBg, series.descriptionBg];
-      const map = await this.translateMany(sources);
+      const sourceLang = this.detectSourceLang(sources);
+      const targetLang: Lang = sourceLang === 'bg' ? 'en' : 'bg';
+      this.logger.log(
+        `Series ${seriesId}: detected ${sourceLang} → translating to ${targetLang}`,
+      );
+
+      const map = await this.translateMany(sources, sourceLang, targetLang);
+      const title = this.pair(map, series.titleBg, sourceLang);
+      const description = series.descriptionBg
+        ? this.pair(map, series.descriptionBg, sourceLang)
+        : null;
 
       const latest = await this.prisma.series.findUnique({
         where: { id: seriesId },
@@ -404,13 +522,13 @@ export class TranslationService implements OnModuleInit, OnModuleDestroy {
         data: {
           translationStatus: TranslationStatus.READY,
           translationError: null,
-          titleEn: this.tr(map, series.titleBg) || null,
-          descriptionEn: series.descriptionBg
-            ? this.tr(map, series.descriptionBg)
-            : null,
+          titleBg: title.bg,
+          titleEn: title.en || null,
+          descriptionBg: description?.bg ?? series.descriptionBg,
+          descriptionEn: description?.en || null,
         },
       });
-      this.logger.log(`Translated series ${seriesId}`);
+      this.logger.log(`Translated series ${seriesId} (${sourceLang}→${targetLang})`);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       await this.prisma.series.update({

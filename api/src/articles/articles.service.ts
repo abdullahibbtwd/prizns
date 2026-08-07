@@ -21,6 +21,7 @@ import {
   toPublicSection,
 } from './section.util';
 import { ensureUniqueSlug } from '../common/slug.util';
+import { StorageService } from '../storage/storage.service';
 
 type GalleryMedia = {
   id: string;
@@ -52,7 +53,15 @@ type ArticleWithRelations = Article & {
 
 @Injectable()
 export class ArticlesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storage: StorageService,
+  ) {}
+
+  private mediaUrl(media: { key: string; url: string } | null | undefined) {
+    if (!media) return '';
+    return this.storage.publicUrlFor(media.key);
+  }
 
   private include = {
     author: true,
@@ -204,7 +213,7 @@ export class ArticlesService {
     if (items.length > 0) {
       return items.map((item) => ({
         id: item.media.id,
-        url: item.media.url,
+        url: this.mediaUrl(item.media),
         creditBg: item.media.creditBg,
       }));
     }
@@ -212,7 +221,7 @@ export class ArticlesService {
       return [
         {
           id: article.heroMedia.id,
-          url: article.heroMedia.url,
+          url: this.mediaUrl(article.heroMedia),
           creditBg: article.heroMedia.creditBg,
         },
       ];
@@ -301,14 +310,16 @@ export class ArticlesService {
       speakerBg: article.speakerBg ?? undefined,
       date: article.dateEn ?? article.dateBg,
       dateBg: article.dateBg,
-      image: article.heroMedia?.url ?? '',
+      image: this.mediaUrl(article.heroMedia),
       photoCredit: article.photoCreditEn ?? article.photoCreditBg,
       photoCreditBg: article.photoCreditBg,
-      audioUrl: article.audioMedia?.url ?? undefined,
+      audioUrl: article.audioMedia
+        ? this.mediaUrl(article.audioMedia)
+        : undefined,
       audioDuration: article.audioDuration ?? undefined,
       videoUrl:
         article.videoUrl?.trim() ||
-        article.videoMedia?.url ||
+        (article.videoMedia ? this.mediaUrl(article.videoMedia) : undefined) ||
         undefined,
       videoMediaId: article.videoMediaId,
       body,

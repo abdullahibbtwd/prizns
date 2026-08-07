@@ -1,17 +1,30 @@
-import {
-  CmsCard,
-  CmsPageHeader,
-  StatusPill,
-} from '@/cms/components/CmsUI'
-import { cmsPartnerships } from '@/cms/data/mock'
-import { Building2, UserCheck, Calendar } from 'lucide-react'
+import { CmsPageHeader, ComingSoon } from '@/cms/components/CmsUI'
+import { Building2 } from 'lucide-react'
+// import {
+//   CmsCard,
+//   CmsPageHeader,
+//   StatusPill,
+// } from '@/cms/components/CmsUI'
+// import { cmsPartnerships } from '@/cms/data/mock'
+// import { Building2, UserCheck, Calendar } from 'lucide-react'
 
-const pipeline = ['new', 'contacted', 'negotiating', 'won', 'lost'] as const
+// const pipeline = ['new', 'contacted', 'negotiating', 'won', 'lost'] as const
 
 export default function CmsPartnershipsPage() {
   return (
     <div>
       <CmsPageHeader
+        title="Partnerships & CRM Pipeline"
+        description="Track alliances with regional tourism boards, ethnographic museums, wineries, and sponsors."
+        badge="Coming Soon"
+      />
+      <ComingSoon
+        icon={Building2}
+        title="Partnerships CRM"
+        blurb="Partner pipeline, account tracking, and sponsorship workflows will live here once this module is ready."
+      />
+
+      {/* <CmsPageHeader
         title="Partnerships & CRM Pipeline"
         description="Track alliances with regional tourism boards, ethnographic museums, wineries, and sponsors."
         badge={`${cmsPartnerships.length} Active Accounts`}
@@ -62,8 +75,7 @@ export default function CmsPartnershipsPage() {
             </div>
           </CmsCard>
         ))}
-      </div>
+      </div> */}
     </div>
   )
 }
-

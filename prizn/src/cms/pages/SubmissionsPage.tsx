@@ -1,177 +1,273 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { ChevronLeft, ChevronRight, Search } from 'lucide-react'
 import {
   CmsCard,
   CmsPageHeader,
-  GhostButton,
-  PrimaryButton,
   StatusPill,
 } from '@/cms/components/CmsUI'
-import { cmsSubmissions } from '@/cms/data/mock'
+import {
+  listCmsSubmissions,
+  type SubmissionStatus,
+} from '@/lib/submissions-api'
 import { cn } from '@/lib/utils'
-import { Mail, MapPin, Calendar, FileText, CheckCircle2, AlertCircle, XCircle } from 'lucide-react'
+
+const STATUS_FILTERS: Array<'all' | SubmissionStatus> = [
+  'all',
+  'new',
+  'review',
+  'changes',
+  'approved',
+  'rejected',
+]
+
+const PAGE_SIZE_OPTIONS = [5, 10, 20, 50, 100] as const
+const BASE_PATH = '/cms/submissions'
 
 export default function CmsSubmissionsPage() {
-  const [selectedId, setSelectedId] = useState(cmsSubmissions[0]?.id)
-  const [items, setItems] = useState(cmsSubmissions)
-  const selected = items.find((s) => s.id === selectedId) ?? items[0]
-  const [toast, setToast] = useState('')
+  const [query, setQuery] = useState('')
+  const [debouncedQuery, setDebouncedQuery] = useState('')
+  const [status, setStatus] = useState<(typeof STATUS_FILTERS)[number]>('all')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>(10)
 
-  const updateStatus = (status: (typeof items)[0]['status'], message: string) => {
-    if (!selected) return
-    setItems((prev) =>
-      prev.map((item) => (item.id === selected.id ? { ...item, status } : item)),
-    )
-    setToast(message)
-    setTimeout(() => setToast(''), 4000)
-  }
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 300)
+    return () => window.clearTimeout(timer)
+  }, [query])
+
+  useEffect(() => {
+    setPage(1)
+  }, [status, debouncedQuery, pageSize])
+
+  const listQuery = useQuery({
+    queryKey: ['cms-submissions', page, pageSize, status, debouncedQuery],
+    queryFn: () =>
+      listCmsSubmissions({
+        page,
+        pageSize,
+        q: debouncedQuery || undefined,
+        status: status === 'all' ? undefined : status,
+      }),
+    placeholderData: (prev) => prev,
+  })
+
+  const items = listQuery.data?.items ?? []
+  const total = listQuery.data?.total ?? 0
+  const totalPages = listQuery.data?.totalPages ?? 1
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages)
+  }, [page, totalPages])
+
+  const from = total === 0 ? 0 : (page - 1) * pageSize + 1
+  const to = Math.min(page * pageSize, total)
+
+  const pageNumbers = useMemo(() => {
+    const maxButtons = 5
+    if (totalPages <= maxButtons) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1)
+    }
+    const half = Math.floor(maxButtons / 2)
+    let start = Math.max(1, page - half)
+    const end = Math.min(totalPages, start + maxButtons - 1)
+    start = Math.max(1, end - maxButtons + 1)
+    return Array.from({ length: end - start + 1 }, (_, i) => start + i)
+  }, [page, totalPages])
 
   return (
     <div>
       <CmsPageHeader
         title="Write for Us Queue"
-        description="Review community submissions and convert accepted entries directly into draft stories."
-        badge={`${items.length} Submissions`}
+        description="Review community submissions and open any entry for full details."
+        badge={`${total} Submissions`}
       />
 
-      {toast && (
-        <div className="mb-6 flex items-center justify-between rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-semibold text-emerald-900 shadow-md animate-in fade-in duration-200">
-          <div className="flex items-center gap-2.5">
-            <CheckCircle2 className="size-5 text-emerald-600 shrink-0" />
-            <span>{toast}</span>
-          </div>
-          <button onClick={() => setToast('')} className="text-emerald-700 hover:text-emerald-950 font-bold">
-            Dismiss
-          </button>
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative w-full sm:max-w-sm">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-stone-400" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search title, author, place…"
+            className="w-full rounded-xl border border-[#E8E4DC] bg-white py-2.5 pl-10 pr-3 text-sm outline-none focus:border-[#0C2686]"
+          />
         </div>
+
+        <div className="flex flex-wrap gap-2">
+          {STATUS_FILTERS.map((item) => (
+            <button
+              key={item}
+              type="button"
+              onClick={() => setStatus(item)}
+              className={cn(
+                'rounded-full border px-3 py-1.5 text-xs font-semibold capitalize transition-colors',
+                status === item
+                  ? 'border-[#0C2686] bg-[#0C2686] text-white'
+                  : 'border-[#E8E4DC] bg-white text-stone-600 hover:border-[#0C2686]/40',
+              )}
+            >
+              {item}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {listQuery.isLoading && (
+        <CmsCard className="p-8 text-sm text-stone-600">Loading submissions…</CmsCard>
       )}
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[360px_minmax(0,1fr)]">
-        {/* Submissions Inbox Panel */}
-        <CmsCard className="overflow-hidden">
-          <div className="border-b border-[#E8E4DC] bg-[#FAF8F3] px-5 py-3.5 flex items-center justify-between">
-            <span className="font-heading text-xs font-bold uppercase tracking-[0.2em] text-stone-600">
-              Community Inbox
-            </span>
-            <span className="rounded-full bg-[#0C2686]/10 px-2.5 py-0.5 text-xs font-bold text-[#0C2686]">
-              {items.length} Total
-            </span>
-          </div>
+      {listQuery.isError && (
+        <CmsCard className="p-8 text-sm text-rose-700">
+          Failed to load submissions. {(listQuery.error as Error).message}
+        </CmsCard>
+      )}
 
-          <div className="divide-y divide-[#E8E4DC]">
-            {items.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setSelectedId(item.id)}
-                className={cn(
-                  'flex w-full cursor-pointer gap-3.5 px-5 py-4 text-left transition-all hover:bg-stone-50',
-                  selected?.id === item.id && 'bg-amber-50/40 border-l-4 border-[#0C2686]',
-                )}
-              >
-                <img src={item.image} alt="" className="size-12 rounded-xl object-cover border border-stone-200 shadow-2xs shrink-0" />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-1">
-                    <p className="truncate text-sm font-bold text-stone-900">{item.title}</p>
-                  </div>
-                  <p className="truncate text-xs font-medium text-stone-600 mt-0.5">
-                    {item.name} · {item.village}
-                  </p>
-                  <div className="mt-2 flex items-center justify-between">
-                    <StatusPill status={item.status} />
-                    <span className="text-[10px] font-semibold text-stone-400">{item.submittedAt}</span>
-                  </div>
-                </div>
-              </button>
-            ))}
+      {!listQuery.isLoading && !listQuery.isError && total === 0 && !debouncedQuery && status === 'all' && (
+        <CmsCard className="p-8 text-sm text-stone-600">
+          No submissions yet. Public entries from{' '}
+          <a href="/write-for-us" className="font-semibold text-[#0C2686] underline">
+            /write-for-us
+          </a>{' '}
+          will appear here.
+        </CmsCard>
+      )}
+
+      {!listQuery.isLoading && !listQuery.isError && total === 0 && (debouncedQuery || status !== 'all') && (
+        <CmsCard className="p-8 text-sm text-stone-600">
+          No submissions match your filters.
+        </CmsCard>
+      )}
+
+      {items.length > 0 && (
+        <CmsCard hover={false} className="overflow-hidden p-0">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[720px] text-left text-sm">
+              <thead className="border-b border-[#E8E4DC] bg-stone-50 text-xs uppercase tracking-wider text-stone-500">
+                <tr>
+                  <th className="px-4 py-3">Title</th>
+                  <th className="px-4 py-3">Author</th>
+                  <th className="px-4 py-3">Place</th>
+                  <th className="px-4 py-3">Category</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Submitted</th>
+                  <th className="px-4 py-3" />
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((item) => (
+                  <tr
+                    key={item.id}
+                    className="border-b border-[#E8E4DC]/70 transition-colors hover:bg-stone-50/80"
+                  >
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={item.image}
+                          alt=""
+                          className="size-10 shrink-0 rounded-lg border border-stone-200 object-cover"
+                        />
+                        <div className="min-w-0">
+                          <p className="truncate font-medium text-stone-900">{item.title}</p>
+                          <p className="truncate text-xs text-stone-500">{item.email}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 font-medium text-stone-800">{item.name}</td>
+                    <td className="px-4 py-3 text-stone-600">{item.village}</td>
+                    <td className="px-4 py-3 text-stone-600">{item.category}</td>
+                    <td className="px-4 py-3">
+                      <StatusPill status={item.status} />
+                    </td>
+                    <td className="px-4 py-3 text-stone-500">{item.submittedAt}</td>
+                    <td className="px-4 py-3 text-right">
+                      <Link
+                        to={`${BASE_PATH}/${item.id}`}
+                        className="font-semibold text-[#0C2686] hover:underline"
+                      >
+                        Open
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </CmsCard>
+      )}
 
-        {/* Selected Submission Detail View */}
-        {selected && (
-          <CmsCard className="p-6 md:p-8">
-            <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[#E8E4DC] pb-6">
-              <div>
-                <div className="flex items-center gap-2.5">
-                  <StatusPill status={selected.status} />
-                  <span className="rounded-full bg-stone-100 px-2.5 py-0.5 text-xs font-semibold text-stone-700 uppercase tracking-wider border border-stone-200">
-                    {selected.category}
-                  </span>
-                </div>
-                <h2 className="mt-3 font-heading text-2xl md:text-3xl font-bold tracking-tight text-stone-900">
-                  {selected.title}
-                </h2>
-                <div className="mt-2 flex flex-wrap items-center gap-4 text-xs font-semibold text-stone-600">
-                  <span className="flex items-center gap-1">
-                    <MapPin className="size-3.5 text-[#0C2686]" /> {selected.name} ({selected.village})
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Mail className="size-3.5 text-[#0C2686]" /> {selected.email}
-                  </span>
-                </div>
-              </div>
+      {total > 0 && (
+        <div className="mt-6 flex flex-col gap-4 rounded-2xl border border-[#E8E4DC] bg-white px-4 py-3 shadow-2xs sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs font-medium text-stone-600">
+            Showing {from}–{to} of {total}
+          </p>
 
-              <div className="flex items-center gap-1.5 rounded-xl bg-stone-100 px-3 py-1.5 text-xs font-semibold text-stone-600 border border-stone-200">
-                <Calendar className="size-3.5 text-[#0C2686]" />
-                Submitted {selected.submittedAt}
-              </div>
-            </div>
-
-            <div className="relative mt-6 overflow-hidden rounded-2xl border border-[#E8E4DC] shadow-sm">
-              <img
-                src={selected.image}
-                alt=""
-                className="aspect-[16/9] w-full object-cover"
-              />
-              <div className="absolute bottom-3 left-3 rounded-lg bg-black/70 px-3 py-1 text-xs font-semibold text-white backdrop-blur-xs">
-                Featured Cover Media Attachment
-              </div>
-            </div>
-
-            <div className="mt-6 grid grid-cols-2 gap-4 text-xs font-medium">
-              <div className="rounded-xl border border-[#E8E4DC] bg-[#FAF8F3] p-4">
-                <p className="font-heading uppercase tracking-wider text-stone-500 font-bold">Category & Topic</p>
-                <p className="mt-1 text-sm font-bold text-stone-900">{selected.category}</p>
-              </div>
-              <div className="rounded-xl border border-[#E8E4DC] bg-[#FAF8F3] p-4">
-                <p className="font-heading uppercase tracking-wider text-stone-500 font-bold">Submitted Files</p>
-                <p className="mt-1 text-sm font-bold text-stone-900">2 High-Res Photos · 1 Doc</p>
-              </div>
-            </div>
-
-            <div className="mt-6 space-y-3 rounded-2xl border border-stone-200 bg-stone-50/60 p-5 text-sm leading-relaxed text-stone-700">
-              <p className="font-heading text-base font-bold text-stone-900">Contribution Summary Excerpt:</p>
-              <p>
-                "Every morning, the old clay oven in Varbovo gives off the scent of woodsmoke and wild thyme.
-                My grandmother learned this recipe during the post-war harvest years, passing down the hand-braided sourdough technique..."
-              </p>
-            </div>
-
-            {/* Action Bar */}
-            <div className="mt-8 flex flex-wrap items-center gap-3 border-t border-[#E8E4DC] pt-6">
-              <PrimaryButton
-                onClick={() =>
-                  updateStatus('approved', 'Converted to draft story! Opened in Stories editor queue.')
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="flex items-center gap-2 text-xs font-medium text-stone-600">
+              Per page
+              <select
+                value={pageSize}
+                onChange={(e) =>
+                  setPageSize(
+                    Number(e.target.value) as (typeof PAGE_SIZE_OPTIONS)[number],
+                  )
                 }
+                className="rounded-lg border border-[#E8E4DC] bg-stone-50 px-2 py-1.5 text-xs font-semibold text-stone-900 outline-none focus:border-[#0C2686]"
               >
-                <FileText className="size-4" /> Convert to Draft Story
-              </PrimaryButton>
-              <GhostButton onClick={() => updateStatus('approved', 'Submission approved.')}>
-                <CheckCircle2 className="size-4 text-emerald-600" /> Approve
-              </GhostButton>
-              <GhostButton onClick={() => updateStatus('changes', 'Requested author revision.')}>
-                <AlertCircle className="size-4 text-amber-600" /> Request Changes
-              </GhostButton>
-              <GhostButton
-                className="text-rose-700 hover:bg-rose-50 hover:border-rose-200"
-                onClick={() => updateStatus('rejected', 'Submission archived.')}
+                {PAGE_SIZE_OPTIONS.map((size) => (
+                  <option key={size} value={size}>
+                    {size}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1 || listQuery.isFetching}
+                className="inline-flex items-center gap-1 rounded-xl border border-[#E8E4DC] bg-stone-50 px-2.5 py-1.5 text-xs font-semibold text-stone-700 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
               >
-                <XCircle className="size-4 text-rose-600" /> Reject
-              </GhostButton>
+                <ChevronLeft className="size-3.5" />
+                Prev
+              </button>
+
+              {pageNumbers.map((num) => (
+                <button
+                  key={num}
+                  type="button"
+                  onClick={() => setPage(num)}
+                  disabled={listQuery.isFetching}
+                  className={cn(
+                    'min-w-8 rounded-xl px-2.5 py-1.5 text-xs font-semibold transition-colors',
+                    num === page
+                      ? 'bg-[#0C2686] text-white shadow-xs'
+                      : 'border border-[#E8E4DC] bg-stone-50 text-stone-700 hover:bg-white',
+                  )}
+                >
+                  {num}
+                </button>
+              ))}
+
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages || listQuery.isFetching}
+                className="inline-flex items-center gap-1 rounded-xl border border-[#E8E4DC] bg-stone-50 px-2.5 py-1.5 text-xs font-semibold text-stone-700 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Next
+                <ChevronRight className="size-3.5" />
+              </button>
             </div>
-          </CmsCard>
-        )}
-      </div>
+
+            <p className="text-xs font-medium text-stone-500">
+              Page {page} of {totalPages}
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
-
