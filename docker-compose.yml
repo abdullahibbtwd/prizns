@@ -40,8 +40,10 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     ports:
-      - "${MINIO_PORT:-9010}:9000"
-      - "${MINIO_CONSOLE_PORT:-9011}:9001"
+      # Host publish (9010) — separate from MINIO_PORT used by the API client.
+      # Avoids clashing with another MinIO already on host :9000 (Coolify/Hostinger).
+      - "${MINIO_HOST_PORT:-9010}:9000"
+      - "${MINIO_CONSOLE_HOST_PORT:-${MINIO_CONSOLE_PORT:-9011}}:9001"
     volumes:
       - minio_data:/data
     healthcheck:
@@ -65,11 +67,16 @@ services:
       REDIS_PORT: 6379
       REDIS_URL: redis://redis:6379
       MINIO_ENDPOINT: minio
+      # Inside Docker network MinIO always listens on 9000 (container port).
+      # Host publish is MINIO_HOST_PORT (9010) — do not set MINIO_PORT=9000 in Coolify
+      # for the host mapping; that conflict is what this split fixes.
       MINIO_PORT: 9000
       # Browser-facing URL. Use `/media` (proxied by web nginx) on Coolify/Docker.
       # Local API outside Docker: http://localhost:9010
       MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL:-/media}
       API_PORT: 3000
+      # Auto seed admin + journal content on boot (safe upserts). Set false to skip.
+      SEED_ON_BOOT: ${SEED_ON_BOOT:-true}
     ports:
       - "${API_PORT:-3000}:3000"
     # Do NOT depend on one-shot init containers — Coolify removes them and

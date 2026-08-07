@@ -5,7 +5,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
-  IsUrl,
+  Matches,
   Max,
   Min,
   validateSync,
@@ -67,8 +67,13 @@ class EnvironmentVariables {
   @IsBooleanString()
   MINIO_USE_SSL?: string;
 
+  /** Full URL (http://…) or same-origin path (/media) proxied by nginx. */
   @IsOptional()
-  @IsUrl({ require_tld: false })
+  @IsString()
+  @Matches(/^(https?:\/\/[^\s]+|\/[A-Za-z0-9._~:/?#[\]@!$&'()*+,;=%-]*)$/, {
+    message:
+      'MINIO_PUBLIC_URL must be a URL (https://…) or a public path like /media',
+  })
   MINIO_PUBLIC_URL?: string;
 
   @IsOptional()
@@ -107,6 +112,14 @@ class EnvironmentVariables {
 
   @IsOptional()
   @IsString()
+  ADMIN_NAME?: string;
+
+  @IsOptional()
+  @IsBooleanString()
+  SEED_ON_BOOT?: string;
+
+  @IsOptional()
+  @IsString()
   GOOGLE_CLOUD_PROJECT?: string;
 
   @IsOptional()
@@ -115,7 +128,13 @@ class EnvironmentVariables {
 }
 
 export function validateEnv(config: Record<string, unknown>) {
-  const validated = plainToInstance(EnvironmentVariables, config, {
+  const normalized = { ...config };
+  // Coolify often injects empty strings for optional vars — treat as unset.
+  for (const key of Object.keys(normalized)) {
+    if (normalized[key] === '') delete normalized[key];
+  }
+
+  const validated = plainToInstance(EnvironmentVariables, normalized, {
     enableImplicitConversion: true,
   });
 
