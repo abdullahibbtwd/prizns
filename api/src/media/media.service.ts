@@ -73,7 +73,7 @@ export class MediaService {
   }
 
   withPublicUrl<T extends { key: string; url: string }>(row: T): T {
-    return { ...row, url: this.storage.publicUrlFor(row.key) };
+    return { ...row, url: this.storage.resolvePublicUrl(row) };
   }
 
   private detectKind(mime: string): MediaKind {

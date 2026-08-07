@@ -101,8 +101,11 @@ export class SeriesService {
     return row ? this.toPublicDto(row) : null;
   }
 
-  private mediaUrl(media: { key: string } | null | undefined) {
+  private mediaUrl(
+    media: { key: string; url?: string } | null | undefined,
+  ) {
     if (!media) return '';
+    if (media.url) return this.storage.resolvePublicUrl({ key: media.key, url: media.url });
     return this.storage.publicUrlFor(media.key);
   }
 

@@ -19,6 +19,22 @@ export type UploadedFile = {
   url: string;
 };
 
+/** Pure helper — keeps URL resolution typed even when class method lookup fails. */
+export function resolvePublicMediaUrl(
+  media: { key: string; url: string },
+  publicUrlForKey: (key: string) => string,
+): string {
+  const url = media.url?.trim() ?? '';
+  if (
+    url.startsWith('http://') ||
+    url.startsWith('https://') ||
+    (url.startsWith('/') && !url.startsWith('/media'))
+  ) {
+    return url;
+  }
+  return publicUrlForKey(media.key);
+}
+
 @Injectable()
 export class StorageService implements OnModuleInit {
   private readonly logger = new Logger(StorageService.name);
@@ -54,6 +70,15 @@ export class StorageService implements OnModuleInit {
   /** Always rebuild browser URLs from key + current MINIO_PUBLIC_URL. */
   publicUrlFor(key: string, bucket = this.bucket): string {
     return `${this.publicUrl}/${bucket}/${key}`;
+  }
+
+  /**
+   * Resolve a MediaAsset for the browser.
+   * Seed rows store site-root paths like `/village.jpg` (served by the web app).
+   * CMS uploads store MinIO keys and are exposed via MINIO_PUBLIC_URL (/media/...).
+   */
+  resolvePublicUrl(media: { key: string; url: string }): string {
+    return resolvePublicMediaUrl(media, (key) => this.publicUrlFor(key));
   }
 
   async onModuleInit() {
@@ -128,9 +153,8 @@ export class StorageService implements OnModuleInit {
     const key = `${folder}/${randomUUID()}${ext}`;
 
     await this.client.putObject(this.bucket, key, file.buffer, file.size, {
-        'Content-Type': file.mimetype,
-      },
-    );
+      'Content-Type': file.mimetype,
+    });
 
     const url = this.publicUrlFor(key);
 

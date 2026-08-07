@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import {
   Article,
   ArticleStatus,
@@ -8,10 +12,7 @@ import {
   TranslationStatus,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import type {
-  PublicArticleDto,
-  StoredArticleBlock,
-} from './article.types';
+import type { PublicArticleDto, StoredArticleBlock } from './article.types';
 import { CreateArticleDto } from './dto/create-article.dto';
 import { UpdateArticleDto } from './dto/update-article.dto';
 import {
@@ -58,9 +59,26 @@ export class ArticlesService {
     private readonly storage: StorageService,
   ) {}
 
-  private mediaUrl(media: { key: string; url: string } | null | undefined) {
+  private mediaUrl(
+    media: { key: string; url: string } | null | undefined,
+  ): string {
     if (!media) return '';
+    const url = (media.url ?? '').trim();
+    if (
+      url.startsWith('http://') ||
+      url.startsWith('https://') ||
+      (url.startsWith('/') && !url.startsWith('/media'))
+    ) {
+      return url;
+    }
     return this.storage.publicUrlFor(media.key);
+  }
+
+  /** Normalize optional free-text (keeps PartialType / Prisma fields clearly typed). */
+  private optionalText(value: unknown): string | null {
+    if (typeof value !== 'string') return null;
+    const trimmed = value.trim();
+    return trimmed || null;
   }
 
   private include = {
@@ -329,7 +347,7 @@ export class ArticlesService {
       translationStatus: article.translationStatus,
       featured: article.featured,
       sponsored: article.sponsored,
-      sponsorName: article.sponsorName,
+      sponsorName: this.optionalText(article.sponsorName),
       series: (() => {
         const membership = article.seriesEpisodes?.[0];
         if (!membership) return null;
@@ -499,7 +517,7 @@ export class ArticlesService {
         body: (dto.body ?? []) as unknown as Prisma.InputJsonValue,
         featured: dto.featured ?? false,
         sponsored: dto.sponsored ?? false,
-        sponsorName: dto.sponsorName?.trim() || null,
+        sponsorName: this.optionalText(dto.sponsorName),
         authorId: dto.authorId,
         heroMediaId,
         audioMediaId: dto.audioMediaId,
@@ -583,7 +601,7 @@ export class ArticlesService {
       speakerBgChanged ||
       bodyMerge.bgChanged;
 
-    const row = await this.prisma.article.update({
+    await this.prisma.article.update({
       where: { id },
       data: {
         section,
@@ -618,7 +636,7 @@ export class ArticlesService {
         featured: dto.featured,
         sponsored: dto.sponsored,
         ...(dto.sponsorName !== undefined
-          ? { sponsorName: dto.sponsorName?.trim() || null }
+          ? { sponsorName: this.optionalText(dto.sponsorName) }
           : {}),
         authorId: dto.authorId,
         heroMediaId: dto.heroMediaId,

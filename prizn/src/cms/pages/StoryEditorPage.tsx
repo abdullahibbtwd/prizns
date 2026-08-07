@@ -14,6 +14,7 @@ import {
   Headphones,
   ImagePlus,
   LayoutGrid,
+  Loader2,
   Plus,
   Save,
   Trash2,
@@ -185,7 +186,25 @@ function formatDateBg(iso: string) {
   }).format(date)
 }
 
-type GalleryItem = { id: string; url: string; uploading?: boolean }
+type GalleryItem = {
+  id: string
+  url: string
+  /** Local file waiting to upload on Save/Publish */
+  file?: File
+}
+
+function revokeIfBlob(url?: string | null) {
+  if (url?.startsWith('blob:')) URL.revokeObjectURL(url)
+}
+
+function preloadImageUrl(url: string) {
+  return new Promise<void>((resolve) => {
+    const img = new Image()
+    img.onload = () => resolve()
+    img.onerror = () => resolve()
+    img.src = url
+  })
+}
 
 export default function CmsStoryEditorPage() {
   const { id } = useParams()
@@ -204,11 +223,13 @@ export default function CmsStoryEditorPage() {
   const [newAuthorName, setNewAuthorName] = useState('')
   const [showCreateSeries, setShowCreateSeries] = useState(false)
   const [newSeriesTitle, setNewSeriesTitle] = useState('')
-  const [videoUploading, setVideoUploading] = useState(false)
   const [posterBusy, setPosterBusy] = useState(false)
   const [linkPreviewOpen, setLinkPreviewOpen] = useState(false)
   const [audioUrl, setAudioUrl] = useState('')
-  const [audioUploading, setAudioUploading] = useState(false)
+  const [pendingVideoFile, setPendingVideoFile] = useState<File | null>(null)
+  const [pendingAudioFile, setPendingAudioFile] = useState<File | null>(null)
+  const [mediaSaving, setMediaSaving] = useState(false)
+  const [mediaPreparing, setMediaPreparing] = useState(false)
 
   const articleQuery = useQuery({
     queryKey: ['cms-article', id],
@@ -336,9 +357,13 @@ export default function CmsStoryEditorPage() {
       form.setValue('speakerBg', '', { shouldDirty: true })
       form.setValue('audioDuration', '', { shouldDirty: true })
       form.setValue('audioMediaId', '', { shouldDirty: true })
+      revokeIfBlob(audioUrl)
+      setPendingAudioFile(null)
       setAudioUrl('')
     }
     if (!nextProfile.showVideoSource) {
+      revokeIfBlob(form.getValues('videoUrl'))
+      setPendingVideoFile(null)
       form.setValue('videoUrl', '', { shouldDirty: true })
       form.setValue('videoMediaId', '', { shouldDirty: true })
     }
@@ -353,51 +378,104 @@ export default function CmsStoryEditorPage() {
 
   const saveMutation = useMutation({
     mutationFn: async (values: ArticleFormValues) => {
-      const minutes = Number(values.readTimeMinutes) || 1
-      const sectionProfile = getSectionProfile(values.section)
-      const durationSeconds =
-        values.readTimeUnit === 'hours' ? minutes * 3600 : minutes * 60
-      const payload = {
-        section: values.section,
-        status: values.status,
-        categoryBg: values.categoryBg,
-        titleBg: values.titleBg,
-        subtitleBg: values.subtitleBg,
-        readTimeBg: formatReadTimeBg(minutes, values.readTimeUnit),
-        locationBg: values.locationBg,
-        dateBg: formatDateBg(values.dateIso),
-        publishedAt: values.dateIso
-          ? new Date(`${values.dateIso}T12:00:00`).toISOString()
-          : undefined,
-        photoCreditBg: values.photoCreditBg,
-        endLabelBg: values.endLabelBg,
-        speakerBg: values.speakerBg || undefined,
-        audioDuration: sectionProfile.showVideoSource
-          ? formatWatchDuration(durationSeconds) || undefined
-          : values.audioDuration || undefined,
-        authorId: values.authorId || undefined,
-        galleryMediaIds: values.galleryMediaIds,
-        heroMediaId: values.galleryMediaIds[0] || undefined,
-        audioMediaId: values.audioMediaId || undefined,
-        videoUrl: values.videoUrl.trim().startsWith('blob:')
+      setMediaSaving(true)
+      try {
+        const credit = values.photoCreditBg
+        const galleryMediaIds: string[] = []
+
+        for (const item of gallery) {
+          if (item.file) {
+            const media = await uploadCmsMedia(item.file, credit)
+            galleryMediaIds.push(media.id)
+          } else if (!item.id.startsWith('local-')) {
+            galleryMediaIds.push(item.id)
+          }
+        }
+
+        let audioMediaId = values.audioMediaId || undefined
+        if (pendingAudioFile) {
+          const media = await uploadCmsMedia(pendingAudioFile)
+          audioMediaId = media.id
+        }
+
+        let videoMediaId = values.videoMediaId || null
+        let videoUrl = values.videoUrl.trim().startsWith('blob:')
           ? null
-          : values.videoUrl.trim() || null,
-        videoMediaId: values.videoMediaId || null,
-        featured: values.featured,
-        sponsored: values.sponsored,
-        sponsorName: values.sponsored
-          ? values.sponsorName.trim() || null
-          : null,
-        body: values.body,
-        seriesId:
-          values.seriesMode === 'series' && values.seriesId
-            ? values.seriesId
+          : values.videoUrl.trim() || null
+        if (pendingVideoFile) {
+          const media = await uploadCmsMedia(pendingVideoFile)
+          videoMediaId = media.id
+          videoUrl = null
+        }
+
+        const minutes = Number(values.readTimeMinutes) || 1
+        const sectionProfile = getSectionProfile(values.section)
+        const durationSeconds =
+          values.readTimeUnit === 'hours' ? minutes * 3600 : minutes * 60
+        const payload = {
+          section: values.section,
+          status: values.status,
+          categoryBg: values.categoryBg,
+          titleBg: values.titleBg,
+          subtitleBg: values.subtitleBg,
+          readTimeBg: formatReadTimeBg(minutes, values.readTimeUnit),
+          locationBg: values.locationBg,
+          dateBg: formatDateBg(values.dateIso),
+          publishedAt: values.dateIso
+            ? new Date(`${values.dateIso}T12:00:00`).toISOString()
+            : undefined,
+          photoCreditBg: values.photoCreditBg,
+          endLabelBg: values.endLabelBg,
+          speakerBg: values.speakerBg || undefined,
+          audioDuration: sectionProfile.showVideoSource
+            ? formatWatchDuration(durationSeconds) || undefined
+            : values.audioDuration || undefined,
+          authorId: values.authorId || undefined,
+          galleryMediaIds,
+          heroMediaId: galleryMediaIds[0] || undefined,
+          audioMediaId,
+          videoUrl,
+          videoMediaId,
+          featured: values.featured,
+          sponsored: values.sponsored,
+          sponsorName: values.sponsored
+            ? values.sponsorName.trim() || null
             : null,
+          body: values.body,
+          seriesId:
+            values.seriesMode === 'series' && values.seriesId
+              ? values.seriesId
+              : null,
+        }
+        if (isNew) return createCmsArticle(payload)
+        return updateCmsArticle(id!, payload)
+      } finally {
+        setMediaSaving(false)
       }
-      if (isNew) return createCmsArticle(payload)
-      return updateCmsArticle(id!, payload)
     },
     onSuccess: async (article) => {
+      // Drop local blob previews; reload saved remote URLs from the article.
+      for (const item of gallery) revokeIfBlob(item.url)
+      revokeIfBlob(audioUrl)
+      revokeIfBlob(form.getValues('videoUrl'))
+      setPendingVideoFile(null)
+      setPendingAudioFile(null)
+      setGallery(
+        article.gallery?.length
+          ? article.gallery.map((item) => ({ id: item.id, url: item.url }))
+          : article.heroMediaId && article.image
+            ? [{ id: article.heroMediaId, url: article.image }]
+            : [],
+      )
+      setAudioUrl(article.audioUrl ?? '')
+      form.setValue('videoUrl', article.videoUrl ?? '', { shouldDirty: false })
+      form.setValue('videoMediaId', article.videoMediaId ?? '', {
+        shouldDirty: false,
+      })
+      form.setValue('audioMediaId', article.audioMediaId ?? '', {
+        shouldDirty: false,
+      })
+
       await queryClient.invalidateQueries({ queryKey: ['cms-articles'] })
       await queryClient.invalidateQueries({ queryKey: ['cms-articles-count'] })
       await queryClient.invalidateQueries({ queryKey: ['cms-series'] })
@@ -432,62 +510,46 @@ export default function CmsStoryEditorPage() {
     },
   })
 
-  const uploadImages = async (files: FileList | null) => {
+  /** Local preview only — MinIO upload happens on Save/Publish. */
+  const pickImages = async (files: FileList | null) => {
     if (!files?.length) return
-    const list = Array.from(files)
-    const temps: GalleryItem[] = list.map((file) => ({
-      id: `temp-${crypto.randomUUID()}`,
-      url: URL.createObjectURL(file),
-      uploading: true,
-    }))
-    // Show local previews immediately — do not wait for MinIO.
-    const startIndex = gallery.length
-    setGallery((prev) => [...prev, ...temps])
-    setActiveSlide(startIndex)
-
-    const credit = form.getValues('photoCreditBg')
-    void Promise.all(
-      list.map(async (file, index) => {
-        const tempId = temps[index].id
-        try {
-          const media = await uploadCmsMedia(file, credit)
-          if (!form.getValues('photoCreditBg') && media.creditBg) {
-            form.setValue('photoCreditBg', media.creditBg)
-          }
-          // Keep blob URL for snappy preview; only swap the id once uploaded.
-          setGallery((prev) =>
-            prev.map((item) =>
-              item.id === tempId
-                ? { id: media.id, url: item.url, uploading: false }
-                : item,
-            ),
-          )
-        } catch {
-          setGallery((prev) => {
-            const doomed = prev.find((item) => item.id === tempId)
-            if (doomed?.url.startsWith('blob:')) URL.revokeObjectURL(doomed.url)
-            return prev.filter((item) => item.id !== tempId)
-          })
-        }
-      }),
-    )
+    setMediaPreparing(true)
+    try {
+      const list = Array.from(files)
+      const items: GalleryItem[] = list.map((file) => ({
+        id: `local-${crypto.randomUUID()}`,
+        url: URL.createObjectURL(file),
+        file,
+      }))
+      await Promise.all(items.map((item) => preloadImageUrl(item.url)))
+      const startIndex = gallery.length
+      setGallery((prev) => [...prev, ...items])
+      setActiveSlide(startIndex)
+    } finally {
+      setMediaPreparing(false)
+    }
   }
 
-  const uploadPoster = async (files: FileList | null) => {
+  /** Replace poster/cover with a local preview (no upload until save). */
+  const pickPoster = async (files: FileList | null) => {
     const file = files?.[0]
     if (!file) return
-    const tempId = `temp-${crypto.randomUUID()}`
-    const tempUrl = URL.createObjectURL(file)
-    setGallery([{ id: tempId, url: tempUrl, uploading: true }])
+    setMediaPreparing(true)
     try {
-      const media = await uploadCmsMedia(file, form.getValues('photoCreditBg'))
-      if (!form.getValues('photoCreditBg') && media.creditBg) {
-        form.setValue('photoCreditBg', media.creditBg)
-      }
-      setGallery([{ id: media.id, url: tempUrl, uploading: false }])
-    } catch {
-      URL.revokeObjectURL(tempUrl)
-      setGallery([])
+      const url = URL.createObjectURL(file)
+      await preloadImageUrl(url)
+      setGallery((prev) => {
+        for (const item of prev) revokeIfBlob(item.url)
+        return [
+          {
+            id: `local-${crypto.randomUUID()}`,
+            url,
+            file,
+          },
+        ]
+      })
+    } finally {
+      setMediaPreparing(false)
     }
   }
 
@@ -495,36 +557,34 @@ export default function CmsStoryEditorPage() {
     const file = new File([blob], filename, {
       type: blob.type || 'image/jpeg',
     })
-    const tempId = `temp-${crypto.randomUUID()}`
-    const tempUrl = URL.createObjectURL(file)
-    setGallery([{ id: tempId, url: tempUrl, uploading: true }])
-    try {
-      const media = await uploadCmsMedia(file, form.getValues('photoCreditBg'))
-      if (!form.getValues('photoCreditBg') && media.creditBg) {
-        form.setValue('photoCreditBg', media.creditBg)
-      }
-      setGallery([{ id: media.id, url: tempUrl, uploading: false }])
-    } catch {
-      URL.revokeObjectURL(tempUrl)
-    }
+    const url = URL.createObjectURL(file)
+    await preloadImageUrl(url)
+    setGallery((prev) => {
+      for (const item of prev) revokeIfBlob(item.url)
+      return [
+        {
+          id: `local-${crypto.randomUUID()}`,
+          url,
+          file,
+        },
+      ]
+    })
   }
 
-  const uploadVideoFile = async (file: File) => {
-    const localUrl = URL.createObjectURL(file)
-    // Instant local playback while MinIO upload runs in the background.
-    form.setValue('videoUrl', localUrl, { shouldDirty: true })
-    form.setValue('videoMediaId', '', { shouldDirty: true })
-    setVideoUploading(true)
+  const pickVideoFile = async (file: File) => {
+    setMediaPreparing(true)
     setPosterBusy(true)
     setLinkPreviewOpen(false)
-
     try {
-      const uploadPromise = uploadCmsMedia(file)
+      const previousUrl = form.getValues('videoUrl')
+      revokeIfBlob(previousUrl)
+      const localUrl = URL.createObjectURL(file)
+      setPendingVideoFile(file)
+      form.setValue('videoUrl', localUrl, { shouldDirty: true })
+      form.setValue('videoMediaId', '', { shouldDirty: true })
 
-      let posterBlob: Blob | null = null
       try {
         const captured = await captureVideoPosterBlob(file)
-        posterBlob = captured.blob
         if (captured.durationSec > 0) {
           const mins = Math.max(1, Math.round(captured.durationSec / 60))
           form.setValue('readTimeMinutes', mins, { shouldDirty: true })
@@ -535,26 +595,13 @@ export default function CmsStoryEditorPage() {
             { shouldDirty: true },
           )
         }
+        await setPosterFromBlob(captured.blob)
       } catch {
-        /* keep video without auto poster */
+        /* video preview still works without auto poster */
       }
-
-      if (posterBlob) {
-        void setPosterFromBlob(posterBlob)
-      }
-      setPosterBusy(false)
-
-      const media = await uploadPromise
-      form.setValue('videoMediaId', media.id, { shouldDirty: true })
-      // Keep local blob as preview URL so playback stays instant.
-      form.setValue('videoUrl', localUrl, { shouldDirty: true })
-    } catch {
-      form.setValue('videoUrl', '', { shouldDirty: true })
-      form.setValue('videoMediaId', '', { shouldDirty: true })
-      URL.revokeObjectURL(localUrl)
     } finally {
-      setVideoUploading(false)
       setPosterBusy(false)
+      setMediaPreparing(false)
     }
   }
 
@@ -563,6 +610,7 @@ export default function CmsStoryEditorPage() {
     const thumb = getRemotePosterUrl(url)
     if (!thumb) return
     setLinkPreviewOpen(true)
+    setMediaPreparing(true)
     setPosterBusy(true)
     try {
       const res = await fetch(thumb)
@@ -573,48 +621,44 @@ export default function CmsStoryEditorPage() {
       /* Preview still shows remote thumbnail without gallery save */
     } finally {
       setPosterBusy(false)
+      setMediaPreparing(false)
     }
   }
 
-  const uploadAudioFile = async (file: File) => {
-    const localUrl = URL.createObjectURL(file)
-    setAudioUrl(localUrl)
-    setAudioUploading(true)
-    form.setValue('audioMediaId', '', { shouldDirty: true })
-
-    // Read duration from local file immediately
-    void new Promise<void>((resolve) => {
-      const el = document.createElement('audio')
-      el.preload = 'metadata'
-      el.onloadedmetadata = () => {
-        if (Number.isFinite(el.duration) && el.duration > 0) {
-          form.setValue('audioDuration', formatWatchDuration(el.duration), {
-            shouldDirty: true,
-          })
-        }
-        resolve()
-      }
-      el.onerror = () => resolve()
-      el.src = localUrl
-    })
-
+  const pickAudioFile = async (file: File) => {
+    setMediaPreparing(true)
     try {
-      const media = await uploadCmsMedia(file)
-      form.setValue('audioMediaId', media.id, { shouldDirty: true })
-      // Keep local blob for instant playback in the editor.
-    } catch {
-      setAudioUrl('')
+      revokeIfBlob(audioUrl)
+      const localUrl = URL.createObjectURL(file)
+      setPendingAudioFile(file)
+      setAudioUrl(localUrl)
       form.setValue('audioMediaId', '', { shouldDirty: true })
-      URL.revokeObjectURL(localUrl)
+
+      await new Promise<void>((resolve) => {
+        const el = document.createElement('audio')
+        el.preload = 'metadata'
+        el.onloadedmetadata = () => {
+          if (Number.isFinite(el.duration) && el.duration > 0) {
+            form.setValue('audioDuration', formatWatchDuration(el.duration), {
+              shouldDirty: true,
+            })
+          }
+          resolve()
+        }
+        el.onerror = () => resolve()
+        el.src = localUrl
+      })
     } finally {
-      setAudioUploading(false)
+      setMediaPreparing(false)
     }
   }
 
   const videoPlayback = resolveVideoPlayback(videoUrlValue)
-  const hasVideoSource = Boolean(videoUrlValue.trim() || videoMediaIdValue)
+  const hasVideoSource = Boolean(
+    videoUrlValue.trim() || videoMediaIdValue || pendingVideoFile,
+  )
   const isFileVideo =
-    Boolean(videoMediaIdValue) ||
+    Boolean(videoMediaIdValue || pendingVideoFile) ||
     videoUrlValue.startsWith('blob:') ||
     videoPlayback?.kind === 'file'
   const isEmbedVideo =
@@ -627,7 +671,6 @@ export default function CmsStoryEditorPage() {
     setLinkPreviewOpen(false)
   }, [videoUrlValue])
 
-
   useEffect(() => {
     if (gallery.length === 0) {
       setActiveSlide(0)
@@ -638,9 +681,25 @@ export default function CmsStoryEditorPage() {
 
   const removeImage = (mediaId: string) => {
     setGallery((prev) => {
-      const next = prev.filter((item) => item.id !== mediaId)
-      return next
+      const doomed = prev.find((item) => item.id === mediaId)
+      revokeIfBlob(doomed?.url)
+      return prev.filter((item) => item.id !== mediaId)
     })
+  }
+
+  const clearVideo = () => {
+    revokeIfBlob(form.getValues('videoUrl'))
+    setPendingVideoFile(null)
+    form.setValue('videoUrl', '', { shouldDirty: true })
+    form.setValue('videoMediaId', '', { shouldDirty: true })
+  }
+
+  const clearAudio = () => {
+    revokeIfBlob(audioUrl)
+    setPendingAudioFile(null)
+    setAudioUrl('')
+    form.setValue('audioMediaId', '', { shouldDirty: true })
+    form.setValue('audioDuration', '', { shouldDirty: true })
   }
 
   const setAsHero = (mediaId: string) => {
@@ -664,20 +723,7 @@ export default function CmsStoryEditorPage() {
   }
 
   const onSubmit = form.handleSubmit(async (values) => {
-    // Wait briefly if an upload is still finishing so we don't save temp ids.
-    if (
-      gallery.some((item) => item.uploading) ||
-      videoUploading ||
-      audioUploading
-    ) {
-      return
-    }
-    await saveMutation.mutateAsync({
-      ...values,
-      galleryMediaIds: gallery
-        .filter((item) => !item.uploading && !item.id.startsWith('temp-'))
-        .map((item) => item.id),
-    })
+    await saveMutation.mutateAsync(values)
   })
 
   if (!isNew && articleQuery.isLoading) {
@@ -715,8 +761,17 @@ export default function CmsStoryEditorPage() {
     label: pickLang(lang, author.nameEn ?? author.nameBg, author.nameBg),
   }))
 
-  const mediaBusy =
-    gallery.some((item) => item.uploading) || videoUploading || audioUploading
+  const mediaBusy = mediaSaving || mediaPreparing || posterBusy
+
+  const MediaPrepOverlay = ({ label }: { label?: string }) =>
+    mediaPreparing || posterBusy ? (
+      <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-[#FDFBF7]/80 backdrop-blur-[2px]">
+        <Loader2 className="size-7 animate-spin text-[#0C2686]" />
+        <span className="text-xs font-semibold uppercase tracking-wider text-stone-600">
+          {label || t('cms.editor.preparingMedia')}
+        </span>
+      </div>
+    ) : null
 
   return (
     <div>
@@ -842,11 +897,12 @@ export default function CmsStoryEditorPage() {
               </div>
 
               {!hasVideoSource ? (
-                <label className="flex cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-[#E8E4DC] bg-[#FAF8F3] px-6 py-16 text-center transition-colors hover:border-[#0C2686]/40">
+                <label className="relative flex cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-[#E8E4DC] bg-[#FAF8F3] px-6 py-16 text-center transition-colors hover:border-[#0C2686]/40">
+                  <MediaPrepOverlay />
                   <Film className="size-8 text-[#0C2686]" />
                   <span className="text-sm font-medium text-stone-600">
-                    {videoUploading || posterBusy
-                      ? t('cms.authors.uploading')
+                    {mediaBusy
+                      ? t('cms.editor.preparingMedia')
                       : t('cms.editor.addVideo')}
                   </span>
                   <span className="text-[11px] text-stone-400">
@@ -856,17 +912,18 @@ export default function CmsStoryEditorPage() {
                     type="file"
                     accept="video/*"
                     className="hidden"
-                    disabled={videoUploading}
+                    disabled={mediaBusy}
                     onChange={async (e) => {
                       const file = e.target.files?.[0]
                       if (!file) return
-                      await uploadVideoFile(file)
+                      await pickVideoFile(file)
                       e.target.value = ''
                     }}
                   />
                 </label>
               ) : (
-                <div className="space-y-3">
+                <div className="relative space-y-3">
+                  <MediaPrepOverlay />
                   {isFileVideo && videoUrlValue ? (
                     <div className="overflow-hidden rounded-2xl border border-[#E8E4DC] bg-black">
                       <video
@@ -920,18 +977,18 @@ export default function CmsStoryEditorPage() {
                   <div className="flex flex-wrap gap-2">
                     <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-[#E8E4DC] bg-white px-3 py-2 text-xs font-semibold text-[#0C2686]">
                       <Film className="size-3.5" />
-                      {videoUploading
-                        ? t('cms.authors.uploading')
+                      {mediaBusy
+                        ? t('cms.editor.preparingMedia')
                         : t('cms.editor.replaceVideo')}
                       <input
                         type="file"
                         accept="video/*"
                         className="hidden"
-                        disabled={videoUploading}
+                        disabled={mediaBusy}
                         onChange={async (e) => {
                           const file = e.target.files?.[0]
                           if (!file) return
-                          await uploadVideoFile(file)
+                          await pickVideoFile(file)
                           e.target.value = ''
                         }}
                       />
@@ -940,8 +997,7 @@ export default function CmsStoryEditorPage() {
                       type="button"
                       className="py-2 text-xs"
                       onClick={() => {
-                        form.setValue('videoUrl', '', { shouldDirty: true })
-                        form.setValue('videoMediaId', '', { shouldDirty: true })
+                        clearVideo()
                         setLinkPreviewOpen(false)
                       }}
                     >
@@ -967,13 +1023,16 @@ export default function CmsStoryEditorPage() {
                   </div>
                   <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-[#E8E4DC] bg-white px-3 py-2 text-xs font-semibold text-[#0C2686]">
                     <ImagePlus className="size-3.5" />
-                    {t('cms.editor.uploadPoster')}
+                    {mediaBusy
+                      ? t('cms.editor.preparingMedia')
+                      : t('cms.editor.uploadPoster')}
                     <input
                       type="file"
                       accept="image/*"
                       className="hidden"
-                      onChange={(e) => {
-                        void uploadPoster(e.target.files)
+                      disabled={mediaBusy}
+                      onChange={async (e) => {
+                        await pickPoster(e.target.files)
                         e.target.value = ''
                       }}
                     />
@@ -981,6 +1040,7 @@ export default function CmsStoryEditorPage() {
                 </div>
                 {gallery[0] ? (
                   <div className="relative aspect-[16/10] overflow-hidden rounded-2xl border border-[#E8E4DC] bg-stone-100">
+                    <MediaPrepOverlay />
                     <img
                       src={gallery[0].url}
                       alt=""
@@ -997,6 +1057,7 @@ export default function CmsStoryEditorPage() {
                   </div>
                 ) : linkPreviewOpen && remoteThumb ? (
                   <div className="relative aspect-[16/10] overflow-hidden rounded-2xl border border-[#E8E4DC] bg-stone-100">
+                    <MediaPrepOverlay />
                     <img
                       src={remoteThumb}
                       alt=""
@@ -1004,10 +1065,13 @@ export default function CmsStoryEditorPage() {
                     />
                   </div>
                 ) : (
-                  <div className="rounded-2xl border border-dashed border-[#E8E4DC] bg-white px-6 py-8 text-center text-xs text-stone-400">
+                  <div className="relative rounded-2xl border border-dashed border-[#E8E4DC] bg-white px-6 py-8 text-center text-xs text-stone-400">
+                    <MediaPrepOverlay />
                     {posterBusy
                       ? t('cms.editor.generatingPoster')
-                      : t('cms.editor.videoPosterHint')}
+                      : mediaPreparing
+                        ? t('cms.editor.preparingMedia')
+                        : t('cms.editor.videoPosterHint')}
                   </div>
                 )}
               </div>
@@ -1024,11 +1088,12 @@ export default function CmsStoryEditorPage() {
               </div>
 
               {!audioUrl && !form.watch('audioMediaId') ? (
-                <label className="flex cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-[#E8E4DC] bg-[#FAF8F3] px-6 py-16 text-center transition-colors hover:border-[#0C2686]/40">
+                <label className="relative flex cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-[#E8E4DC] bg-[#FAF8F3] px-6 py-16 text-center transition-colors hover:border-[#0C2686]/40">
+                  <MediaPrepOverlay />
                   <Headphones className="size-8 text-[#0C2686]" />
                   <span className="text-sm font-medium text-stone-600">
-                    {audioUploading
-                      ? t('cms.authors.uploading')
+                    {mediaBusy
+                      ? t('cms.editor.preparingMedia')
                       : t('cms.editor.addAudio')}
                   </span>
                   <span className="text-[11px] text-stone-400">
@@ -1038,17 +1103,18 @@ export default function CmsStoryEditorPage() {
                     type="file"
                     accept="audio/*"
                     className="hidden"
-                    disabled={audioUploading}
+                    disabled={mediaBusy}
                     onChange={async (e) => {
                       const file = e.target.files?.[0]
                       if (!file) return
-                      await uploadAudioFile(file)
+                      await pickAudioFile(file)
                       e.target.value = ''
                     }}
                   />
                 </label>
               ) : (
-                <div className="space-y-4">
+                <div className="relative space-y-4">
+                  <MediaPrepOverlay />
                   <div className="rounded-2xl border border-[#E8E4DC] bg-[#FAF8F3] p-4">
                     <p className="mb-3 text-xs font-semibold text-stone-700">
                       {t('cms.editor.audioReady')}
@@ -1078,18 +1144,18 @@ export default function CmsStoryEditorPage() {
                   <div className="flex flex-wrap gap-2">
                     <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-[#E8E4DC] bg-white px-3 py-2 text-xs font-semibold text-[#0C2686]">
                       <Headphones className="size-3.5" />
-                      {audioUploading
-                        ? t('cms.authors.uploading')
+                      {mediaBusy
+                        ? t('cms.editor.preparingMedia')
                         : t('cms.editor.replaceAudio')}
                       <input
                         type="file"
                         accept="audio/*"
                         className="hidden"
-                        disabled={audioUploading}
+                        disabled={mediaBusy}
                         onChange={async (e) => {
                           const file = e.target.files?.[0]
                           if (!file) return
-                          await uploadAudioFile(file)
+                          await pickAudioFile(file)
                           e.target.value = ''
                         }}
                       />
@@ -1097,11 +1163,7 @@ export default function CmsStoryEditorPage() {
                     <GhostButton
                       type="button"
                       className="py-2 text-xs"
-                      onClick={() => {
-                        form.setValue('audioMediaId', '', { shouldDirty: true })
-                        form.setValue('audioDuration', '', { shouldDirty: true })
-                        setAudioUrl('')
-                      }}
+                      onClick={() => clearAudio()}
                     >
                       {t('cms.editor.clearAudio')}
                     </GhostButton>
@@ -1121,15 +1183,18 @@ export default function CmsStoryEditorPage() {
                   </div>
                   <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-[#E8E4DC] bg-white px-3 py-2 text-xs font-semibold text-[#0C2686]">
                     <ImagePlus className="size-3.5" />
-                    {gallery[0]
-                      ? t('cms.editor.audioCoverChange')
-                      : t('cms.editor.audioCoverUpload')}
+                    {mediaBusy
+                      ? t('cms.editor.preparingMedia')
+                      : gallery[0]
+                        ? t('cms.editor.audioCoverChange')
+                        : t('cms.editor.audioCoverUpload')}
                     <input
                       type="file"
                       accept="image/*"
                       className="hidden"
-                      onChange={(e) => {
-                        void uploadPoster(e.target.files)
+                      disabled={mediaBusy}
+                      onChange={async (e) => {
+                        await pickPoster(e.target.files)
                         e.target.value = ''
                       }}
                     />
@@ -1137,6 +1202,7 @@ export default function CmsStoryEditorPage() {
                 </div>
                 {gallery[0] ? (
                   <div className="relative aspect-[16/10] overflow-hidden rounded-2xl border border-[#E8E4DC] bg-stone-100">
+                    <MediaPrepOverlay />
                     <img
                       src={gallery[0].url}
                       alt=""
@@ -1152,17 +1218,21 @@ export default function CmsStoryEditorPage() {
                     </button>
                   </div>
                 ) : (
-                  <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-[#E8E4DC] bg-white px-6 py-10 text-center transition-colors hover:border-[#0C2686]/40">
+                  <label className="relative flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-[#E8E4DC] bg-white px-6 py-10 text-center transition-colors hover:border-[#0C2686]/40">
+                    <MediaPrepOverlay />
                     <ImagePlus className="size-6 text-stone-400" />
                     <span className="text-xs font-medium text-stone-500">
-                      {t('cms.editor.audioCoverUpload')}
+                      {mediaBusy
+                        ? t('cms.editor.preparingMedia')
+                        : t('cms.editor.audioCoverUpload')}
                     </span>
                     <input
                       type="file"
                       accept="image/*"
                       className="hidden"
-                      onChange={(e) => {
-                        void uploadPoster(e.target.files)
+                      disabled={mediaBusy}
+                      onChange={async (e) => {
+                        await pickPoster(e.target.files)
                         e.target.value = ''
                       }}
                     />
@@ -1192,14 +1262,17 @@ export default function CmsStoryEditorPage() {
                 )}
                 <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-[#E8E4DC] bg-white px-4 py-2.5 text-xs font-semibold text-[#0C2686] shadow-2xs">
                   <ImagePlus className="size-4" />
-                  {t('cms.editor.addImages')}
+                  {mediaBusy
+                    ? t('cms.editor.preparingMedia')
+                    : t('cms.editor.addImages')}
                   <input
                     type="file"
                     accept="image/*"
                     multiple
                     className="hidden"
-                    onChange={(e) => {
-                      void uploadImages(e.target.files)
+                    disabled={mediaBusy}
+                    onChange={async (e) => {
+                      await pickImages(e.target.files)
                       e.target.value = ''
                     }}
                   />
@@ -1208,24 +1281,29 @@ export default function CmsStoryEditorPage() {
             </div>
 
             {gallery.length === 0 ? (
-              <label className="flex cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-[#E8E4DC] bg-[#FAF8F3] px-6 py-16 text-center transition-colors hover:border-[#0C2686]/40">
+              <label className="relative flex cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-[#E8E4DC] bg-[#FAF8F3] px-6 py-16 text-center transition-colors hover:border-[#0C2686]/40">
+                <MediaPrepOverlay />
                 <ImagePlus className="size-8 text-[#0C2686]" />
                 <span className="text-sm font-medium text-stone-600">
-                  {t('cms.editor.addImages')}
+                  {mediaBusy
+                    ? t('cms.editor.preparingMedia')
+                    : t('cms.editor.addImages')}
                 </span>
                 <input
                   type="file"
                   accept="image/*"
                   multiple
                   className="hidden"
-                  onChange={(e) => {
-                    void uploadImages(e.target.files)
+                  disabled={mediaBusy}
+                  onChange={async (e) => {
+                    await pickImages(e.target.files)
                     e.target.value = ''
                   }}
                 />
               </label>
             ) : galleryView === 'slider' ? (
-              <div className="space-y-3">
+              <div className="relative space-y-3">
+                <MediaPrepOverlay />
                 <div className="relative aspect-[16/10] overflow-hidden rounded-2xl border border-[#E8E4DC] bg-stone-100">
                   <img
                     src={gallery[activeSlide]?.url}
@@ -1304,15 +1382,15 @@ export default function CmsStoryEditorPage() {
                           alt=""
                           className={cn(
                             'h-full w-full object-cover',
-                            item.uploading && 'opacity-60',
+                            item.file && 'ring-1 ring-amber-400/70',
                           )}
                         />
-                        {item.uploading && (
-                          <span className="absolute inset-0 flex items-center justify-center bg-black/25 text-[9px] font-semibold uppercase tracking-wider text-white">
-                            …
+                        {item.file && (
+                          <span className="absolute inset-x-0 top-0 bg-amber-400/90 py-0.5 text-center text-[8px] font-semibold uppercase text-[#1A1A1A]">
+                            new
                           </span>
                         )}
-                        {index === 0 && !item.uploading && (
+                        {index === 0 && (
                           <span className="absolute inset-x-0 bottom-0 bg-[#0C2686]/90 py-0.5 text-center text-[9px] font-semibold uppercase text-white">
                             {t('cms.editor.heroLabel')}
                           </span>
@@ -1323,7 +1401,8 @@ export default function CmsStoryEditorPage() {
                 )}
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
+              <div className="relative grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
+                <MediaPrepOverlay />
                 {gallery.map((item, index) => (
                   <button
                     key={item.id}
@@ -1339,15 +1418,15 @@ export default function CmsStoryEditorPage() {
                       alt=""
                       className={cn(
                         'h-full w-full object-cover transition group-hover:scale-105',
-                        item.uploading && 'opacity-60',
+                        item.file && 'ring-1 ring-amber-400/70',
                       )}
                     />
-                    {item.uploading && (
-                      <span className="absolute inset-0 flex items-center justify-center bg-black/30 text-[10px] font-semibold uppercase tracking-wider text-white">
-                        …
+                    {item.file && (
+                      <span className="absolute inset-x-0 top-0 bg-amber-400/90 py-0.5 text-center text-[8px] font-semibold uppercase text-[#1A1A1A]">
+                        new
                       </span>
                     )}
-                    {index === 0 && !item.uploading && (
+                    {index === 0 && (
                       <span className="absolute left-2 top-2 rounded-md bg-[#0C2686] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white">
                         {t('cms.editor.heroLabel')}
                       </span>
