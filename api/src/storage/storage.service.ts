@@ -49,7 +49,28 @@ export class StorageService implements OnModuleInit {
   }
 
   async onModuleInit() {
-    await this.ensureBucket();
+    await this.ensureBucketWithRetry();
+  }
+
+  private async ensureBucketWithRetry(attempts = 12, delayMs = 2500) {
+    let lastError: unknown;
+    for (let i = 1; i <= attempts; i++) {
+      try {
+        await this.ensureBucket();
+        return;
+      } catch (error) {
+        lastError = error;
+        this.logger.warn(
+          `MinIO not ready (attempt ${i}/${attempts}): ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+    }
+    throw lastError instanceof Error
+      ? lastError
+      : new Error('Failed to initialize MinIO bucket');
   }
 
   private async ensureBucket() {
@@ -60,6 +81,20 @@ export class StorageService implements OnModuleInit {
     } else {
       this.logger.log(`MinIO bucket ready: ${this.bucket}`);
     }
+
+    // Public read for uploaded assets (replaces former minio-init mc policy)
+    const policy = {
+      Version: '2012-10-17',
+      Statement: [
+        {
+          Effect: 'Allow',
+          Principal: { AWS: ['*'] },
+          Action: ['s3:GetObject'],
+          Resource: [`arn:aws:s3:::${this.bucket}/*`],
+        },
+      ],
+    };
+    await this.client.setBucketPolicy(this.bucket, JSON.stringify(policy));
   }
 
   async ping(): Promise<boolean> {

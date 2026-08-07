@@ -51,25 +51,6 @@ services:
       retries: 10
       start_period: 10s
 
-
-  minio-init:
-    image: minio/mc:latest
-    depends_on:
-      minio:
-        condition: service_started
-    entrypoint: >
-      /bin/sh -c "
-      sleep 3;
-      mc alias set local http://minio:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD};
-      mc mb --ignore-existing local/$${MINIO_BUCKET};
-      mc anonymous set download local/$${MINIO_BUCKET};
-      exit 0;
-      "
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-      MINIO_BUCKET: ${MINIO_BUCKET}
-
   api:
     build:
       context: ./api
@@ -89,6 +70,9 @@ services:
       API_PORT: 3000
     ports:
       - "${API_PORT:-3000}:3000"
+    # Do NOT depend on one-shot init containers — Coolify removes them and
+    # `service_completed_successfully` then fails with "No such container".
+    # Bucket + public policy are ensured by StorageService.onModuleInit.
     depends_on:
       postgres:
         condition: service_healthy
@@ -96,8 +80,6 @@ services:
         condition: service_healthy
       minio:
         condition: service_started
-      minio-init:
-        condition: service_completed_successfully
 
   web:
     build:
