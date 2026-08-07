@@ -653,6 +653,12 @@ export class ArticlesService {
     return this.getCmsById(id);
   }
 
+  async remove(id: string) {
+    await this.prisma.article.findUniqueOrThrow({ where: { id } });
+    await this.prisma.article.delete({ where: { id } });
+    return { ok: true as const, id };
+  }
+
   async markTranslation(
     id: string,
     data: {

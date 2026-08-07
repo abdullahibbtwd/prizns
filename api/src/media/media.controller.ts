@@ -31,7 +31,8 @@ export class MediaController {
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
-      limits: { fileSize: 40 * 1024 * 1024 },
+      // Videos/audio on VPS can be large; images stay well under this.
+      limits: { fileSize: 200 * 1024 * 1024 },
     }),
   )
   upload(

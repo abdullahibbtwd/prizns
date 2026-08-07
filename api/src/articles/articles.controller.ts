@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -94,5 +95,11 @@ export class ArticlesController {
   async translate(@Param('id') id: string) {
     await this.translation.enqueue(id);
     return { ok: true, queued: true };
+  }
+
+  @Delete('cms/articles/:id')
+  @UseGuards(JwtAuthGuard)
+  remove(@Param('id') id: string) {
+    return this.articles.remove(id);
   }
 }

@@ -70,6 +70,10 @@ export function updateCmsArticle(
   return api.patch<CmsArticle>(`/cms/articles/${id}`, body);
 }
 
+export function deleteCmsArticle(id: string) {
+  return api.delete<{ ok: boolean; id: string }>(`/cms/articles/${id}`);
+}
+
 export function queueArticleTranslation(id: string) {
   return api.post<{ ok: boolean }>(`/cms/articles/${id}/translate`);
 }

@@ -379,7 +379,9 @@ export default function CmsStoryEditorPage() {
         galleryMediaIds: values.galleryMediaIds,
         heroMediaId: values.galleryMediaIds[0] || undefined,
         audioMediaId: values.audioMediaId || undefined,
-        videoUrl: values.videoUrl.trim() || null,
+        videoUrl: values.videoUrl.trim().startsWith('blob:')
+          ? null
+          : values.videoUrl.trim() || null,
         videoMediaId: values.videoMediaId || null,
         featured: values.featured,
         sponsored: values.sponsored,
@@ -438,37 +440,35 @@ export default function CmsStoryEditorPage() {
       url: URL.createObjectURL(file),
       uploading: true,
     }))
+    // Show local previews immediately — do not wait for MinIO.
+    const startIndex = gallery.length
     setGallery((prev) => [...prev, ...temps])
+    setActiveSlide(startIndex)
 
     const credit = form.getValues('photoCreditBg')
-    const results = await Promise.all(
+    void Promise.all(
       list.map(async (file, index) => {
+        const tempId = temps[index].id
         try {
           const media = await uploadCmsMedia(file, credit)
-          return { tempId: temps[index].id, media, error: null as Error | null }
-        } catch (error) {
-          return {
-            tempId: temps[index].id,
-            media: null,
-            error: error as Error,
+          if (!form.getValues('photoCreditBg') && media.creditBg) {
+            form.setValue('photoCreditBg', media.creditBg)
           }
+          // Keep blob URL for snappy preview; only swap the id once uploaded.
+          setGallery((prev) =>
+            prev.map((item) =>
+              item.id === tempId
+                ? { id: media.id, url: item.url, uploading: false }
+                : item,
+            ),
+          )
+        } catch {
+          setGallery((prev) => {
+            const doomed = prev.find((item) => item.id === tempId)
+            if (doomed?.url.startsWith('blob:')) URL.revokeObjectURL(doomed.url)
+            return prev.filter((item) => item.id !== tempId)
+          })
         }
-      }),
-    )
-
-    for (const temp of temps) {
-      URL.revokeObjectURL(temp.url)
-    }
-
-    setGallery((prev) =>
-      prev.flatMap((item) => {
-        const match = results.find((r) => r.tempId === item.id)
-        if (!match) return [item]
-        if (!match.media) return []
-        if (!form.getValues('photoCreditBg') && match.media.creditBg) {
-          form.setValue('photoCreditBg', match.media.creditBg)
-        }
-        return [{ id: match.media.id, url: match.media.url }]
       }),
     )
   }
@@ -476,16 +476,18 @@ export default function CmsStoryEditorPage() {
   const uploadPoster = async (files: FileList | null) => {
     const file = files?.[0]
     if (!file) return
+    const tempId = `temp-${crypto.randomUUID()}`
     const tempUrl = URL.createObjectURL(file)
-    setGallery([{ id: `temp-${crypto.randomUUID()}`, url: tempUrl, uploading: true }])
+    setGallery([{ id: tempId, url: tempUrl, uploading: true }])
     try {
       const media = await uploadCmsMedia(file, form.getValues('photoCreditBg'))
-      setGallery([{ id: media.id, url: media.url }])
       if (!form.getValues('photoCreditBg') && media.creditBg) {
         form.setValue('photoCreditBg', media.creditBg)
       }
-    } finally {
+      setGallery([{ id: media.id, url: tempUrl, uploading: false }])
+    } catch {
       URL.revokeObjectURL(tempUrl)
+      setGallery([])
     }
   }
 
@@ -493,46 +495,63 @@ export default function CmsStoryEditorPage() {
     const file = new File([blob], filename, {
       type: blob.type || 'image/jpeg',
     })
-    const media = await uploadCmsMedia(file, form.getValues('photoCreditBg'))
-    setGallery([{ id: media.id, url: media.url }])
-    if (!form.getValues('photoCreditBg') && media.creditBg) {
-      form.setValue('photoCreditBg', media.creditBg)
+    const tempId = `temp-${crypto.randomUUID()}`
+    const tempUrl = URL.createObjectURL(file)
+    setGallery([{ id: tempId, url: tempUrl, uploading: true }])
+    try {
+      const media = await uploadCmsMedia(file, form.getValues('photoCreditBg'))
+      if (!form.getValues('photoCreditBg') && media.creditBg) {
+        form.setValue('photoCreditBg', media.creditBg)
+      }
+      setGallery([{ id: media.id, url: tempUrl, uploading: false }])
+    } catch {
+      URL.revokeObjectURL(tempUrl)
     }
   }
 
   const uploadVideoFile = async (file: File) => {
+    const localUrl = URL.createObjectURL(file)
+    // Instant local playback while MinIO upload runs in the background.
+    form.setValue('videoUrl', localUrl, { shouldDirty: true })
+    form.setValue('videoMediaId', '', { shouldDirty: true })
     setVideoUploading(true)
     setPosterBusy(true)
     setLinkPreviewOpen(false)
+
     try {
+      const uploadPromise = uploadCmsMedia(file)
+
       let posterBlob: Blob | null = null
-      let durationSec = 0
       try {
         const captured = await captureVideoPosterBlob(file)
         posterBlob = captured.blob
-        durationSec = captured.durationSec
+        if (captured.durationSec > 0) {
+          const mins = Math.max(1, Math.round(captured.durationSec / 60))
+          form.setValue('readTimeMinutes', mins, { shouldDirty: true })
+          form.setValue('readTimeUnit', 'minutes', { shouldDirty: true })
+          form.setValue(
+            'audioDuration',
+            formatWatchDuration(captured.durationSec),
+            { shouldDirty: true },
+          )
+        }
       } catch {
-        /* CORS / decode failures — keep video without auto poster */
-      }
-
-      const media = await uploadCmsMedia(file)
-      form.setValue('videoMediaId', media.id, { shouldDirty: true })
-      form.setValue('videoUrl', media.url, { shouldDirty: true })
-
-      if (durationSec > 0) {
-        const mins = Math.max(1, Math.round(durationSec / 60))
-        form.setValue('readTimeMinutes', mins, { shouldDirty: true })
-        form.setValue('readTimeUnit', 'minutes', { shouldDirty: true })
-        form.setValue(
-          'audioDuration',
-          formatWatchDuration(durationSec),
-          { shouldDirty: true },
-        )
+        /* keep video without auto poster */
       }
 
       if (posterBlob) {
-        await setPosterFromBlob(posterBlob)
+        void setPosterFromBlob(posterBlob)
       }
+      setPosterBusy(false)
+
+      const media = await uploadPromise
+      form.setValue('videoMediaId', media.id, { shouldDirty: true })
+      // Keep local blob as preview URL so playback stays instant.
+      form.setValue('videoUrl', localUrl, { shouldDirty: true })
+    } catch {
+      form.setValue('videoUrl', '', { shouldDirty: true })
+      form.setValue('videoMediaId', '', { shouldDirty: true })
+      URL.revokeObjectURL(localUrl)
     } finally {
       setVideoUploading(false)
       setPosterBusy(false)
@@ -558,33 +577,35 @@ export default function CmsStoryEditorPage() {
   }
 
   const uploadAudioFile = async (file: File) => {
+    const localUrl = URL.createObjectURL(file)
+    setAudioUrl(localUrl)
     setAudioUploading(true)
+    form.setValue('audioMediaId', '', { shouldDirty: true })
+
+    // Read duration from local file immediately
+    void new Promise<void>((resolve) => {
+      const el = document.createElement('audio')
+      el.preload = 'metadata'
+      el.onloadedmetadata = () => {
+        if (Number.isFinite(el.duration) && el.duration > 0) {
+          form.setValue('audioDuration', formatWatchDuration(el.duration), {
+            shouldDirty: true,
+          })
+        }
+        resolve()
+      }
+      el.onerror = () => resolve()
+      el.src = localUrl
+    })
+
     try {
       const media = await uploadCmsMedia(file)
       form.setValue('audioMediaId', media.id, { shouldDirty: true })
-      setAudioUrl(media.url)
-
-      await new Promise<void>((resolve) => {
-        const objectUrl = URL.createObjectURL(file)
-        const el = document.createElement('audio')
-        el.preload = 'metadata'
-        el.onloadedmetadata = () => {
-          if (Number.isFinite(el.duration) && el.duration > 0) {
-            form.setValue(
-              'audioDuration',
-              formatWatchDuration(el.duration),
-              { shouldDirty: true },
-            )
-          }
-          URL.revokeObjectURL(objectUrl)
-          resolve()
-        }
-        el.onerror = () => {
-          URL.revokeObjectURL(objectUrl)
-          resolve()
-        }
-        el.src = objectUrl
-      })
+      // Keep local blob for instant playback in the editor.
+    } catch {
+      setAudioUrl('')
+      form.setValue('audioMediaId', '', { shouldDirty: true })
+      URL.revokeObjectURL(localUrl)
     } finally {
       setAudioUploading(false)
     }
@@ -593,7 +614,9 @@ export default function CmsStoryEditorPage() {
   const videoPlayback = resolveVideoPlayback(videoUrlValue)
   const hasVideoSource = Boolean(videoUrlValue.trim() || videoMediaIdValue)
   const isFileVideo =
-    Boolean(videoMediaIdValue) || videoPlayback?.kind === 'file'
+    Boolean(videoMediaIdValue) ||
+    videoUrlValue.startsWith('blob:') ||
+    videoPlayback?.kind === 'file'
   const isEmbedVideo =
     videoPlayback?.kind === 'youtube' || videoPlayback?.kind === 'vimeo'
   const remoteThumb = getRemotePosterUrl(videoUrlValue)
@@ -641,6 +664,14 @@ export default function CmsStoryEditorPage() {
   }
 
   const onSubmit = form.handleSubmit(async (values) => {
+    // Wait briefly if an upload is still finishing so we don't save temp ids.
+    if (
+      gallery.some((item) => item.uploading) ||
+      videoUploading ||
+      audioUploading
+    ) {
+      return
+    }
     await saveMutation.mutateAsync({
       ...values,
       galleryMediaIds: gallery
@@ -684,6 +715,9 @@ export default function CmsStoryEditorPage() {
     label: pickLang(lang, author.nameEn ?? author.nameBg, author.nameBg),
   }))
 
+  const mediaBusy =
+    gallery.some((item) => item.uploading) || videoUploading || audioUploading
+
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-[#E8E4DC] pb-4">
@@ -706,7 +740,7 @@ export default function CmsStoryEditorPage() {
               form.setValue('status', 'DRAFT')
               void onSubmit()
             }}
-            disabled={saveMutation.isPending}
+            disabled={saveMutation.isPending || mediaBusy}
           >
             <Save className="size-4" /> {t('cms.editor.saveDraft')}
           </GhostButton>
@@ -716,7 +750,7 @@ export default function CmsStoryEditorPage() {
               form.setValue('status', 'PUBLISHED')
               void onSubmit()
             }}
-            disabled={saveMutation.isPending}
+            disabled={saveMutation.isPending || mediaBusy}
           >
             {t('cms.editor.publish')}
           </PrimaryButton>

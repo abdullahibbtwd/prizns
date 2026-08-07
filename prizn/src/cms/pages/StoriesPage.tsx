@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import {
   Plus,
@@ -9,6 +9,7 @@ import {
   List,
   Eye,
   Edit,
+  Trash2,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react'
@@ -18,12 +19,13 @@ import {
   PrimaryButton,
   StatusPill,
 } from '@/cms/components/CmsUI'
-import { listCmsArticles } from '@/lib/articles-api'
-import type { ArticleStatus } from '@/lib/cms-types'
+import { deleteCmsArticle, listCmsArticles } from '@/lib/articles-api'
+import type { ArticleStatus, CmsArticle } from '@/lib/cms-types'
 import { cn } from '@/lib/utils'
 import { useJournalLang } from '@/hooks/useJournalLang'
 import { pickLang } from '@/lib/pick-lang'
 import { getSectionLabel } from '@/lib/section-i18n'
+import { ApiError } from '@/lib/api'
 
 const filters: Array<'all' | ArticleStatus | 'sponsored'> = [
   'all',
@@ -103,6 +105,23 @@ export default function CmsStoriesPage() {
 
   const from = total === 0 ? 0 : (page - 1) * pageSize + 1
   const to = Math.min(page * pageSize, total)
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => deleteCmsArticle(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['cms-articles'] })
+      await queryClient.invalidateQueries({ queryKey: ['cms-articles-count'] })
+    },
+  })
+
+  const confirmDelete = (story: CmsArticle) => {
+    const title = pickLang(lang, story.title, story.titleBg) || story.titleBg
+    const ok = window.confirm(
+      t('cms.stories.deleteConfirm', { title }),
+    )
+    if (!ok) return
+    deleteMutation.mutate(story.id)
+  }
 
   const filterLabel = (item: (typeof filters)[number]) => {
     if (item === 'all') return t('cms.status.all')
@@ -199,6 +218,15 @@ export default function CmsStoriesPage() {
         <p className="text-sm text-rose-700">{t('cms.stories.loadFailed')}</p>
       )}
 
+      {deleteMutation.isError && (
+        <p className="mb-4 text-sm text-rose-700">
+          {t('cms.stories.deleteFailed')}
+          {(deleteMutation.error as ApiError)?.message
+            ? `: ${(deleteMutation.error as ApiError).message}`
+            : ''}
+        </p>
+      )}
+
       {!articlesQuery.isLoading && total === 0 && (
         <CmsCard className="p-8 text-center text-sm text-stone-500">
           {t('cms.stories.empty')}{' '}
@@ -239,7 +267,7 @@ export default function CmsStoriesPage() {
                     · {story.updatedAt?.slice(0, 10)}
                   </p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap items-center gap-3">
                   <Link
                     to={`${BASE_PATH}/${story.id}`}
                     className="inline-flex items-center gap-1 text-xs font-semibold text-[#0C2686]"
@@ -256,6 +284,17 @@ export default function CmsStoriesPage() {
                       <Eye className="size-3.5" /> {t('cms.stories.view')}
                     </a>
                   )}
+                  <button
+                    type="button"
+                    onClick={() => confirmDelete(story)}
+                    disabled={deleteMutation.isPending}
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-rose-700 disabled:opacity-50"
+                  >
+                    <Trash2 className="size-3.5" />
+                    {deleteMutation.isPending
+                      ? t('cms.stories.deleting')
+                      : t('cms.stories.delete')}
+                  </button>
                 </div>
               </div>
             </CmsCard>
@@ -291,12 +330,22 @@ export default function CmsStoriesPage() {
                     <StatusPill status={story.translationStatus} />
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <Link
-                      to={`${BASE_PATH}/${story.id}`}
-                      className="font-semibold text-[#0C2686]"
-                    >
-                      {t('cms.stories.edit')}
-                    </Link>
+                    <div className="flex items-center justify-end gap-3">
+                      <Link
+                        to={`${BASE_PATH}/${story.id}`}
+                        className="font-semibold text-[#0C2686]"
+                      >
+                        {t('cms.stories.edit')}
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => confirmDelete(story)}
+                        disabled={deleteMutation.isPending}
+                        className="font-semibold text-rose-700 disabled:opacity-50"
+                      >
+                        {t('cms.stories.delete')}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
