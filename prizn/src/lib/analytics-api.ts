@@ -33,6 +33,7 @@ export type AnalyticsSummary = {
     avgDwellLabel: string
   }>
   daily: Array<{ day: string; views: number }>
+  trafficSources?: Array<{ source: string; views: number }>
 }
 
 export type BeaconPayload = {
@@ -43,6 +44,10 @@ export type BeaconPayload = {
   path: string
   articleId?: string
   title?: string
+  referrer?: string
+  utmSource?: string
+  utmMedium?: string
+  utmCampaign?: string
   dwellMs?: number
 }
 

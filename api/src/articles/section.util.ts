@@ -12,6 +12,7 @@ const SECTION_TO_PREFIX: Record<ArticleSection, string> = {
   voices: 'voices',
   sports: 'sports',
   events: 'events',
+  news: 'news',
   video: 'video',
   campaigns: 'campaigns',
   gallery: 'gallery',
@@ -27,6 +28,7 @@ export type PublicSection =
   | 'voices'
   | 'sports'
   | 'events'
+  | 'news'
   | 'video'
   | 'campaigns'
   | 'gallery';

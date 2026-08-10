@@ -19,6 +19,8 @@ interface JournalSelectProps {
   defaultValue?: string
   onChange?: (value: string) => void
   className?: string
+  /** underline = public journal; boxed = CMS dense forms */
+  variant?: 'underline' | 'boxed'
 }
 
 type MenuCoords = {
@@ -39,6 +41,7 @@ export function JournalSelect({
   defaultValue = '',
   onChange,
   className,
+  variant = 'underline',
 }: JournalSelectProps) {
   const [open, setOpen] = useState(false)
   const [internalValue, setInternalValue] = useState(defaultValue)
@@ -247,17 +250,29 @@ export function JournalSelect({
           else openMenu()
         }}
         className={cn(
-          'flex w-full cursor-pointer items-center justify-between gap-3 border-b bg-transparent py-3 text-left font-sans text-sm outline-none transition-colors',
-          open
-            ? 'border-[#0C2686]'
-            : 'border-[#1A1A1A]/15 hover:border-[#1A1A1A]/35',
-          selected ? 'text-[#1A1A1A]' : 'text-[#1A1A1A]/30',
+          'flex w-full cursor-pointer items-center justify-between gap-3 text-left font-sans text-sm outline-none transition-all',
+          variant === 'boxed'
+            ? cn(
+                'rounded-xl border bg-white px-3.5 py-2.5 shadow-2xs',
+                open
+                  ? 'border-[#0C2686] ring-2 ring-[#0C2686]/10'
+                  : 'border-[#E8E4DC] hover:border-[#0C2686]/25',
+                selected ? 'text-stone-900' : 'text-stone-400',
+              )
+            : cn(
+                'border-b bg-transparent py-3',
+                open
+                  ? 'border-[#0C2686]'
+                  : 'border-[#1A1A1A]/15 hover:border-[#1A1A1A]/35',
+                selected ? 'text-[#1A1A1A]' : 'text-[#1A1A1A]/30',
+              ),
         )}
       >
         <span className="truncate">{selected?.label ?? placeholder}</span>
         <ChevronDown
           className={cn(
-            'size-4 shrink-0 stroke-[1.5] text-[#1A1A1A]/45 transition-transform duration-300',
+            'size-4 shrink-0 stroke-[1.5] transition-transform duration-300',
+            variant === 'boxed' ? 'text-stone-400' : 'text-[#1A1A1A]/45',
             open && 'rotate-180',
           )}
         />

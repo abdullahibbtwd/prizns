@@ -4,20 +4,31 @@ import { resolve } from 'path';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AnalyticsModule } from './analytics/analytics.module';
+import { AiModule } from './ai/ai.module';
 import { ArticlesModule } from './articles/articles.module';
 import { AuthModule } from './auth/auth.module';
 import { AuthorsModule } from './authors/authors.module';
 import { validateEnv } from './config/env.validation';
+import { DigestModule } from './digest/digest.module';
+import { DonationsModule } from './donations/donations.module';
 import { HealthModule } from './health/health.module';
+import { JobsModule } from './jobs/jobs.module';
+import { MailModule } from './mail/mail.module';
 import { MediaModule } from './media/media.module';
 import { NewsletterModule } from './newsletter/newsletter.module';
+import { PartnershipsModule } from './partnerships/partnerships.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { RedisModule } from './redis/redis.module';
+import { SeoModule } from './seo/seo.module';
 import { SeriesModule } from './series/series.module';
+import { ShopModule } from './shop/shop.module';
+import { SocialModule } from './social/social.module';
 import { StorageModule } from './storage/storage.module';
 import { SubmissionsModule } from './submissions/submissions.module';
+import { TagsModule } from './tags/tags.module';
 import { TodosModule } from './todos/todos.module';
 import { TranslationModule } from './translation/translation.module';
+import { TtsModule } from './tts/tts.module';
 import { UsersModule } from './users/users.module';
 
 @Module({
@@ -32,17 +43,28 @@ import { UsersModule } from './users/users.module';
     }),
     PrismaModule,
     RedisModule,
+    JobsModule,
     AuthModule,
     AuthorsModule,
     MediaModule,
     ArticlesModule,
     SeriesModule,
+    TagsModule,
     SubmissionsModule,
+    PartnershipsModule,
     NewsletterModule,
+    DonationsModule,
+    ShopModule,
+    SeoModule,
     UsersModule,
     TodosModule,
     AnalyticsModule,
     TranslationModule,
+    TtsModule,
+    AiModule,
+    SocialModule,
+    DigestModule,
+    MailModule,
     StorageModule,
     HealthModule,
   ],

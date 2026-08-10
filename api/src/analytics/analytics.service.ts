@@ -49,6 +49,17 @@ function normalizePath(raw: string) {
   }
 }
 
+function referrerHost(referrer: string | null | undefined): string | null {
+  const value = referrer?.trim();
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    return url.host || null;
+  } catch {
+    return value.slice(0, 120);
+  }
+}
+
 @Injectable()
 export class AnalyticsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -92,6 +103,10 @@ export class AnalyticsService {
           path,
           articleId: dto.articleId?.trim() || null,
           title: dto.title?.trim().slice(0, 240) || null,
+          referrer: dto.referrer?.trim().slice(0, 500) || null,
+          utmSource: dto.utmSource?.trim().slice(0, 120) || null,
+          utmMedium: dto.utmMedium?.trim().slice(0, 120) || null,
+          utmCampaign: dto.utmCampaign?.trim().slice(0, 120) || null,
           dwellMs: Math.max(0, dto.dwellMs ?? 0),
         },
       });
@@ -159,7 +174,7 @@ export class AnalyticsService {
 
   async summary(range: AnalyticsRange = 'today') {
     const { start, end, prevStart, prevEnd } = rangeWindow(range);
-    const [current, previous, topPagesRaw, topStoriesRaw, dailyRaw] =
+    const [current, previous, topPagesRaw, topStoriesRaw, dailyRaw, sourceRows] =
       await Promise.all([
         this.periodStats(start, end),
         this.periodStats(prevStart, prevEnd),
@@ -189,6 +204,10 @@ export class AnalyticsService {
           GROUP BY 1
           ORDER BY 1 ASC
         `,
+        this.prisma.pageView.findMany({
+          where: { startedAt: { gte: start, lt: end } },
+          select: { utmSource: true, referrer: true },
+        }),
       ]);
 
     const articleIds = topStoriesRaw
@@ -213,6 +232,19 @@ export class AnalyticsService {
       if (prev <= 0) return curr > 0 ? 100 : 0;
       return Math.round(((curr - prev) / prev) * 1000) / 10;
     };
+
+    const sourceCounts = new Map<string, number>();
+    for (const row of sourceRows) {
+      const label =
+        row.utmSource?.trim() ||
+        referrerHost(row.referrer) ||
+        'direct';
+      sourceCounts.set(label, (sourceCounts.get(label) ?? 0) + 1);
+    }
+    const trafficSources = [...sourceCounts.entries()]
+      .map(([source, views]) => ({ source, views }))
+      .sort((a, b) => b.views - a.views)
+      .slice(0, 10);
 
     return {
       range,
@@ -249,6 +281,7 @@ export class AnalyticsService {
           avgDwellLabel: formatDuration(Math.round(row._avg.dwellMs ?? 0)),
         };
       }),
+      trafficSources,
       daily: dailyRaw.map((row) => ({
         day: row.day.toISOString().slice(0, 10),
         views: Number(row.views),

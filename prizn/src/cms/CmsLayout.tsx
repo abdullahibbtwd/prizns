@@ -19,6 +19,8 @@ export function CmsLayout() {
   const crumbKey = `cms.nav.${crumbSegment === 'dashboard' ? 'dashboard' : crumbSegment}`
   const crumbLabel = t(crumbKey, { defaultValue: crumbSegment })
 
+  const isStoryEditor = /^\/cms\/stories\/[^/]+\/?$/.test(location.pathname)
+
   // Cmd+K shortcut
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -31,10 +33,24 @@ export function CmsLayout() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
+  // Trap scroll inside the CMS shell — never scroll the document behind it.
+  useEffect(() => {
+    const html = document.documentElement
+    const body = document.body
+    const prevHtml = html.style.overflow
+    const prevBody = body.style.overflow
+    html.style.overflow = 'hidden'
+    body.style.overflow = 'hidden'
+    return () => {
+      html.style.overflow = prevHtml
+      body.style.overflow = prevBody
+    }
+  }, [])
+
   return (
-    <div className="flex h-svh overflow-hidden bg-[#FAF8F3] font-sans text-stone-900 antialiased">
+    <div className="flex h-svh max-h-svh overflow-hidden bg-[#FAF8F3] font-sans text-stone-900 antialiased">
       {/* Desktop Sidebar */}
-      <div className="hidden lg:block">
+      <div className="hidden h-full lg:block">
         <CmsSidebar />
       </div>
 
@@ -186,9 +202,21 @@ export function CmsLayout() {
           </div>
         </header>
 
-        {/* Page Content Container */}
-        <main className="flex-1 overflow-y-auto">
-          <div className="mx-auto max-w-7xl px-4 py-8 md:px-8 lg:px-10">
+        {/* Page Content Container — story editor owns its own scroller */}
+        <main
+          className={
+            isStoryEditor
+              ? 'flex min-h-0 flex-1 flex-col overflow-hidden'
+              : 'min-h-0 flex-1 overflow-y-auto'
+          }
+        >
+          <div
+            className={
+              isStoryEditor
+                ? 'mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col overflow-hidden px-4 py-4 md:px-8 lg:px-10'
+                : 'mx-auto max-w-7xl px-4 py-8 md:px-8 lg:px-10'
+            }
+          >
             <Outlet />
           </div>
         </main>

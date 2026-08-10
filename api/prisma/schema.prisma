@@ -22,9 +22,30 @@ enum ArticleSection {
   voices
   sports
   events
+  news
   video
   campaigns
   gallery
+}
+
+enum TagKind {
+  LOCATION
+  TOPIC
+  CATEGORY
+}
+
+enum PartnershipStatus {
+  NEW
+  REVIEW
+  CONTACTED
+  CLOSED
+}
+
+enum DonationStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  CANCELLED
 }
 
 enum ArticleStatus {
@@ -46,6 +67,14 @@ enum MediaKind {
   IMAGE
   AUDIO
   VIDEO
+}
+
+enum NarrationStatus {
+  IDLE
+  PENDING
+  RUNNING
+  READY
+  FAILED
 }
 
 model User {
@@ -116,6 +145,7 @@ model Author {
   isActive          Boolean           @default(true) @map("is_active")
   translationStatus TranslationStatus @default(PENDING) @map("translation_status")
   translationError  String?           @map("translation_error")
+  sourceLang        String?           @map("source_lang")
   createdAt         DateTime          @default(now()) @map("created_at")
   updatedAt         DateTime          @updatedAt @map("updated_at")
   articles          Article[]
@@ -145,6 +175,8 @@ model MediaAsset {
   videoArticles Article[]            @relation("ArticleVideo")
   galleryItems  ArticleGalleryItem[]
   seriesCovers  Series[]
+  products      Product[]
+  productGalleryItems ProductGalleryItem[]
 
   @@map("media_assets")
 }
@@ -197,8 +229,17 @@ model Article {
   featured          Boolean              @default(false)
   sponsored         Boolean              @default(false)
   sponsorName       String?              @map("sponsor_name")
+  behindStoryBg     String               @default("") @map("behind_story_bg")
+  behindStoryEn     String?              @map("behind_story_en")
+  seoTitleBg        String?              @map("seo_title_bg")
+  seoTitleEn        String?              @map("seo_title_en")
+  seoDescriptionBg  String?              @map("seo_description_bg")
+  seoDescriptionEn  String?              @map("seo_description_en")
   translationStatus TranslationStatus    @default(PENDING) @map("translation_status")
   translationError  String?              @map("translation_error")
+  sourceLang        String?              @map("source_lang")
+  narrationStatus   NarrationStatus      @default(IDLE) @map("narration_status")
+  narrationError    String?              @map("narration_error")
   authorId          String?              @map("author_id")
   author            Author?              @relation(fields: [authorId], references: [id], onDelete: SetNull)
   heroMediaId       String?              @map("hero_media_id")
@@ -209,6 +250,10 @@ model Article {
   videoMedia        MediaAsset?          @relation("ArticleVideo", fields: [videoMediaId], references: [id], onDelete: SetNull)
   galleryItems      ArticleGalleryItem[]
   seriesEpisodes    SeriesEpisode[]
+  articleTags       ArticleTag[]
+  reactions         ArticleReaction[]
+  socialPosts       SocialPost[]
+  digestSends       EpisodeDigestSend[]
   createdAt         DateTime             @default(now()) @map("created_at")
   updatedAt         DateTime             @updatedAt @map("updated_at")
 
@@ -216,6 +261,193 @@ model Article {
   @@index([status, section])
   @@index([authorId])
   @@map("articles")
+}
+
+/** Soft engagement — anonymous “I Relate” (no reader accounts). */
+model ArticleReaction {
+  id         String   @id @default(cuid())
+  articleId  String   @map("article_id")
+  article    Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  kind       String   @default("RELATE")
+  visitorKey String   @map("visitor_key")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@unique([articleId, kind, visitorKey])
+  @@index([articleId, kind])
+  @@map("article_reactions")
+}
+
+model Tag {
+  id          String       @id @default(cuid())
+  slug        String
+  kind        TagKind
+  nameBg      String       @map("name_bg")
+  nameEn      String?      @map("name_en")
+  articleTags ArticleTag[]
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+
+  @@unique([kind, slug])
+  @@index([kind, nameBg])
+  @@map("tags")
+}
+
+model ArticleTag {
+  articleId String  @map("article_id")
+  tagId     String  @map("tag_id")
+  article   Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  tag       Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([articleId, tagId])
+  @@index([tagId])
+  @@map("article_tags")
+}
+
+model PartnershipInquiry {
+  id             String            @id @default(cuid())
+  organization   String
+  contactName    String            @map("contact_name")
+  email          String
+  phone          String?
+  website        String?
+  type           String
+  budget         String?
+  message        String
+  honeypot       String?           @map("honeypot")
+  status         PartnershipStatus @default(NEW)
+  notes          String?
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+
+  @@index([status, createdAt])
+  @@index([email])
+  @@map("partnership_inquiries")
+}
+
+model Donation {
+  id               String         @id @default(cuid())
+  amountCents      Int            @map("amount_cents")
+  currency         String         @default("bgn")
+  status           DonationStatus @default(PENDING)
+  email            String?
+  name             String?
+  stripeSessionId  String?        @unique @map("stripe_session_id")
+  stripePaymentIntentId String?   @map("stripe_payment_intent_id")
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
+
+  @@index([status, createdAt])
+  @@map("donations")
+}
+
+enum ShopOrderStatus {
+  PENDING
+  PAID
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  FAILED
+}
+
+enum ShopPaymentMethod {
+  STRIPE
+  COD
+}
+
+enum EstimatedArrivalDayType {
+  BUSINESS
+  CALENDAR
+}
+
+model Product {
+  id                  String      @id @default(cuid())
+  slug                String      @unique
+  titleBg             String      @map("title_bg")
+  titleEn             String?     @map("title_en")
+  descriptionBg       String      @default("") @map("description_bg")
+  descriptionEn       String?     @map("description_en")
+  priceCents          Int         @map("price_cents")
+  currency            String      @default("bgn")
+  stock               Int         @default(0)
+  active              Boolean     @default(true)
+  /** Allow cash / pay on delivery for this product. */
+  allowCod            Boolean     @default(false) @map("allow_cod")
+  /** Inclusive day range for COD ETA, e.g. 3–5. */
+  estimatedArrivalMinDays Int?    @map("estimated_arrival_min_days")
+  estimatedArrivalMaxDays Int?    @map("estimated_arrival_max_days")
+  estimatedArrivalDayType EstimatedArrivalDayType? @map("estimated_arrival_day_type")
+  /** Cached display strings generated from the day range (bg/en). */
+  estimatedArrivalBg  String      @default("") @map("estimated_arrival_bg")
+  estimatedArrivalEn  String?     @map("estimated_arrival_en")
+  imageMediaId        String?     @map("image_media_id")
+  imageMedia          MediaAsset? @relation(fields: [imageMediaId], references: [id], onDelete: SetNull)
+  galleryItems        ProductGalleryItem[]
+  orderItems          OrderItem[]
+  createdAt           DateTime    @default(now()) @map("created_at")
+  updatedAt           DateTime    @updatedAt @map("updated_at")
+
+  @@index([active, createdAt])
+  @@map("products")
+}
+
+model ProductGalleryItem {
+  id        String     @id @default(cuid())
+  productId String     @map("product_id")
+  mediaId   String     @map("media_id")
+  sortOrder Int        @default(0) @map("sort_order")
+  product   Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  media     MediaAsset @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  createdAt DateTime   @default(now()) @map("created_at")
+
+  @@unique([productId, mediaId])
+  @@index([productId, sortOrder])
+  @@map("product_gallery_items")
+}
+
+model ShopOrder {
+  id                    String            @id @default(cuid())
+  publicId              String            @unique @map("public_id")
+  email                 String            @default("")
+  status                ShopOrderStatus   @default(PENDING)
+  paymentMethod         ShopPaymentMethod @default(STRIPE) @map("payment_method")
+  totalCents            Int               @map("total_cents")
+  currency              String            @default("bgn")
+  estimatedArrival      String?           @map("estimated_arrival")
+  shippingName          String?           @map("shipping_name")
+  shippingLine1         String?           @map("shipping_line1")
+  shippingLine2         String?           @map("shipping_line2")
+  shippingCity          String?           @map("shipping_city")
+  shippingPostal        String?           @map("shipping_postal")
+  shippingCountry       String?           @map("shipping_country")
+  shippingPhone         String?           @map("shipping_phone")
+  stripeSessionId       String?           @unique @map("stripe_session_id")
+  stripePaymentIntentId String?           @map("stripe_payment_intent_id")
+  paidAt                DateTime?         @map("paid_at")
+  shippedAt             DateTime?         @map("shipped_at")
+  deliveredAt           DateTime?         @map("delivered_at")
+  items                 OrderItem[]
+  createdAt             DateTime          @default(now()) @map("created_at")
+  updatedAt             DateTime          @updatedAt @map("updated_at")
+
+  @@index([status, createdAt])
+  @@index([email])
+  @@map("shop_orders")
+}
+
+model OrderItem {
+  id             String    @id @default(cuid())
+  orderId        String    @map("order_id")
+  order          ShopOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId      String?   @map("product_id")
+  product        Product?  @relation(fields: [productId], references: [id], onDelete: SetNull)
+  titleSnapshot  String    @map("title_snapshot")
+  unitPriceCents Int       @map("unit_price_cents")
+  qty            Int
+  lineTotalCents Int       @map("line_total_cents")
+
+  @@index([orderId])
+  @@index([productId])
+  @@map("order_items")
 }
 
 enum SeriesStatus {
@@ -236,7 +468,9 @@ model Series {
   coverMedia        MediaAsset?       @relation(fields: [coverMediaId], references: [id], onDelete: SetNull)
   translationStatus TranslationStatus @default(PENDING) @map("translation_status")
   translationError  String?           @map("translation_error")
+  sourceLang        String?           @map("source_lang")
   episodes          SeriesEpisode[]
+  digestSends       EpisodeDigestSend[]
   createdAt         DateTime          @default(now()) @map("created_at")
   updatedAt         DateTime          @updatedAt @map("updated_at")
 
@@ -301,6 +535,69 @@ model NewsletterSubscriber {
   @@map("newsletter_subscribers")
 }
 
+enum SocialPostStatus {
+  DRAFT
+  APPROVED
+  SCHEDULED
+  PUBLISHED
+  FAILED
+}
+
+model SocialPost {
+  id            String           @id @default(cuid())
+  articleId     String           @map("article_id")
+  article       Article          @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  platform      String
+  status        SocialPostStatus @default(DRAFT)
+  body          String
+  hashtags      String           @default("")
+  promptVersion String?          @map("prompt_version")
+  scheduledAt   DateTime?        @map("scheduled_at")
+  publishedAt   DateTime?        @map("published_at")
+  externalId    String?          @map("external_id")
+  error         String?
+  createdAt     DateTime         @default(now()) @map("created_at")
+  updatedAt     DateTime         @updatedAt @map("updated_at")
+
+  @@unique([articleId, platform])
+  @@index([status, updatedAt])
+  @@index([platform, status])
+  @@map("social_posts")
+}
+
+/** Singleton row: which platforms to generate for. */
+model SocialWorkspaceSettings {
+  id        String   @id @default("default")
+  platforms String[] @default(["FACEBOOK", "INSTAGRAM", "TIKTOK"])
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("social_workspace_settings")
+}
+
+enum DigestSendStatus {
+  SENT
+  FAILED
+}
+
+model EpisodeDigestSend {
+  id              String           @id @default(cuid())
+  seriesId        String           @map("series_id")
+  series          Series           @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  articleId       String           @map("article_id")
+  article         Article          @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  status          DigestSendStatus @default(SENT)
+  recipientCount  Int              @default(0) @map("recipient_count")
+  resendId        String?          @map("resend_id")
+  error           String?
+  subject         String           @default("")
+  sentAt          DateTime         @default(now()) @map("sent_at")
+  createdAt       DateTime         @default(now()) @map("created_at")
+
+  @@unique([seriesId, articleId])
+  @@index([sentAt])
+  @@map("episode_digest_sends")
+}
+
 model EditorialTodo {
   id        String    @id @default(cuid())
   userId    String    @map("user_id")
@@ -329,19 +626,24 @@ model AnalyticsSession {
 }
 
 model PageView {
-  id        String           @id @default(cuid())
-  sessionId String           @map("session_id")
-  session   AnalyticsSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  path      String
-  articleId String?          @map("article_id")
-  title     String?
-  startedAt DateTime         @default(now()) @map("started_at")
-  dwellMs   Int              @default(0) @map("dwell_ms")
-  endedAt   DateTime?        @map("ended_at")
+  id          String           @id @default(cuid())
+  sessionId   String           @map("session_id")
+  session     AnalyticsSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  path        String
+  articleId   String?          @map("article_id")
+  title       String?
+  referrer    String?
+  utmSource   String?          @map("utm_source")
+  utmMedium   String?          @map("utm_medium")
+  utmCampaign String?          @map("utm_campaign")
+  startedAt   DateTime         @default(now()) @map("started_at")
+  dwellMs     Int              @default(0) @map("dwell_ms")
+  endedAt     DateTime?        @map("ended_at")
 
   @@index([startedAt])
   @@index([path, startedAt])
   @@index([articleId, startedAt])
   @@index([sessionId])
+  @@index([utmSource, startedAt])
   @@map("page_views")
 }

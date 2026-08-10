@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ViewAllLink } from '@/components/concept-3/ViewAllLink'
+import { SponsoredBadge } from '@/components/concept-3/SponsoredBadge'
 import {
   articlePath,
   preferApi,
@@ -51,9 +52,19 @@ export function TraditionsSection({ lang }: TraditionsSectionProps) {
                     <img
                       src={item.image}
                       alt={item.title}
+                      loading="lazy"
                       className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent" />
+                    {item.sponsored ? (
+                      <div className="absolute left-3 top-3">
+                        <SponsoredBadge
+                          lang={lang}
+                          sponsorName={item.sponsorName}
+                          tone="onDark"
+                        />
+                      </div>
+                    ) : null}
                   </div>
                   <span className="font-sans text-[10px] uppercase tracking-[0.22em] text-[#1A1A1A]/45">
                     {item.sub}

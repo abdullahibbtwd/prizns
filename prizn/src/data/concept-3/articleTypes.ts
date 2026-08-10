@@ -12,6 +12,7 @@ export type ArticleSection =
   | 'voices'
   | 'sports'
   | 'events'
+  | 'news'
   | 'video'
   | 'campaigns'
   | 'gallery'
@@ -87,6 +88,17 @@ export interface JournalArticle {
 
   sponsored?: boolean
   sponsorName?: string | null
+
+  /** Editorial transparency block at end of article */
+  behindStory?: string
+  behindStoryBg?: string
+
+  seoTitle?: string | null
+  seoTitleBg?: string | null
+  seoDescription?: string | null
+  seoDescriptionBg?: string | null
+
+  gallery?: Array<{ id: string; url: string; creditBg?: string | null }>
 
   /** Present when the story belongs to a series */
   series?: {

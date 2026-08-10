@@ -1,16 +1,24 @@
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { JournalShell } from '@/components/concept-3/JournalShell'
 import { ListingHeader } from '@/components/concept-3/ListingHeader'
+import { SponsoredBadge } from '@/components/concept-3/SponsoredBadge'
 import {
   articlePath,
   preferApi,
   usePublicArticles,
+  usePublicTags,
 } from '@/lib/public-content'
 import { toTraditionCard } from '@/lib/section-cards'
+import { cn } from '@/lib/utils'
 
 export default function TraditionsPage() {
-  const { data } = usePublicArticles('traditions')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const selectedTopic = searchParams.get('topic') || ''
+  const { data } = usePublicArticles('traditions', {
+    topic: selectedTopic || undefined,
+  })
+  const topicsQuery = usePublicTags('TOPIC')
 
   return (
     <JournalShell>
@@ -40,6 +48,43 @@ export default function TraditionsPage() {
               }
             />
 
+            {(topicsQuery.data ?? []).length > 0 ? (
+              <div className="mx-auto max-w-7xl px-6 pt-10 md:px-12">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="mr-1 font-sans text-[11px] uppercase tracking-[0.2em] text-[#1A1A1A]/45">
+                    {lang === 'bg' ? 'Тема' : 'Topic'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setSearchParams({})}
+                    className={cn(
+                      'rounded-full border px-3 py-1.5 font-sans text-[11px] uppercase tracking-[0.16em] transition-colors',
+                      !selectedTopic
+                        ? 'border-[#0C2686] bg-[#0C2686] text-white'
+                        : 'border-[#EAE6DF] bg-white text-[#1A1A1A]/70 hover:border-[#0C2686]/40',
+                    )}
+                  >
+                    {lang === 'bg' ? 'Всички' : 'All'}
+                  </button>
+                  {(topicsQuery.data ?? []).map((tag) => (
+                    <button
+                      key={tag.id}
+                      type="button"
+                      onClick={() => setSearchParams({ topic: tag.slug })}
+                      className={cn(
+                        'rounded-full border px-3 py-1.5 font-sans text-[11px] uppercase tracking-[0.16em] transition-colors',
+                        selectedTopic === tag.slug
+                          ? 'border-[#0C2686] bg-[#0C2686] text-white'
+                          : 'border-[#EAE6DF] bg-white text-[#1A1A1A]/70 hover:border-[#0C2686]/40',
+                      )}
+                    >
+                      {lang === 'bg' ? tag.nameBg : tag.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
             <div className="mx-auto max-w-7xl px-6 py-16 md:px-12 md:py-20">
               <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
                 {traditions.map((item, index) => {
@@ -55,9 +100,19 @@ export default function TraditionsPage() {
                           <img
                             src={item.image}
                             alt={item.title}
+                            loading="lazy"
                             className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
                           />
                           <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent" />
+                          {item.sponsored ? (
+                            <div className="absolute left-3 top-3">
+                              <SponsoredBadge
+                                lang={lang}
+                                sponsorName={item.sponsorName}
+                                tone="onDark"
+                              />
+                            </div>
+                          ) : null}
                         </div>
                         <span className="font-sans text-[10px] uppercase tracking-[0.22em] text-[#1A1A1A]/45">
                           {item.sub}

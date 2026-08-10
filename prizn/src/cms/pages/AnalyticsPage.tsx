@@ -193,6 +193,39 @@ export default function CmsAnalyticsPage() {
           </div>
         </CmsCard>
       </div>
+
+      {data?.trafficSources && data.trafficSources.length > 0 ? (
+        <CmsCard hover={false} className="mt-6 overflow-hidden p-0">
+          <div className="border-b border-[#E8E4DC] bg-[#FAF8F3] px-5 py-3.5">
+            <h2 className="font-heading text-sm font-bold uppercase tracking-wider text-stone-700">
+              Traffic sources
+            </h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[320px] text-left text-sm">
+              <thead className="border-b border-[#E8E4DC] bg-stone-50 text-xs uppercase tracking-wider text-stone-500">
+                <tr>
+                  <th className="px-4 py-3">Source</th>
+                  <th className="px-4 py-3">Views</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.trafficSources.map((row) => (
+                  <tr
+                    key={row.source}
+                    className="border-b border-[#E8E4DC]/70"
+                  >
+                    <td className="px-4 py-3 font-medium text-stone-900">
+                      {row.source}
+                    </td>
+                    <td className="px-4 py-3 text-stone-700">{row.views}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CmsCard>
+      ) : null}
     </div>
   )
 }

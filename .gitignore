@@ -12,6 +12,17 @@ coverage/
 .env.*.local
 !.env.example
 
+# Secrets / credentials (never commit)
+secrets/
+scret/
+**/secrets/
+**/scret/
+**/google-service-account.json
+
+# Local phase notes (not for repo)
+PHASE*.md
+PHASE_*.md
+
 # Logs / OS
 logs/
 *.log

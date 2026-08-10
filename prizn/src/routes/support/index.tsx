@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   ChevronDown,
@@ -16,6 +16,8 @@ import {
   SectionShell,
   TextInput,
 } from '@/components/concept-3/contribute/shared'
+import { ApiError } from '@/lib/api'
+import { createDonationCheckout } from '@/lib/donations-api'
 import { cn } from '@/lib/utils'
 
 const stats = [
@@ -98,12 +100,50 @@ const faqs = [
 ]
 
 export default function SupportUsPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [amount, setAmount] = useState('25')
   const [custom, setCustom] = useState('')
-  const [donated, setDonated] = useState(false)
+  const [email, setEmail] = useState('')
+  const [donated, setDonated] = useState(
+    () => searchParams.get('donation') === 'success',
+  )
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
   const [openFaq, setOpenFaq] = useState<number | null>(0)
 
   const selectedAmount = amount === 'custom' ? custom : amount
+
+  useEffect(() => {
+    if (searchParams.get('donation') === 'success') {
+      setDonated(true)
+    }
+  }, [searchParams])
+
+  const handleDonate = async () => {
+    setError('')
+    const amountBgn = Number(selectedAmount)
+    if (!Number.isFinite(amountBgn) || amountBgn < 1) {
+      setError('Please choose a valid amount (at least 1 BGN).')
+      return
+    }
+    setSubmitting(true)
+    try {
+      const result = await createDonationCheckout({
+        amountBgn,
+        email: email.trim() || undefined,
+      })
+      window.location.href = result.url
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : 'Unable to start checkout.',
+      )
+      setSubmitting(false)
+    }
+  }
 
   return (
     <JournalShell>
@@ -177,9 +217,19 @@ export default function SupportUsPage() {
                 </h3>
                 <p className="mt-3 font-sans text-sm font-light text-[#1A1A1A]/65">
                   {lang === 'bg'
-                    ? 'Това е демонстрация на фронтенда — реални плащания ще бъдат свързани скоро.'
-                    : 'This is a frontend preview — real payments will be connected soon.'}
+                    ? 'Вашето дарение помага да документираме хора, места и традиции.'
+                    : 'Your donation helps us document people, places, and traditions.'}
                 </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDonated(false)
+                    setSearchParams({})
+                  }}
+                  className="mt-6 font-sans text-xs uppercase tracking-[0.2em] text-[#0C2686] underline-offset-4 hover:underline"
+                >
+                  {lang === 'bg' ? 'Дарете отново' : 'Donate again'}
+                </button>
               </motion.div>
             ) : (
               <>
@@ -213,7 +263,7 @@ export default function SupportUsPage() {
                   ))}
                 </div>
 
-                <div className="mx-auto mt-8 max-w-md">
+                <div className="mx-auto mt-8 max-w-md space-y-4">
                   <button
                     type="button"
                     onClick={() => setAmount('custom')}
@@ -241,25 +291,43 @@ export default function SupportUsPage() {
                       </div>
                     )}
                   </button>
+
+                  <div>
+                    <FieldLabel>
+                      {lang === 'bg' ? 'Имейл (по избор)' : 'Email (optional)'}
+                    </FieldLabel>
+                    <TextInput
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder={lang === 'bg' ? 'за разписка' : 'for your receipt'}
+                    />
+                  </div>
                 </div>
 
                 <div className="mt-10 text-center">
                   <button
                     type="button"
-                    disabled={!selectedAmount || Number(selectedAmount) <= 0}
-                    onClick={() => setDonated(true)}
+                    disabled={
+                      submitting ||
+                      !selectedAmount ||
+                      Number(selectedAmount) <= 0
+                    }
+                    onClick={() => void handleDonate()}
                     className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-[#0C2686] px-8 py-3.5 font-sans text-xs font-medium uppercase tracking-[0.22em] text-white transition-colors hover:bg-[#1A1A1A] disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     <Heart className="size-3.5 fill-current" />
-                    {lang === 'bg'
-                      ? `Дарете ${selectedAmount || '—'} BGN`
-                      : `Donate ${selectedAmount || '—'} BGN`}
+                    {submitting
+                      ? lang === 'bg'
+                        ? 'Пренасочване…'
+                        : 'Redirecting…'
+                      : lang === 'bg'
+                        ? `Дарете ${selectedAmount || '—'} BGN`
+                        : `Donate ${selectedAmount || '—'} BGN`}
                   </button>
-                  <p className="mt-4 font-sans text-xs text-[#1A1A1A]/40">
-                    {lang === 'bg'
-                      ? 'Демонстрация без реално плащане.'
-                      : 'Preview only — no real payment yet.'}
-                  </p>
+                  {error ? (
+                    <p className="mt-4 font-sans text-sm text-rose-700">{error}</p>
+                  ) : null}
                 </div>
               </>
             )}

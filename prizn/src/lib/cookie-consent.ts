@@ -85,3 +85,23 @@ export function setAnalyticsSessionId(id: string) {
     // ignore
   }
 }
+
+const REACTION_SESSION_KEY = 'prizni-reaction-key'
+
+/**
+ * Soft id for “I Relate” — prefers consented visitor key;
+ * falls back to a session-only key when cookies were declined / pending.
+ */
+export function ensureReactionVisitorKey(): string {
+  const consented = ensureVisitorKey()
+  if (consented) return consented
+  try {
+    const existing = sessionStorage.getItem(REACTION_SESSION_KEY)
+    if (existing) return existing
+    const next = uuid()
+    sessionStorage.setItem(REACTION_SESSION_KEY, next)
+    return next
+  } catch {
+    return uuid()
+  }
+}

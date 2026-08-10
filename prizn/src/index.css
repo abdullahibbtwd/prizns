@@ -134,4 +134,54 @@
   }
 }
 
+/* Phase 3 — print-friendly article (A4 / Save as PDF) */
+@media print {
+  @page {
+    size: A4;
+    margin: 16mm 14mm;
+  }
+
+  html {
+    scroll-padding-top: 0;
+  }
+
+  body {
+    background: #fff !important;
+    color: #1a1a1a !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .print-hidden,
+  [data-print-hide] {
+    display: none !important;
+  }
+
+  .article-print {
+    max-width: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .article-print h1 {
+    font-size: 28pt !important;
+    line-height: 1.15 !important;
+    margin-bottom: 10pt !important;
+  }
+
+  .article-print img {
+    max-width: 100% !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .article-print p,
+  .article-print blockquote,
+  .article-print aside,
+  .article-print figure {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}
+
 

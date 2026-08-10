@@ -81,6 +81,25 @@ export type PublicArticleDto = {
   featured: boolean;
   sponsored: boolean;
   sponsorName?: string | null;
+  behindStory: string;
+  behindStoryBg: string;
+  seoTitle: string | null;
+  seoTitleBg: string | null;
+  seoDescription: string | null;
+  seoDescriptionBg: string | null;
+  gallery: Array<{
+    id: string;
+    url: string;
+    creditBg: string | null;
+  }>;
+  tags: Array<{
+    id: string;
+    slug: string;
+    kind: string;
+    nameBg: string;
+    nameEn: string | null;
+    name: string;
+  }>;
   series?: {
     id: string;
     slug: string;
@@ -89,4 +108,7 @@ export type PublicArticleDto = {
     titleEn: string | null;
     episodeNumber: number;
   } | null;
+  /** Phase 3 — “I Relate” count (public article). */
+  relateCount?: number;
+  viewerHasRelated?: boolean;
 };

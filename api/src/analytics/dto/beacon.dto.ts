@@ -37,6 +37,22 @@ export class AnalyticsBeaconDto {
   title?: string;
 
   @IsOptional()
+  @IsString()
+  referrer?: string;
+
+  @IsOptional()
+  @IsString()
+  utmSource?: string;
+
+  @IsOptional()
+  @IsString()
+  utmMedium?: string;
+
+  @IsOptional()
+  @IsString()
+  utmCampaign?: string;
+
+  @IsOptional()
   @Transform(({ value }) =>
     value === undefined || value === null || value === ''
       ? undefined

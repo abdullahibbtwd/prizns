@@ -11,8 +11,10 @@ interface VoicesAudioSectionProps {
 }
 
 export function VoicesAudioSection({ lang }: VoicesAudioSectionProps) {
-  const { data } = usePublicArticles('voices')
-  const voices = preferApi(data?.map(toVoiceItem)).slice(0, 3)
+  const { data, isLoading } = usePublicArticles(undefined, { hasAudio: true })
+  const voices = preferApi(
+    data?.filter((article) => Boolean(article.audioUrl)).map(toVoiceItem),
+  ).slice(0, 6)
 
   return (
     <section id="voices" className="relative overflow-hidden bg-[#1A1A1A] px-6 py-24 text-white md:px-12 md:py-36">
@@ -30,15 +32,15 @@ export function VoicesAudioSection({ lang }: VoicesAudioSectionProps) {
             </h2>
             <p className="mt-3 max-w-md font-sans text-xs font-light uppercase tracking-[0.16em] text-white/45">
               {lang === 'bg'
-                ? 'Пуснете записа или отворете пълната история'
-                : 'Play the recording or open the full story'}
+                ? 'Нарации и записи — кликнете за пълната история'
+                : 'Narrations and recordings — click for the full story'}
             </p>
           </div>
           <div className="flex flex-col items-start gap-3 md:items-end">
             <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 font-sans text-xs text-white/50 backdrop-blur-md">
               <Radio className="size-3.5 animate-pulse text-emerald-400" />
               <span>
-                {lang === 'bg' ? 'Оригинални записи 2026' : 'Original Field Recordings'}
+                {lang === 'bg' ? 'От всички секции' : 'From every section'}
               </span>
             </div>
             <ViewAllLink
@@ -49,7 +51,13 @@ export function VoicesAudioSection({ lang }: VoicesAudioSectionProps) {
           </div>
         </div>
 
-        <VoicesPlayerGrid lang={lang} voices={voices} />
+        {isLoading ? (
+          <p className="font-sans text-sm text-white/50">
+            {lang === 'bg' ? 'Зареждане на записи…' : 'Loading recordings…'}
+          </p>
+        ) : voices.length > 0 ? (
+          <VoicesPlayerGrid lang={lang} voices={voices} />
+        ) : null}
       </div>
     </section>
   )

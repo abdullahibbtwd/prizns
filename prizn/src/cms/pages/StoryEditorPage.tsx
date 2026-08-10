@@ -27,12 +27,24 @@ import {
   PrimaryButton,
   StatusPill,
 } from '@/cms/components/CmsUI'
+import {
+  CmsCheckbox,
+  CmsField,
+  CmsInput,
+  CmsRadio,
+  CmsRadioGroup,
+  CmsTextarea,
+} from '@/cms/components/CmsFields'
+import { CmsTagPicker } from '@/cms/components/CmsMultiSelect'
+import { AiAssistantPanel } from '@/cms/components/AiAssistantPanel'
+import { NarrationPanel } from '@/cms/components/NarrationPanel'
 import { JournalSelect } from '@/components/ui/JournalSelect'
 import {
   createCmsArticle,
   createCmsAuthor,
   getCmsArticle,
   listCmsAuthors,
+  queueArticleTranslation,
   updateCmsArticle,
   uploadCmsMedia,
 } from '@/lib/articles-api'
@@ -46,6 +58,7 @@ import {
   type ArticleSection,
   type BodyBlock,
 } from '@/lib/cms-types'
+import { createCmsTag, listCmsTags } from '@/lib/tags-api'
 import { ApiError } from '@/lib/api'
 import { useJournalLang } from '@/hooks/useJournalLang'
 import { pickLang } from '@/lib/pick-lang'
@@ -113,6 +126,10 @@ const schema = z.object({
   featured: z.boolean(),
   sponsored: z.boolean(),
   sponsorName: z.string(),
+  behindStoryBg: z.string(),
+  seoTitleBg: z.string(),
+  seoDescriptionBg: z.string(),
+  tagIds: z.array(z.string()),
   body: z.array(blockSchema).min(1),
   seriesMode: z.enum(['standalone', 'series']),
   seriesId: z.string(),
@@ -140,6 +157,10 @@ const emptyDefaults: ArticleFormValues = {
   featured: false,
   sponsored: false,
   sponsorName: '',
+  behindStoryBg: '',
+  seoTitleBg: '',
+  seoDescriptionBg: '',
+  tagIds: [],
   body: [{ type: 'paragraph', textBg: '' }],
   seriesMode: 'standalone',
   seriesId: '',
@@ -236,8 +257,14 @@ export default function CmsStoryEditorPage() {
     queryFn: () => getCmsArticle(id!),
     enabled: !isNew,
     refetchInterval: (query) => {
-      const status = query.state.data?.translationStatus
-      return status === 'PENDING' || status === 'RUNNING' ? 2000 : false
+      const translation = query.state.data?.translationStatus
+      const narration = query.state.data?.narrationStatus
+      const busy =
+        translation === 'PENDING' ||
+        translation === 'RUNNING' ||
+        narration === 'PENDING' ||
+        narration === 'RUNNING'
+      return busy ? 2000 : false
     },
   })
 
@@ -249,6 +276,11 @@ export default function CmsStoryEditorPage() {
   const seriesListQuery = useQuery({
     queryKey: ['cms-series'],
     queryFn: listCmsSeries,
+  })
+
+  const tagsQuery = useQuery({
+    queryKey: ['cms-tags'],
+    queryFn: () => listCmsTags(),
   })
 
   useEffect(() => {
@@ -312,6 +344,10 @@ export default function CmsStoryEditorPage() {
       featured: article.featured,
       sponsored: article.sponsored,
       sponsorName: article.sponsorName ?? '',
+      behindStoryBg: article.behindStoryBg ?? '',
+      seoTitleBg: article.seoTitleBg ?? '',
+      seoDescriptionBg: article.seoDescriptionBg ?? '',
+      tagIds: article.tagIds ?? [],
       body:
         article.bodyRaw && article.bodyRaw.length > 0
           ? article.bodyRaw
@@ -337,15 +373,31 @@ export default function CmsStoryEditorPage() {
   const seriesId = form.watch('seriesId')
   const videoUrlValue = form.watch('videoUrl')
   const videoMediaIdValue = form.watch('videoMediaId')
+  const status = form.watch('status')
   const profile = getSectionProfile(section)
 
   useEffect(() => {
     form.setValue(
       'galleryMediaIds',
       gallery.map((item) => item.id),
-      { shouldDirty: true },
+      { shouldDirty: false },
     )
   }, [gallery, form])
+
+  // Editing a published story returns it to draft until Publish is clicked again.
+  useEffect(() => {
+    const sub = form.watch((_values, info) => {
+      if (info.type !== 'change') return
+      if (!info.name || info.name === 'status') return
+      // Synced from local gallery state — demotion happens via noteGalleryEdit.
+      if (info.name === 'galleryMediaIds') return
+      if (form.getValues('status') !== 'PUBLISHED') return
+      // Skip programmatic syncs (shouldDirty: false) that leave the form clean.
+      if (!form.formState.isDirty) return
+      form.setValue('status', 'DRAFT', { shouldDirty: true })
+    })
+    return () => sub.unsubscribe()
+  }, [form])
 
   const applySection = (next: ArticleSection) => {
     const nextProfile = getSectionProfile(next)
@@ -441,6 +493,10 @@ export default function CmsStoryEditorPage() {
           sponsorName: values.sponsored
             ? values.sponsorName.trim() || null
             : null,
+          behindStoryBg: values.behindStoryBg,
+          seoTitleBg: values.seoTitleBg.trim() || null,
+          seoDescriptionBg: values.seoDescriptionBg.trim() || null,
+          tagIds: values.tagIds,
           body: values.body,
           seriesId:
             values.seriesMode === 'series' && values.seriesId
@@ -489,6 +545,14 @@ export default function CmsStoryEditorPage() {
     },
   })
 
+  const retranslateMutation = useMutation({
+    mutationFn: () => queueArticleTranslation(id!),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['cms-article', id] })
+      await queryClient.invalidateQueries({ queryKey: ['cms-articles'] })
+    },
+  })
+
   const createAuthorMutation = useMutation({
     mutationFn: (nameBg: string) => createCmsAuthor(nameBg),
     onSuccess: async (author) => {
@@ -510,6 +574,18 @@ export default function CmsStoryEditorPage() {
     },
   })
 
+  const noteGalleryEdit = () => {
+    if (form.getValues('status') === 'PUBLISHED') {
+      form.setValue('status', 'DRAFT', { shouldDirty: true })
+    } else {
+      form.setValue(
+        'galleryMediaIds',
+        form.getValues('galleryMediaIds'),
+        { shouldDirty: true },
+      )
+    }
+  }
+
   /** Local preview only — MinIO upload happens on Save/Publish. */
   const pickImages = async (files: FileList | null) => {
     if (!files?.length) return
@@ -525,6 +601,7 @@ export default function CmsStoryEditorPage() {
       const startIndex = gallery.length
       setGallery((prev) => [...prev, ...items])
       setActiveSlide(startIndex)
+      noteGalleryEdit()
     } finally {
       setMediaPreparing(false)
     }
@@ -548,6 +625,7 @@ export default function CmsStoryEditorPage() {
           },
         ]
       })
+      noteGalleryEdit()
     } finally {
       setMediaPreparing(false)
     }
@@ -685,6 +763,7 @@ export default function CmsStoryEditorPage() {
       revokeIfBlob(doomed?.url)
       return prev.filter((item) => item.id !== mediaId)
     })
+    noteGalleryEdit()
   }
 
   const clearVideo = () => {
@@ -712,6 +791,7 @@ export default function CmsStoryEditorPage() {
       return next
     })
     setActiveSlide(0)
+    noteGalleryEdit()
   }
 
   const goPrev = () => {
@@ -727,7 +807,9 @@ export default function CmsStoryEditorPage() {
   })
 
   if (!isNew && articleQuery.isLoading) {
-    return <p className="text-sm text-stone-500">{t('cms.editor.loading')}</p>
+    return (
+      <p className="text-sm text-stone-500">{t('cms.editor.loading')}</p>
+    )
   }
 
   if (!isNew && articleQuery.isError) {
@@ -774,8 +856,8 @@ export default function CmsStoryEditorPage() {
     ) : null
 
   return (
-    <div>
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-[#E8E4DC] pb-4">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="mb-4 flex shrink-0 flex-wrap items-center justify-between gap-4 border-b border-[#E8E4DC] pb-4">
         <Link
           to={basePath}
           className="inline-flex items-center gap-2 text-xs font-semibold text-stone-600 transition-colors hover:text-[#0C2686]"
@@ -785,7 +867,12 @@ export default function CmsStoryEditorPage() {
         </Link>
 
         <div className="flex flex-wrap items-center gap-3">
-          <StatusPill status={form.watch('status')} />
+          <StatusPill status={status} />
+          {articleQuery.data?.status === 'PUBLISHED' && status === 'DRAFT' ? (
+            <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-amber-800">
+              {t('cms.editor.unpublishedEdits')}
+            </span>
+          ) : null}
           {articleQuery.data?.translationStatus && (
             <StatusPill status={articleQuery.data.translationStatus} />
           )}
@@ -812,6 +899,7 @@ export default function CmsStoryEditorPage() {
         </div>
       </div>
 
+      <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto pb-8">
       <CmsPageHeader
         title={
           isNew
@@ -825,15 +913,16 @@ export default function CmsStoryEditorPage() {
 
       <form
         onSubmit={onSubmit}
-        className="grid grid-cols-1 gap-8 xl:grid-cols-[minmax(0,1fr)_320px]"
+        className="grid grid-cols-1 gap-8 overflow-x-hidden xl:grid-cols-[minmax(0,1fr)_320px]"
       >
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6 overflow-x-hidden">
           <CmsCard className="space-y-3 p-5">
             <h2 className="text-sm font-semibold text-stone-800">
               {t('cms.editor.sectionHint')}
             </h2>
             <JournalSelect
               name="section"
+              variant="boxed"
               label={t('cms.editor.section')}
               placeholder={t('cms.editor.section')}
               options={sectionOptions}
@@ -1302,13 +1391,13 @@ export default function CmsStoryEditorPage() {
                 />
               </label>
             ) : galleryView === 'slider' ? (
-              <div className="relative space-y-3">
+              <div className="relative max-w-full space-y-3 overflow-x-hidden">
                 <MediaPrepOverlay />
-                <div className="relative aspect-[16/10] overflow-hidden rounded-2xl border border-[#E8E4DC] bg-stone-100">
+                <div className="relative h-[min(14rem,32vh)] w-full overflow-hidden rounded-2xl border border-[#E8E4DC] bg-stone-100">
                   <img
                     src={gallery[activeSlide]?.url}
                     alt=""
-                    className="h-full w-full object-cover"
+                    className="absolute inset-0 h-full w-full object-cover"
                   />
                   {activeSlide === 0 && (
                     <span className="absolute left-3 top-3 rounded-md bg-[#0C2686] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-white">
@@ -1365,7 +1454,8 @@ export default function CmsStoryEditorPage() {
                 </div>
 
                 {gallery.length > 1 && (
-                  <div className="flex gap-2 overflow-x-auto pb-1">
+                  <div className="max-w-full overflow-x-auto overflow-y-hidden pb-1">
+                    <div className="flex w-max gap-2">
                     {gallery.map((item, index) => (
                       <button
                         key={item.id}
@@ -1397,6 +1487,7 @@ export default function CmsStoryEditorPage() {
                         )}
                       </button>
                     ))}
+                    </div>
                   </div>
                 )}
               </div>
@@ -1411,7 +1502,7 @@ export default function CmsStoryEditorPage() {
                       setActiveSlide(index)
                       setGalleryView('slider')
                     }}
-                    className="group relative aspect-square overflow-hidden rounded-xl border border-[#E8E4DC] bg-stone-100 text-left"
+                    className="group relative aspect-square max-h-44 overflow-hidden rounded-xl border border-[#E8E4DC] bg-stone-100 text-left"
                   >
                     <img
                       src={item.url}
@@ -1626,33 +1717,27 @@ export default function CmsStoryEditorPage() {
         <div className="space-y-6">
           <CmsCard className="space-y-4 p-5">
             <h3 className="text-sm font-semibold">{t('cms.series.seriesMode')}</h3>
-            <div className="space-y-2 text-xs">
-              <label className="flex cursor-pointer items-center gap-2">
-                <input
-                  type="radio"
-                  name="seriesMode"
-                  checked={seriesMode === 'standalone'}
-                  onChange={() => {
-                    form.setValue('seriesMode', 'standalone', {
-                      shouldDirty: true,
-                    })
-                    form.setValue('seriesId', '', { shouldDirty: true })
-                  }}
-                />
-                {t('cms.series.standalone')}
-              </label>
-              <label className="flex cursor-pointer items-center gap-2">
-                <input
-                  type="radio"
-                  name="seriesMode"
-                  checked={seriesMode === 'series'}
-                  onChange={() =>
-                    form.setValue('seriesMode', 'series', { shouldDirty: true })
-                  }
-                />
-                {t('cms.series.partOfSeries')}
-              </label>
-            </div>
+            <CmsRadioGroup>
+              <CmsRadio
+                name="seriesMode"
+                checked={seriesMode === 'standalone'}
+                onChange={() => {
+                  form.setValue('seriesMode', 'standalone', {
+                    shouldDirty: true,
+                  })
+                  form.setValue('seriesId', '', { shouldDirty: true })
+                }}
+                label={t('cms.series.standalone')}
+              />
+              <CmsRadio
+                name="seriesMode"
+                checked={seriesMode === 'series'}
+                onChange={() =>
+                  form.setValue('seriesMode', 'series', { shouldDirty: true })
+                }
+                label={t('cms.series.partOfSeries')}
+              />
+            </CmsRadioGroup>
 
             {seriesMode === 'series' && (
               <div className="space-y-3 border-t border-[#E8E4DC] pt-3">
@@ -1660,6 +1745,7 @@ export default function CmsStoryEditorPage() {
                   <span>{t('cms.series.selectSeries')}</span>
                   <JournalSelect
                     name="seriesId"
+                    variant="boxed"
                     label={t('cms.series.selectSeries')}
                     placeholder={t('cms.series.selectSeries')}
                     options={(seriesListQuery.data ?? []).map((item) => ({
@@ -1731,12 +1817,91 @@ export default function CmsStoryEditorPage() {
             )}
           </CmsCard>
 
+          <AiAssistantPanel
+            articleId={isNew ? undefined : id}
+            titleBg={form.watch('titleBg')}
+            subtitleBg={form.watch('subtitleBg')}
+            section={section}
+            bodyText={form
+              .watch('body')
+              .map((block) =>
+                block.type === 'note'
+                  ? `${block.labelBg}\n${block.textBg}`
+                  : block.textBg,
+              )
+              .join('\n\n')}
+            lang={lang}
+            onApply={(patch) => {
+              if (patch.titleBg) {
+                form.setValue('titleBg', patch.titleBg, { shouldDirty: true })
+              }
+              if (patch.subtitleBg) {
+                form.setValue('subtitleBg', patch.subtitleBg, {
+                  shouldDirty: true,
+                })
+              }
+              if (patch.seoTitleBg) {
+                form.setValue('seoTitleBg', patch.seoTitleBg, {
+                  shouldDirty: true,
+                })
+              }
+              if (patch.seoDescriptionBg) {
+                form.setValue('seoDescriptionBg', patch.seoDescriptionBg, {
+                  shouldDirty: true,
+                })
+              }
+            }}
+          />
+
+          {!isNew && articleQuery.data ? (
+            <CmsCard className="space-y-3 p-5">
+              <h3 className="text-sm font-semibold">
+                {t('cms.editor.translation')}
+              </h3>
+              <div className="flex flex-wrap items-center gap-2">
+                <StatusPill status={articleQuery.data.translationStatus} />
+                {articleQuery.data.sourceLang ? (
+                  <span className="rounded-full bg-stone-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-stone-600">
+                    {t('cms.editor.detectedLang', {
+                      lang: articleQuery.data.sourceLang.toUpperCase(),
+                    })}
+                  </span>
+                ) : null}
+              </div>
+              {articleQuery.data.translationStatus === 'FAILED' &&
+              articleQuery.data.translationError ? (
+                <p className="text-xs text-rose-700">
+                  {articleQuery.data.translationError}
+                </p>
+              ) : null}
+              <GhostButton
+                type="button"
+                className="w-full text-xs"
+                disabled={retranslateMutation.isPending}
+                onClick={() => retranslateMutation.mutate()}
+              >
+                {retranslateMutation.isPending
+                  ? t('cms.editor.retranslating')
+                  : t('cms.editor.retranslate')}
+              </GhostButton>
+            </CmsCard>
+          ) : null}
+
+          {!isNew && articleQuery.data ? (
+            <NarrationPanel
+              articleId={id!}
+              article={articleQuery.data}
+              audioUrl={audioUrl || articleQuery.data.audioUrl || undefined}
+            />
+          ) : null}
+
           <CmsCard className="space-y-4 p-5">
             <h3 className="text-sm font-semibold">{t('cms.editor.publishing')}</h3>
             <div className="space-y-1 text-xs">
               <span>{t('cms.editor.status')}</span>
               <JournalSelect
                 name="status"
+                variant="boxed"
                 label={t('cms.editor.status')}
                 placeholder={t('cms.editor.status')}
                 options={statusOptions}
@@ -1748,24 +1913,65 @@ export default function CmsStoryEditorPage() {
                 }
               />
             </div>
-            <label className="flex items-center gap-2 text-xs">
-              <input type="checkbox" {...form.register('featured')} />{' '}
-              {t('cms.editor.featured')}
-            </label>
-            <label className="flex items-center gap-2 text-xs">
-              <input type="checkbox" {...form.register('sponsored')} />{' '}
-              {t('cms.editor.sponsored')}
-            </label>
+            <CmsCheckbox
+              checked={form.watch('featured')}
+              onChange={() =>
+                form.setValue('featured', !form.getValues('featured'), {
+                  shouldDirty: true,
+                })
+              }
+              label={t('cms.editor.featured')}
+            />
+            <CmsCheckbox
+              checked={form.watch('sponsored')}
+              onChange={() =>
+                form.setValue('sponsored', !form.getValues('sponsored'), {
+                  shouldDirty: true,
+                })
+              }
+              label={t('cms.editor.sponsored')}
+            />
             {form.watch('sponsored') ? (
-              <label className="block space-y-1 text-xs">
-                {t('cms.editor.sponsorName')}
-                <input
-                  className="w-full border border-[#E8E4DC] bg-white px-2 py-2"
+              <CmsField label={t('cms.editor.sponsorName')}>
+                <CmsInput
                   placeholder={t('cms.editor.sponsorNamePlaceholder')}
                   {...form.register('sponsorName')}
                 />
-              </label>
+              </CmsField>
             ) : null}
+
+            <CmsField label={t('cms.editor.behindStory')}>
+              <CmsTextarea rows={4} {...form.register('behindStoryBg')} />
+            </CmsField>
+            <CmsField label={t('cms.editor.seoTitle')}>
+              <CmsInput {...form.register('seoTitleBg')} />
+            </CmsField>
+            <CmsField label={t('cms.editor.seoDescription')}>
+              <CmsInput {...form.register('seoDescriptionBg')} />
+            </CmsField>
+
+            <div className="space-y-2 border-t border-[#E8E4DC] pt-3">
+              <p className="text-xs font-semibold text-stone-700">
+                {t('cms.editor.tags')}
+              </p>
+              <p className="text-[11px] text-stone-500">
+                {t('cms.editor.tagsHint')}
+              </p>
+              <CmsTagPicker
+                tags={tagsQuery.data ?? []}
+                kinds={['LOCATION', 'TOPIC']}
+                value={form.watch('tagIds')}
+                loading={tagsQuery.isLoading}
+                onChange={(next) =>
+                  form.setValue('tagIds', next, { shouldDirty: true })
+                }
+                onCreateTag={async (input) => {
+                  const tag = await createCmsTag(input)
+                  await queryClient.invalidateQueries({ queryKey: ['cms-tags'] })
+                  return tag
+                }}
+              />
+            </div>
           </CmsCard>
 
           <CmsCard className="space-y-3 p-5">
@@ -1797,6 +2003,7 @@ export default function CmsStoryEditorPage() {
                 ) : (
                   <JournalSelect
                     name="readTimeUnit"
+                    variant="boxed"
                     label={t('cms.editor.readTime')}
                     placeholder={t('cms.editor.minutes')}
                     options={[
@@ -1886,6 +2093,7 @@ export default function CmsStoryEditorPage() {
             <h3 className="text-sm font-semibold">{t('cms.editor.author')}</h3>
             <JournalSelect
               name="authorId"
+              variant="boxed"
               label={t('cms.editor.author')}
               placeholder={t('cms.editor.selectAuthor')}
               options={authorOptions}
@@ -1964,6 +2172,7 @@ export default function CmsStoryEditorPage() {
           )}
         </div>
       </form>
+      </div>
     </div>
   )
 }

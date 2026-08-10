@@ -9,6 +9,8 @@ import {
   Author,
   MediaAsset,
   Prisma,
+  Tag,
+  TagKind,
   TranslationStatus,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -40,6 +42,10 @@ type SeriesEpisodeRel = {
   };
 };
 
+type ArticleTagRel = {
+  tag: Tag;
+};
+
 type ArticleWithRelations = Article & {
   author: Author | null;
   heroMedia: MediaAsset | null;
@@ -50,6 +56,7 @@ type ArticleWithRelations = Article & {
     media: MediaAsset;
   }>;
   seriesEpisodes?: SeriesEpisodeRel[];
+  articleTags?: ArticleTagRel[];
 };
 
 @Injectable()
@@ -98,6 +105,9 @@ export class ArticlesService {
           select: { id: true, slug: true, titleBg: true, titleEn: true },
         },
       },
+    },
+    articleTags: {
+      include: { tag: true },
     },
   } as const;
 
@@ -270,6 +280,35 @@ export class ArticlesService {
     });
   }
 
+  private async syncArticleTags(articleId: string, tagIds: string[]) {
+    const unique = [...new Set(tagIds.filter(Boolean))];
+    if (unique.length > 0) {
+      const found = await this.prisma.tag.findMany({
+        where: { id: { in: unique } },
+        select: { id: true },
+      });
+      if (found.length !== unique.length) {
+        throw new BadRequestException('One or more tags were not found');
+      }
+    }
+    await this.prisma.articleTag.deleteMany({ where: { articleId } });
+    if (unique.length === 0) return;
+    await this.prisma.articleTag.createMany({
+      data: unique.map((tagId) => ({ articleId, tagId })),
+    });
+  }
+
+  private tagsFromArticle(article: ArticleWithRelations) {
+    return (article.articleTags ?? []).map((row) => ({
+      id: row.tag.id,
+      slug: row.tag.slug,
+      kind: row.tag.kind,
+      nameBg: row.tag.nameBg,
+      nameEn: row.tag.nameEn,
+      name: row.tag.nameEn ?? row.tag.nameBg,
+    }));
+  }
+
   toPublicDto(article: ArticleWithRelations): PublicArticleDto {
     const section = toPublicSection(article.section);
     const body = this.parseBody(article.body).map((block) => {
@@ -348,6 +387,14 @@ export class ArticlesService {
       featured: article.featured,
       sponsored: article.sponsored,
       sponsorName: this.optionalText(article.sponsorName),
+      behindStory: article.behindStoryEn ?? article.behindStoryBg,
+      behindStoryBg: article.behindStoryBg,
+      seoTitle: article.seoTitleEn ?? article.seoTitleBg,
+      seoTitleBg: article.seoTitleBg,
+      seoDescription: article.seoDescriptionEn ?? article.seoDescriptionBg,
+      seoDescriptionBg: article.seoDescriptionBg,
+      gallery: this.galleryFromArticle(article),
+      tags: this.tagsFromArticle(article),
       series: (() => {
         const membership = article.seriesEpisodes?.[0];
         if (!membership) return null;
@@ -366,6 +413,7 @@ export class ArticlesService {
   toCmsDto(article: ArticleWithRelations) {
     const gallery = this.galleryFromArticle(article);
     const membership = article.seriesEpisodes?.[0];
+    const tags = this.tagsFromArticle(article);
     return {
       ...this.toPublicDto(article),
       authorId: article.authorId,
@@ -374,9 +422,14 @@ export class ArticlesService {
       videoMediaId: article.videoMediaId,
       galleryMediaIds: gallery.map((item) => item.id),
       gallery,
+      tagIds: tags.map((tag) => tag.id),
+      tags,
       bodyRaw: this.parseBody(article.body),
       publishedAt: article.publishedAt,
       translationError: article.translationError,
+      sourceLang: article.sourceLang,
+      narrationStatus: article.narrationStatus,
+      narrationError: article.narrationError,
       createdAt: article.createdAt,
       updatedAt: article.updatedAt,
       series: membership
@@ -391,7 +444,16 @@ export class ArticlesService {
     };
   }
 
-  async listPublic(section?: string, seriesSlug?: string) {
+  async listPublic(
+    section?: string,
+    seriesSlug?: string,
+    filters?: {
+      location?: string;
+      topic?: string;
+      category?: string;
+      hasAudio?: boolean;
+    },
+  ) {
     const where: Prisma.ArticleWhereInput = {
       status: ArticleStatus.PUBLISHED,
     };
@@ -399,11 +461,44 @@ export class ArticlesService {
     if (sectionFilter) {
       where.section = sectionFilter;
     }
+    if (filters?.hasAudio === true) {
+      where.audioMediaId = { not: null };
+    }
     if (seriesSlug?.trim()) {
       where.seriesEpisodes = {
         some: { series: { slug: seriesSlug.trim() } },
       };
     }
+
+    const tagFilters: Array<{ slug: string; kind: TagKind }> = [];
+    if (filters?.location?.trim()) {
+      tagFilters.push({
+        slug: filters.location.trim(),
+        kind: TagKind.LOCATION,
+      });
+    }
+    if (filters?.topic?.trim()) {
+      tagFilters.push({ slug: filters.topic.trim(), kind: TagKind.TOPIC });
+    }
+    if (filters?.category?.trim()) {
+      tagFilters.push({
+        slug: filters.category.trim(),
+        kind: TagKind.CATEGORY,
+      });
+    }
+    if (tagFilters.length > 0) {
+      where.AND = tagFilters.map((tag) => ({
+        articleTags: {
+          some: {
+            tag: {
+              slug: tag.slug,
+              kind: tag.kind,
+            },
+          },
+        },
+      }));
+    }
+
     const rows = await this.prisma.article.findMany({
       where,
       include: this.include,
@@ -412,7 +507,11 @@ export class ArticlesService {
     return rows.map((row) => this.toPublicDto(row));
   }
 
-  async getPublicBySectionSlug(section: string, slug: string) {
+  async getPublicBySectionSlug(
+    section: string,
+    slug: string,
+    visitorKey?: string,
+  ) {
     const sectionFilter = toPrismaSectionFilter(section);
     const row = await this.prisma.article.findFirst({
       where: {
@@ -423,12 +522,174 @@ export class ArticlesService {
       include: this.include,
     });
     if (!row) throw new NotFoundException('Article not found');
-    return this.toPublicDto(row);
+    const dto = this.toPublicDto(row);
+    const relate = await this.relateStats(row.id, visitorKey);
+    return { ...dto, ...relate };
+  }
+
+  private async relateStats(articleId: string, visitorKey?: string) {
+    const kind = 'RELATE';
+    const [relateCount, existing] = await Promise.all([
+      this.prisma.articleReaction.count({
+        where: { articleId, kind },
+      }),
+      visitorKey?.trim()
+        ? this.prisma.articleReaction.findUnique({
+            where: {
+              articleId_kind_visitorKey: {
+                articleId,
+                kind,
+                visitorKey: visitorKey.trim(),
+              },
+            },
+            select: { id: true },
+          })
+        : Promise.resolve(null),
+    ]);
+    return {
+      relateCount,
+      viewerHasRelated: Boolean(existing),
+    };
+  }
+
+  async listRelated(section: string, slug: string, limit = 3) {
+    const take = Math.min(6, Math.max(1, Number(limit) || 3));
+    const sectionFilter = toPrismaSectionFilter(section);
+    const current = await this.prisma.article.findFirst({
+      where: {
+        slug,
+        status: ArticleStatus.PUBLISHED,
+        ...(sectionFilter ? { section: sectionFilter } : {}),
+      },
+      include: {
+        articleTags: { include: { tag: true } },
+        seriesEpisodes: {
+          take: 1,
+          select: { seriesId: true },
+        },
+      },
+    });
+    if (!current) throw new NotFoundException('Article not found');
+
+    const tagIds = current.articleTags.map((row) => row.tagId);
+    const tagKindById = new Map(
+      current.articleTags.map((row) => [row.tagId, row.tag.kind]),
+    );
+    const seriesId = current.seriesEpisodes?.[0]?.seriesId;
+
+    const orFilters: Prisma.ArticleWhereInput[] = [
+      { section: current.section },
+    ];
+    if (tagIds.length > 0) {
+      orFilters.push({
+        articleTags: { some: { tagId: { in: tagIds } } },
+      });
+    }
+    if (current.authorId) {
+      orFilters.push({ authorId: current.authorId });
+    }
+    if (seriesId) {
+      orFilters.push({
+        seriesEpisodes: { some: { seriesId } },
+      });
+    }
+
+    const candidates = await this.prisma.article.findMany({
+      where: {
+        status: ArticleStatus.PUBLISHED,
+        id: { not: current.id },
+        OR: orFilters,
+      },
+      include: this.include,
+      orderBy: [{ publishedAt: 'desc' }, { updatedAt: 'desc' }],
+      take: 48,
+    });
+
+    const scored = candidates
+      .map((row) => {
+        let score = 0;
+        if (row.section === current.section) score += 1;
+        if (current.authorId && row.authorId === current.authorId) score += 1;
+        if (
+          seriesId &&
+          row.seriesEpisodes?.some((ep) => ep.series.id === seriesId)
+        ) {
+          score += 2;
+        }
+        for (const link of row.articleTags ?? []) {
+          if (!tagIds.includes(link.tagId)) continue;
+          const kind = tagKindById.get(link.tagId);
+          if (kind === TagKind.TOPIC || kind === TagKind.LOCATION) score += 3;
+          else if (kind === TagKind.CATEGORY) score += 2;
+          else score += 1;
+        }
+        return { row, score };
+      })
+      .filter((item) => item.score > 0)
+      .sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        const aTime = a.row.publishedAt?.getTime() ?? 0;
+        const bTime = b.row.publishedAt?.getTime() ?? 0;
+        return bTime - aTime;
+      })
+      .slice(0, take);
+
+    return scored.map((item) => this.toPublicDto(item.row));
+  }
+
+  async addRelate(section: string, slug: string, visitorKey: string) {
+    const key = visitorKey.trim();
+    if (key.length < 8) {
+      throw new BadRequestException('visitorKey is required');
+    }
+    const sectionFilter = toPrismaSectionFilter(section);
+    const article = await this.prisma.article.findFirst({
+      where: {
+        slug,
+        status: ArticleStatus.PUBLISHED,
+        ...(sectionFilter ? { section: sectionFilter } : {}),
+      },
+      select: { id: true },
+    });
+    if (!article) throw new NotFoundException('Article not found');
+
+    const kind = 'RELATE';
+    try {
+      await this.prisma.articleReaction.create({
+        data: {
+          articleId: article.id,
+          kind,
+          visitorKey: key,
+        },
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        // already related — idempotent
+      } else {
+        throw error;
+      }
+    }
+
+    return this.relateStats(article.id, key);
+  }
+
+  private async relateCountsByArticleIds(ids: string[]) {
+    if (ids.length === 0) return new Map<string, number>();
+    const rows = await this.prisma.articleReaction.groupBy({
+      by: ['articleId'],
+      where: { articleId: { in: ids }, kind: 'RELATE' },
+      _count: { _all: true },
+    });
+    return new Map(rows.map((row) => [row.articleId, row._count._all]));
   }
 
   async listCms(filters: {
     section?: string;
     status?: ArticleStatus;
+    authorId?: string;
     q?: string;
     sponsored?: boolean;
     page?: number;
@@ -439,6 +700,7 @@ export class ArticlesService {
     const where: Prisma.ArticleWhereInput = {};
     if (filters.section) where.section = toPrismaSection(filters.section);
     if (filters.status) where.status = filters.status;
+    if (filters.authorId) where.authorId = filters.authorId;
     if (filters.sponsored === true) where.sponsored = true;
     if (filters.q) {
       where.OR = [
@@ -459,9 +721,13 @@ export class ArticlesService {
       }),
     ]);
 
+    const counts = await this.relateCountsByArticleIds(rows.map((r) => r.id));
     const totalPages = Math.max(1, Math.ceil(total / pageSize));
     return {
-      items: rows.map((row) => this.toCmsDto(row)),
+      items: rows.map((row) => ({
+        ...this.toCmsDto(row),
+        relateCount: counts.get(row.id) ?? 0,
+      })),
       total,
       page,
       pageSize,
@@ -475,7 +741,8 @@ export class ArticlesService {
       include: this.include,
     });
     if (!row) throw new NotFoundException('Article not found');
-    return this.toCmsDto(row);
+    const relate = await this.relateStats(row.id);
+    return { ...this.toCmsDto(row), relateCount: relate.relateCount };
   }
 
   async create(dto: CreateArticleDto) {
@@ -518,6 +785,9 @@ export class ArticlesService {
         featured: dto.featured ?? false,
         sponsored: dto.sponsored ?? false,
         sponsorName: this.optionalText(dto.sponsorName),
+        behindStoryBg: dto.behindStoryBg?.trim() ?? '',
+        seoTitleBg: this.optionalText(dto.seoTitleBg),
+        seoDescriptionBg: this.optionalText(dto.seoDescriptionBg),
         authorId: dto.authorId,
         heroMediaId,
         audioMediaId: dto.audioMediaId,
@@ -529,6 +799,10 @@ export class ArticlesService {
 
     if (galleryIds.length > 0) {
       await this.replaceGallery(row.id, galleryIds);
+    }
+
+    if (dto.tagIds !== undefined) {
+      await this.syncArticleTags(row.id, dto.tagIds);
     }
 
     await this.syncSeriesMembership(row.id, dto.seriesId);
@@ -588,6 +862,18 @@ export class ArticlesService {
       dto.speakerBg,
       existing.speakerBg,
     );
+    const behindStoryBgChanged = this.fieldChanged(
+      dto.behindStoryBg,
+      existing.behindStoryBg,
+    );
+    const seoTitleBgChanged = this.fieldChanged(
+      dto.seoTitleBg,
+      existing.seoTitleBg,
+    );
+    const seoDescriptionBgChanged = this.fieldChanged(
+      dto.seoDescriptionBg,
+      existing.seoDescriptionBg,
+    );
 
     const textChanged =
       titleBgChanged ||
@@ -599,6 +885,9 @@ export class ArticlesService {
       photoCreditBgChanged ||
       endLabelBgChanged ||
       speakerBgChanged ||
+      behindStoryBgChanged ||
+      seoTitleBgChanged ||
+      seoDescriptionBgChanged ||
       bodyMerge.bgChanged;
 
     await this.prisma.article.update({
@@ -629,6 +918,15 @@ export class ArticlesService {
         ...(dto.videoUrl !== undefined
           ? { videoUrl: dto.videoUrl?.trim() || null }
           : {}),
+        ...(dto.behindStoryBg !== undefined
+          ? { behindStoryBg: dto.behindStoryBg.trim() }
+          : {}),
+        ...(dto.seoTitleBg !== undefined
+          ? { seoTitleBg: this.optionalText(dto.seoTitleBg) }
+          : {}),
+        ...(dto.seoDescriptionBg !== undefined
+          ? { seoDescriptionBg: this.optionalText(dto.seoDescriptionBg) }
+          : {}),
         body:
           dto.body !== undefined
             ? (bodyMerge.body as unknown as Prisma.InputJsonValue)
@@ -657,6 +955,9 @@ export class ArticlesService {
               ...(photoCreditBgChanged ? { photoCreditEn: null } : {}),
               ...(endLabelBgChanged ? { endLabelEn: null } : {}),
               ...(speakerBgChanged ? { speakerEn: null } : {}),
+              ...(behindStoryBgChanged ? { behindStoryEn: null } : {}),
+              ...(seoTitleBgChanged ? { seoTitleEn: null } : {}),
+              ...(seoDescriptionBgChanged ? { seoDescriptionEn: null } : {}),
             }
           : {}),
       },
@@ -665,6 +966,10 @@ export class ArticlesService {
 
     if (dto.galleryMediaIds !== undefined) {
       await this.replaceGallery(id, dto.galleryMediaIds);
+    }
+
+    if (dto.tagIds !== undefined) {
+      await this.syncArticleTags(id, dto.tagIds);
     }
 
     await this.syncSeriesMembership(id, dto.seriesId);

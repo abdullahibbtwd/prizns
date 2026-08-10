@@ -1,10 +1,22 @@
-import { useEffect, useMemo, useState } from 'react'
+﻿import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ChevronLeft, ChevronRight, Search, Trash2, BookOpen, Mail, TrendingUp } from 'lucide-react'
+import {
+  ChevronLeft,
+  ChevronRight,
+  Search,
+  Trash2,
+  BookOpen,
+  Mail,
+  TrendingUp,
+  Send,
+  Radio,
+} from 'lucide-react'
 import {
   CmsCard,
   CmsPageHeader,
+  PrimaryButton,
   StatCard,
+  StatusPill,
 } from '@/cms/components/CmsUI'
 import { JournalSelect } from '@/components/ui/JournalSelect'
 import { Alert } from '@/components/ui/Alert'
@@ -12,6 +24,12 @@ import {
   deleteCmsNewsletterSubscriber,
   listCmsNewsletterSubscribers,
 } from '@/lib/newsletter-api'
+import {
+  getCmsDigestPreview,
+  listCmsDigestHistory,
+  sendCmsDigest,
+} from '@/lib/digest-api'
+import { ApiError } from '@/lib/api'
 import { cn } from '@/lib/utils'
 
 const PAGE_SIZE_OPTIONS = [5, 10, 20, 50, 100] as const
@@ -48,10 +66,51 @@ export default function CmsNewsletterPage() {
     placeholderData: (prev) => prev,
   })
 
+  const previewQuery = useQuery({
+    queryKey: ['cms-digest-preview'],
+    queryFn: () => getCmsDigestPreview(),
+  })
+
+  const historyQuery = useQuery({
+    queryKey: ['cms-digest-history'],
+    queryFn: () => listCmsDigestHistory(),
+  })
+
+  const sendMutation = useMutation({
+    mutationFn: () => {
+      const next = previewQuery.data?.next
+      if (!next) throw new Error('No episode to send')
+      return sendCmsDigest({
+        seriesId: next.seriesId,
+        articleId: next.articleId,
+      })
+    },
+    onSuccess: async (result) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['cms-digest-preview'] }),
+        queryClient.invalidateQueries({ queryKey: ['cms-digest-history'] }),
+      ])
+      setToast({
+        open: true,
+        variant: 'success',
+        message: `Episode sent to ${result.recipientCount} subscriber${result.recipientCount === 1 ? '' : 's'}.`,
+      })
+    },
+    onError: (err: Error) => {
+      setToast({
+        open: true,
+        variant: 'error',
+        message: (err as ApiError)?.message || err.message || 'Send failed',
+      })
+    },
+  })
+
   const items = listQuery.data?.items ?? []
   const total = listQuery.data?.total ?? 0
   const totalPages = listQuery.data?.totalPages ?? 1
   const totalLabel = total.toLocaleString()
+  const nextEpisode = previewQuery.data?.next
+  const history = historyQuery.data ?? []
 
   useEffect(() => {
     if (page > totalPages) setPage(totalPages)
@@ -98,9 +157,95 @@ export default function CmsNewsletterPage() {
     <div>
       <CmsPageHeader
         title="Newsletter Hub"
-        description="Subscribers who signed up from the public newsletter form."
+        description="Episode of the Day digests via Resend, plus subscribers from the public form."
         badge={`${totalLabel} Readers`}
       />
+
+      <CmsCard className="mb-8 space-y-4 p-5">
+        <div className="flex items-center gap-2">
+          <Radio className="size-4 text-[#0C2686]" />
+          <h2 className="text-sm font-semibold">Episode of the Day</h2>
+        </div>
+        <p className="text-xs text-stone-500">
+          Sends the next undigested published episode from an active series to all
+          subscribers. Same episode cannot be sent twice.
+        </p>
+
+        {previewQuery.isLoading ? (
+          <p className="text-sm text-stone-500">Loading next episode…</p>
+        ) : !nextEpisode ? (
+          <p className="text-sm text-stone-500">
+            No undigested published episode found. Add episodes to an active series.
+          </p>
+        ) : (
+          <div className="rounded-xl border border-[#E8E4DC] bg-[#FAF8F3] p-4">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-[#0C2686]">
+              {nextEpisode.seriesTitleBg} · Episode {nextEpisode.episodeNumber}
+            </p>
+            <h3 className="mt-1 font-heading text-xl text-stone-900">
+              {nextEpisode.titleBg}
+            </h3>
+            {nextEpisode.subtitleBg ? (
+              <p className="mt-1 text-sm text-stone-600">{nextEpisode.subtitleBg}</p>
+            ) : null}
+            <p className="mt-2 text-xs text-stone-500">{nextEpisode.path}</p>
+            <p className="mt-3 text-xs text-stone-500">
+              {previewQuery.data?.subscriberCount ?? 0} subscriber
+              {(previewQuery.data?.subscriberCount ?? 0) === 1 ? '' : 's'}
+              {previewQuery.data?.mailConfigured === false
+                ? ' · Resend not configured'
+                : ''}
+            </p>
+            <div className="mt-4">
+              <PrimaryButton
+                type="button"
+                disabled={
+                  sendMutation.isPending ||
+                  (previewQuery.data?.subscriberCount ?? 0) < 1 ||
+                  previewQuery.data?.mailConfigured === false
+                }
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      `Send "${nextEpisode.titleBg}" to ${previewQuery.data?.subscriberCount ?? 0} subscribers?`,
+                    )
+                  ) {
+                    sendMutation.mutate()
+                  }
+                }}
+              >
+                <Send className="size-3.5" />
+                {sendMutation.isPending ? 'Sending…' : 'Send now'}
+              </PrimaryButton>
+            </div>
+          </div>
+        )}
+
+        {history.length > 0 ? (
+          <div className="space-y-2 border-t border-[#E8E4DC] pt-4">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-stone-500">
+              Recent sends
+            </p>
+            {history.slice(0, 8).map((item) => (
+              <div
+                key={item.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#E8E4DC] bg-white px-3 py-2"
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-stone-900">
+                    {item.article.titleBg}
+                  </p>
+                  <p className="text-[11px] text-stone-500">
+                    {item.series.titleBg} · {item.recipientCount} recipients ·{' '}
+                    {new Date(item.sentAt).toLocaleString()}
+                  </p>
+                </div>
+                <StatusPill status={item.status} />
+              </div>
+            ))}
+          </div>
+        ) : null}
+      </CmsCard>
 
       <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard
@@ -112,17 +257,17 @@ export default function CmsNewsletterPage() {
           sparklineData={[0, 0, 0, 0, 0]}
         />
         <StatCard
-          title="Recent Campaigns"
-          value="0 Sent"
-          trend="0% Delivered"
+          title="Digest sends"
+          value={String(history.filter((h) => h.status === 'SENT').length)}
+          trend="Episode of the Day"
           trendType="neutral"
           icon={BookOpen}
           sparklineData={[0, 0, 0, 0]}
         />
         <StatCard
           title="Average Open Rate"
-          value="0%"
-          trend="0%"
+          value="—"
+          trend="via Resend later"
           trendType="neutral"
           icon={TrendingUp}
           sparklineData={[0, 0, 0, 0]}

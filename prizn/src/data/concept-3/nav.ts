@@ -5,19 +5,51 @@ export interface JournalNavLink {
   to: string
 }
 
-/** Primary browse destinations shown across footer / mobile nav. */
-export function getJournalNavLinks(lang: JournalLang): JournalNavLink[] {
+/** Primary browse destinations — Phase 1 pillars. */
+export function getPrimaryNavLinks(lang: JournalLang): JournalNavLink[] {
   return [
-    { label: lang === 'bg' ? 'Истории' : 'Stories', to: '/stories' },
-    { label: lang === 'bg' ? 'Места' : 'Places', to: '/places' },
-    { label: lang === 'bg' ? 'Открийте' : 'Discover', to: '/discover' },
-    { label: lang === 'bg' ? 'Автори' : 'Authors', to: '/authors' },
-    { label: lang === 'bg' ? 'Традиции' : 'Traditions', to: '/traditions' },
-    { label: lang === 'bg' ? 'Гласове' : 'Voices', to: '/voices' },
+    {
+      label: lang === 'bg' ? 'Човешки истории' : 'Human Stories',
+      to: '/stories',
+    },
+    {
+      label: lang === 'bg' ? 'Нашите места' : 'Our Places',
+      to: '/places',
+    },
+    {
+      label: lang === 'bg' ? 'Традиции' : 'Traditions',
+      to: '/traditions',
+    },
+  ]
+}
+
+/** Footer secondary sections (lower UX priority). */
+export function getFooterSecondaryLinks(lang: JournalLang): JournalNavLink[] {
+  return [
     { label: lang === 'bg' ? 'Спорт' : 'Sports', to: '/sports' },
     { label: lang === 'bg' ? 'Събития' : 'Events', to: '/events' },
+    { label: lang === 'bg' ? 'Новини' : 'News', to: '/news' },
+    { label: lang === 'bg' ? 'Магазин' : 'Shop', to: '/shop' },
+  ]
+}
+
+/** Tertiary destinations kept for deep links / mobile overflow. */
+export function getTertiaryNavLinks(lang: JournalLang): JournalNavLink[] {
+  return [
+    { label: lang === 'bg' ? 'Открийте' : 'Discover', to: '/discover' },
+    { label: lang === 'bg' ? 'Автори' : 'Authors', to: '/authors' },
+    { label: lang === 'bg' ? 'Гласове' : 'Voices', to: '/voices' },
+  ]
+}
+
+/** @deprecated Prefer getPrimaryNavLinks / getFooterSecondaryLinks */
+export function getJournalNavLinks(lang: JournalLang): JournalNavLink[] {
+  return [
+    ...getPrimaryNavLinks(lang),
+    ...getTertiaryNavLinks(lang),
+    ...getFooterSecondaryLinks(lang),
     { label: lang === 'bg' ? 'Видео' : 'Video', to: '/video' },
     { label: lang === 'bg' ? 'Кампании' : 'Campaigns', to: '/campaigns' },
-    { label: lang === 'bg' ? 'Магазин' : 'Shop', to: '/#shop' },
+    { label: lang === 'bg' ? 'Магазин' : 'Shop', to: '/shop' },
   ]
 }

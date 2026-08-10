@@ -17,6 +17,8 @@ export type PlaceCard = {
   action: string
   actionBg: string
   detail: string
+  sponsored?: boolean
+  sponsorName?: string | null
 }
 
 export type TraditionCard = {
@@ -26,6 +28,8 @@ export type TraditionCard = {
   sub: string
   image: string
   description: string
+  sponsored?: boolean
+  sponsorName?: string | null
 }
 
 export type HumanStoryCard = {
@@ -80,6 +84,8 @@ export function toPlaceCard(article: CmsArticle): PlaceCard {
       firstParagraphBg(article.bodyRaw) ||
       firstParagraphBg(article.body) ||
       article.subtitleBg,
+    sponsored: Boolean(article.sponsored),
+    sponsorName: article.sponsorName ?? null,
   }
 }
 
@@ -95,6 +101,8 @@ export function toTraditionCard(article: CmsArticle): TraditionCard {
       firstParagraphBg(article.bodyRaw) ||
       firstParagraphBg(article.body) ||
       article.subtitleBg,
+    sponsored: Boolean(article.sponsored),
+    sponsorName: article.sponsorName ?? null,
   }
 }
 

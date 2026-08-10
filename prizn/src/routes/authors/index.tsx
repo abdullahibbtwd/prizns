@@ -48,6 +48,7 @@ export default function AuthorsPage() {
                           <img
                             src={author.image}
                             alt={lang === 'bg' ? author.nameBg : author.name}
+                            loading="lazy"
                             className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.03]"
                           />
                         </div>

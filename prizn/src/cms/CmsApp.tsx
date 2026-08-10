@@ -15,18 +15,19 @@ import CmsSubmissionDetailPage from '@/cms/pages/SubmissionDetailPage'
 import CmsDonationsPage from '@/cms/pages/DonationsPage'
 import CmsPartnershipsPage from '@/cms/pages/PartnershipsPage'
 import CmsNewsletterPage from '@/cms/pages/NewsletterPage'
+import CmsTagsPage from '@/cms/pages/TagsPage'
 import CmsUsersPage from '@/cms/pages/UsersPage'
 import CmsAnalyticsPage from '@/cms/pages/AnalyticsPage'
+import CmsSocialPage from '@/cms/pages/SocialPage'
 import {
   CmsAiPage,
   CmsMediaPage,
-  CmsOrdersPage,
-  CmsProductsPage,
   CmsSeoPage,
   CmsSettingsPage,
   CmsShopPage,
-  CmsSocialPage,
 } from '@/cms/pages/ContentPages'
+import CmsProductsPage from '@/cms/pages/ProductsPage'
+import CmsOrdersPage from '@/cms/pages/OrdersPage'
 
 export default function CmsApp() {
   return (
@@ -41,6 +42,7 @@ export default function CmsApp() {
             <Route path="stories/:id" element={<CmsStoryEditorPage />} />
             <Route path="series" element={<CmsSeriesPage />} />
             <Route path="series/:id" element={<CmsSeriesEditorPage />} />
+            <Route path="tags" element={<CmsTagsPage />} />
             <Route path="authors" element={<CmsAuthorsPage />} />
             <Route path="authors/:id" element={<CmsAuthorEditorPage />} />
             <Route path="media" element={<CmsMediaPage />} />

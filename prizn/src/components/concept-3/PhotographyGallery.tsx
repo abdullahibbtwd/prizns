@@ -103,6 +103,7 @@ export function PhotographyGallery({ lang }: PhotographyGalleryProps) {
                 <img
                   src={item.image}
                   alt={item.title}
+                  loading="lazy"
                   className="h-full w-full object-cover transition-transform duration-1000 ease-out group-hover:scale-105 filter grayscale-[15%] group-hover:grayscale-0"
                 />
                 <div className="absolute inset-0 flex items-center justify-center bg-black/40 p-6 text-center opacity-0 transition-opacity duration-300 group-hover:opacity-100">

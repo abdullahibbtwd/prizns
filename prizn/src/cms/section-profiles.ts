@@ -97,6 +97,10 @@ const PROFILES: Partial<Record<ArticleSection, SectionProfile>> = {
     ...DEFAULT_PROFILE,
     defaultCategoryBg: getSectionCategoryBg('events'),
   },
+  news: {
+    ...DEFAULT_PROFILE,
+    defaultCategoryBg: getSectionCategoryBg('news'),
+  },
   video: {
     ...DEFAULT_PROFILE,
     defaultCategoryBg: getSectionCategoryBg('video'),

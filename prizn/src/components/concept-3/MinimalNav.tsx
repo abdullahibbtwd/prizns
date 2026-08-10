@@ -4,7 +4,11 @@ import { Search, X, Globe, Menu, Heart, ChevronDown, PenLine, Handshake } from '
 import { motion, AnimatePresence } from 'framer-motion'
 import { Logo } from '@/components/Logo'
 import { cn } from '@/lib/utils'
-import { getJournalNavLinks } from '@/data/concept-3/nav'
+import {
+  getFooterSecondaryLinks,
+  getPrimaryNavLinks,
+  getTertiaryNavLinks,
+} from '@/data/concept-3/nav'
 
 interface MinimalNavProps {
   lang: 'bg' | 'en'
@@ -45,10 +49,11 @@ export function MinimalNav({ lang, setLang, variant = 'hero' }: MinimalNavProps)
     return () => document.removeEventListener('mousedown', onPointerDown)
   }, [])
 
-  const allNavLinks = getJournalNavLinks(lang)
-  const navLinks = allNavLinks.filter((link) =>
-    ['/stories', '/places', '/discover'].includes(link.to),
-  )
+  const navLinks = getPrimaryNavLinks(lang)
+  const mobileSecondary = [
+    ...getFooterSecondaryLinks(lang),
+    ...getTertiaryNavLinks(lang),
+  ]
 
   const contributeLinks = [
     {
@@ -69,8 +74,10 @@ export function MinimalNav({ lang, setLang, variant = 'hero' }: MinimalNavProps)
   ]
 
   const mobileLinks = [
-    ...allNavLinks,
+    ...navLinks,
+    ...mobileSecondary,
     ...contributeLinks.map(({ label, href }) => ({ label, to: href })),
+    { label: lang === 'bg' ? 'Защо Prizni' : 'Why Prizni', to: '/why-prizni' },
   ]
 
   const searchSuggestions = [

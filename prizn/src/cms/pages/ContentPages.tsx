@@ -13,11 +13,8 @@ import {
   Film,
   ImagePlus,
   MapPin,
-  Package,
   Search,
   Settings,
-  Share2,
-  ShoppingBag,
   Sparkles,
   Copy,
 } from 'lucide-react'
@@ -281,19 +278,6 @@ export function CmsMediaPage() {
   )
 }
 
-export function CmsSocialPage() {
-  return (
-    <div>
-      <CmsPageHeader title="Social Automation Desk" description="Convert published stories into optimized social snippets with AI." badge="Social Suite" />
-      <ComingSoon
-        icon={Share2}
-        title="Multi-Platform Social Auto-Publish"
-        blurb="Generate Facebook posts, Instagram carousel text, and TikTok scripts with 1-click editorial approval."
-      />
-    </div>
-  )
-}
-
 export function CmsSeoPage() {
   return (
     <div>
@@ -310,26 +294,22 @@ export function CmsSeoPage() {
 export function CmsShopPage() {
   return (
     <div>
-      <CmsPageHeader title="Boutique Shop Cockpit" description="Handcrafted goods, prints, and limited journal editions." badge="Commerce Active" />
-      <ComingSoon icon={ShoppingBag} title="Prizni Storefront Manager" blurb="Manage inventory, digital downloads, and artisanal product listings." />
-    </div>
-  )
-}
-
-export function CmsOrdersPage() {
-  return (
-    <div>
-      <CmsPageHeader title="Customer Orders" description="Order fulfillment, shipping status, and receipts." badge="4 Orders Pending" />
-      <ComingSoon icon={Package} title="Fulfillment Center" blurb="Track order dispatches, generate shipping labels, and manage customer receipts." />
-    </div>
-  )
-}
-
-export function CmsProductsPage() {
-  return (
-    <div>
-      <CmsPageHeader title="Product Catalog" description="SKUs, print journals, and traditional artisan crafts." badge="12 Products" />
-      <ComingSoon icon={Package} title="Artisan Product Catalog" blurb="Manage pricing, variants, and high-res photography for store items." />
+      <CmsPageHeader
+        title="Boutique Shop Cockpit"
+        description="Handcrafted goods, prints, and limited journal editions."
+        badge="Shop"
+      />
+      <CmsCard className="p-6 text-sm text-stone-600">
+        Manage catalog in{' '}
+        <a href="/cms/products" className="font-semibold text-[#0C2686]">
+          Products
+        </a>{' '}
+        and fulfillment in{' '}
+        <a href="/cms/orders" className="font-semibold text-[#0C2686]">
+          Orders
+        </a>
+        . Public storefront: <code className="text-xs">/shop</code>
+      </CmsCard>
     </div>
   )
 }

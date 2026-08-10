@@ -25,6 +25,8 @@ import {
   TextArea,
   TextInput,
 } from '@/components/concept-3/contribute/shared'
+import { ApiError } from '@/lib/api'
+import { createPublicPartnership } from '@/lib/partnerships-api'
 
 const whoCan = [
   { icon: Landmark, en: 'Museums', bg: 'Музеи' },
@@ -109,6 +111,39 @@ const typeOptions = [
 
 export default function PartnershipsPage() {
   const [submitted, setSubmitted] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setError('')
+    setSubmitting(true)
+    const data = new FormData(e.currentTarget)
+    try {
+      await createPublicPartnership({
+        organization: String(data.get('org') ?? '').trim(),
+        contactName: String(data.get('contact') ?? '').trim(),
+        email: String(data.get('email') ?? '').trim(),
+        phone: String(data.get('phone') ?? '').trim() || undefined,
+        website: String(data.get('website') ?? '').trim() || undefined,
+        type: String(data.get('type') ?? '').trim(),
+        budget: String(data.get('budget') ?? '').trim() || undefined,
+        message: String(data.get('message') ?? '').trim(),
+        honeypot: String(data.get('company_fax') ?? '').trim() || undefined,
+      })
+      setSubmitted(true)
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : 'Failed to send inquiry.',
+      )
+    } finally {
+      setSubmitting(false)
+    }
+  }
 
   return (
     <JournalShell>
@@ -258,13 +293,16 @@ export default function PartnershipsPage() {
                 </p>
               </motion.div>
             ) : (
-              <form
-                className="max-w-3xl space-y-8"
-                onSubmit={(e) => {
-                  e.preventDefault()
-                  setSubmitted(true)
-                }}
-              >
+              <form className="max-w-3xl space-y-8" onSubmit={handleSubmit}>
+                {/* Honeypot — leave empty */}
+                <input
+                  type="text"
+                  name="company_fax"
+                  tabIndex={-1}
+                  autoComplete="off"
+                  aria-hidden="true"
+                  className="absolute left-[-9999px] h-0 w-0 opacity-0"
+                />
                 <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
                   <div>
                     <FieldLabel>
@@ -331,12 +369,23 @@ export default function PartnershipsPage() {
                   />
                 </div>
 
+                {error ? (
+                  <p className="font-sans text-sm text-rose-700">{error}</p>
+                ) : null}
+
                 <button
                   type="submit"
-                  className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-[#0C2686] px-8 py-3.5 font-sans text-xs font-medium uppercase tracking-[0.22em] text-white transition-colors hover:bg-[#1A1A1A]"
+                  disabled={submitting}
+                  className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-[#0C2686] px-8 py-3.5 font-sans text-xs font-medium uppercase tracking-[0.22em] text-white transition-colors hover:bg-[#1A1A1A] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Handshake className="size-3.5" />
-                  {lang === 'bg' ? 'Изпратете запитване' : 'Send Inquiry'}
+                  {submitting
+                    ? lang === 'bg'
+                      ? 'Изпращане…'
+                      : 'Sending…'
+                    : lang === 'bg'
+                      ? 'Изпратете запитване'
+                      : 'Send Inquiry'}
                 </button>
               </form>
             )}

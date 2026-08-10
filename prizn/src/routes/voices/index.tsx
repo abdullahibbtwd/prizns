@@ -8,12 +8,19 @@ import {
 import { preferApi, usePublicArticles } from '@/lib/public-content'
 
 export default function VoicesPage() {
-  const { data } = usePublicArticles('voices')
+  // Global audio shelf: any published story with audio (voices uploads + narrations).
+  const { data, isLoading, isError } = usePublicArticles(undefined, {
+    hasAudio: true,
+  })
 
   return (
     <JournalShell>
       {({ lang }) => {
-        const voices = preferApi(data?.map(toVoiceItem))
+        const voices = preferApi(
+          data
+            ?.filter((article) => Boolean(article.audioUrl))
+            .map(toVoiceItem),
+        )
 
         return (
           <main className="bg-[#1A1A1A] text-white">
@@ -26,11 +33,17 @@ export default function VoicesPage() {
               }
               description={
                 lang === 'bg'
-                  ? 'Пуснете записа направо тук, или кликнете картата / „Отворете пълната история“, за да прочетете цялата страница.'
-                  : 'Play a recording right here, or click a card / “Open full story” to read the full page.'
+                  ? 'Слушайте нарации и записи от историите. Кликнете картата, за да отворите пълната страница.'
+                  : 'Listen to narrations and field recordings from our stories. Click a card to open the full page.'
               }
               countLabel={
-                lang === 'bg' ? `${voices.length} записа` : `${voices.length} recordings`
+                isLoading
+                  ? lang === 'bg'
+                    ? 'Зареждане…'
+                    : 'Loading…'
+                  : lang === 'bg'
+                    ? `${voices.length} записа`
+                    : `${voices.length} recordings`
               }
             />
 
@@ -41,11 +54,31 @@ export default function VoicesPage() {
                 <div className="mb-10 flex w-fit items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 font-sans text-xs text-white/50 backdrop-blur-md">
                   <Radio className="size-3.5 animate-pulse text-emerald-400" />
                   <span>
-                    {lang === 'bg' ? 'Оригинални записи 2026' : 'Original Field Recordings'}
+                    {lang === 'bg'
+                      ? 'Гласове от всички истории'
+                      : 'Voices from every story'}
                   </span>
                 </div>
 
-                <VoicesPlayerGrid lang={lang} voices={voices} animateOnMount />
+                {isLoading ? (
+                  <p className="font-sans text-sm text-white/50">
+                    {lang === 'bg' ? 'Зареждане на записи…' : 'Loading recordings…'}
+                  </p>
+                ) : isError ? (
+                  <p className="font-sans text-sm text-rose-300">
+                    {lang === 'bg'
+                      ? 'Неуспешно зареждане на аудио.'
+                      : 'Could not load audio.'}
+                  </p>
+                ) : voices.length === 0 ? (
+                  <p className="font-sans text-sm text-white/50">
+                    {lang === 'bg'
+                      ? 'Все още няма аудио. Публикувайте история с запис или нарация.'
+                      : 'No audio yet. Publish a story with a recording or narration.'}
+                  </p>
+                ) : (
+                  <VoicesPlayerGrid lang={lang} voices={voices} animateOnMount />
+                )}
               </div>
             </div>
           </main>

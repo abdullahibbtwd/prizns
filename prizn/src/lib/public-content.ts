@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { listPublicArticles, listPublicMedia } from "@/lib/articles-api";
 import type { CmsArticle } from "@/lib/cms-types";
+import { listPublicTags, type TagKind } from "@/lib/tags-api";
 
 export type PublicAuthor = {
   id: string;
@@ -65,10 +66,47 @@ export function preferApi<T>(apiItems: T[] | undefined): T[] {
   return apiItems ?? [];
 }
 
-export function usePublicArticles(section: string, series?: string) {
+export function usePublicArticles(
+  section?: string,
+  opts?:
+    | string
+    | {
+        series?: string
+        location?: string
+        topic?: string
+        category?: string
+        hasAudio?: boolean
+      },
+) {
+  const filters =
+    typeof opts === "string" ? { series: opts || undefined } : opts
   return useQuery({
-    queryKey: ["public-articles", section, series || ""],
-    queryFn: () => listPublicArticles(section, series ? { series } : undefined),
+    queryKey: [
+      "public-articles",
+      section || "all",
+      filters?.series || "",
+      filters?.location || "",
+      filters?.topic || "",
+      filters?.category || "",
+      filters?.hasAudio ? "audio" : "",
+    ],
+    queryFn: () =>
+      listPublicArticles(section, {
+        series: filters?.series,
+        location: filters?.location,
+        topic: filters?.topic,
+        category: filters?.category,
+        hasAudio: filters?.hasAudio,
+      }),
+    staleTime: 60_000,
+    retry: false,
+  });
+}
+
+export function usePublicTags(kind?: TagKind) {
+  return useQuery({
+    queryKey: ["public-tags", kind || "all"],
+    queryFn: () => listPublicTags(kind),
     staleTime: 60_000,
     retry: false,
   });

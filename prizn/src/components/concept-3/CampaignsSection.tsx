@@ -70,6 +70,7 @@ export function CampaignsSection({ lang }: CampaignsSectionProps) {
                 <img
                   src={featured.image}
                   alt={lang === 'bg' ? featured.titleBg : featured.title}
+                  loading="lazy"
                   className="absolute inset-0 h-full w-full object-cover transition-transform duration-1000 group-hover:scale-105"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent" />
@@ -106,6 +107,7 @@ export function CampaignsSection({ lang }: CampaignsSectionProps) {
                     <img
                       src={item.image}
                       alt={lang === 'bg' ? item.titleBg : item.title}
+                      loading="lazy"
                       className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
                     />
                   </div>

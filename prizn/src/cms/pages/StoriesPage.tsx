@@ -19,8 +19,10 @@ import {
   PrimaryButton,
   StatusPill,
 } from '@/cms/components/CmsUI'
-import { deleteCmsArticle, listCmsArticles } from '@/lib/articles-api'
-import type { ArticleStatus, CmsArticle } from '@/lib/cms-types'
+import { JournalSelect } from '@/components/ui/JournalSelect'
+import { deleteCmsArticle, listCmsArticles, listCmsAuthors } from '@/lib/articles-api'
+import type { ArticleSection, ArticleStatus, CmsArticle } from '@/lib/cms-types'
+import { ARTICLE_SECTIONS } from '@/lib/cms-types'
 import { cn } from '@/lib/utils'
 import { useJournalLang } from '@/hooks/useJournalLang'
 import { pickLang } from '@/lib/pick-lang'
@@ -38,12 +40,16 @@ const filters: Array<'all' | ArticleStatus | 'sponsored'> = [
 
 const PAGE_SIZE_OPTIONS = [6, 9, 12, 24] as const
 const BASE_PATH = '/cms/stories'
+const ALL_SECTIONS = ''
+const ALL_AUTHORS = ''
 
 export default function CmsStoriesPage() {
   const { t } = useTranslation()
   const { lang } = useJournalLang()
   const queryClient = useQueryClient()
   const [filter, setFilter] = useState<(typeof filters)[number]>('all')
+  const [section, setSection] = useState(ALL_SECTIONS)
+  const [authorId, setAuthorId] = useState(ALL_AUTHORS)
   const [query, setQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid')
@@ -57,15 +63,30 @@ export default function CmsStoriesPage() {
 
   useEffect(() => {
     setPage(1)
-  }, [filter, debouncedQuery, pageSize])
+  }, [filter, section, authorId, debouncedQuery, pageSize])
+
+  const authorsQuery = useQuery({
+    queryKey: ['cms-authors-options'],
+    queryFn: () => listCmsAuthors(),
+  })
 
   const articlesQuery = useQuery({
-    queryKey: ['cms-articles', page, pageSize, filter, debouncedQuery],
+    queryKey: [
+      'cms-articles',
+      page,
+      pageSize,
+      filter,
+      section,
+      authorId,
+      debouncedQuery,
+    ],
     queryFn: () =>
       listCmsArticles({
         page,
         pageSize,
         q: debouncedQuery || undefined,
+        section: section || undefined,
+        authorId: authorId || undefined,
         status:
           filter !== 'all' && filter !== 'sponsored'
             ? (filter as ArticleStatus)
@@ -85,7 +106,15 @@ export default function CmsStoriesPage() {
   })
 
   useEffect(() => {
-    if (!articlesQuery.data || filter !== 'all' || debouncedQuery) return
+    if (
+      !articlesQuery.data ||
+      filter !== 'all' ||
+      section ||
+      authorId ||
+      debouncedQuery
+    ) {
+      return
+    }
     queryClient.setQueryData(['cms-articles-count'], {
       items: articlesQuery.data.items.slice(0, 1),
       total: articlesQuery.data.total,
@@ -93,7 +122,14 @@ export default function CmsStoriesPage() {
       pageSize: 1,
       totalPages: articlesQuery.data.totalPages,
     })
-  }, [filter, debouncedQuery, articlesQuery.data, queryClient])
+  }, [
+    filter,
+    section,
+    authorId,
+    debouncedQuery,
+    articlesQuery.data,
+    queryClient,
+  ])
 
   const stories = articlesQuery.data?.items ?? []
   const total = articlesQuery.data?.total ?? 0
@@ -105,6 +141,28 @@ export default function CmsStoriesPage() {
 
   const from = total === 0 ? 0 : (page - 1) * pageSize + 1
   const to = Math.min(page * pageSize, total)
+
+  const sectionOptions = useMemo(
+    () => [
+      { value: ALL_SECTIONS, label: t('cms.stories.filterSectionAll') },
+      ...ARTICLE_SECTIONS.map((item) => ({
+        value: item,
+        label: getSectionLabel(item, lang),
+      })),
+    ],
+    [lang, t],
+  )
+
+  const authorOptions = useMemo(
+    () => [
+      { value: ALL_AUTHORS, label: t('cms.stories.filterAuthorAll') },
+      ...(authorsQuery.data ?? []).map((author) => ({
+        value: author.id,
+        label: pickLang(lang, author.nameEn ?? author.nameBg, author.nameBg),
+      })),
+    ],
+    [authorsQuery.data, lang, t],
+  )
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteCmsArticle(id),
@@ -157,57 +215,82 @@ export default function CmsStoriesPage() {
         }
       />
 
-      <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-[#E8E4DC] bg-white p-4 shadow-2xs md:flex-row md:items-center md:justify-between">
-        <div className="flex flex-wrap gap-2">
-          {filters.map((item) => (
-            <button
-              key={item}
-              type="button"
-              onClick={() => setFilter(item)}
-              className={cn(
-                'rounded-full px-3 py-1.5 text-xs font-semibold transition-colors',
-                filter === item
-                  ? 'bg-[#0C2686] text-white'
-                  : 'bg-stone-100 text-stone-600 hover:bg-stone-200',
-              )}
-            >
-              {filterLabel(item)}
-            </button>
-          ))}
+      <div className="mb-6 space-y-4 rounded-2xl border border-[#E8E4DC] bg-white p-4 shadow-2xs">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-wrap gap-2">
+            {filters.map((item) => (
+              <button
+                key={item}
+                type="button"
+                onClick={() => setFilter(item)}
+                className={cn(
+                  'rounded-full px-3 py-1.5 text-xs font-semibold transition-colors',
+                  filter === item
+                    ? 'bg-[#0C2686] text-white'
+                    : 'bg-stone-100 text-stone-600 hover:bg-stone-200',
+                )}
+              >
+                {filterLabel(item)}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1 md:w-64">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-stone-400" />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={t('cms.stories.filterPlaceholder')}
+                className="w-full rounded-xl border border-[#E8E4DC] bg-stone-50 py-2 pl-9 pr-3 text-xs outline-none focus:border-[#0C2686]"
+              />
+            </div>
+            <div className="flex rounded-xl border border-[#E8E4DC] bg-stone-50 p-1">
+              <button
+                type="button"
+                onClick={() => setViewMode('grid')}
+                className={cn(
+                  'rounded-lg p-1.5',
+                  viewMode === 'grid' ? 'bg-white text-[#0C2686]' : 'text-stone-400',
+                )}
+              >
+                <LayoutGrid className="size-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('table')}
+                className={cn(
+                  'rounded-lg p-1.5',
+                  viewMode === 'table' ? 'bg-white text-[#0C2686]' : 'text-stone-400',
+                )}
+              >
+                <List className="size-4" />
+              </button>
+            </div>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <div className="relative flex-1 md:w-64">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-stone-400" />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder={t('cms.stories.filterPlaceholder')}
-              className="w-full rounded-xl border border-[#E8E4DC] bg-stone-50 py-2 pl-9 pr-3 text-xs outline-none focus:border-[#0C2686]"
-            />
-          </div>
-          <div className="flex rounded-xl border border-[#E8E4DC] bg-stone-50 p-1">
-            <button
-              type="button"
-              onClick={() => setViewMode('grid')}
-              className={cn(
-                'rounded-lg p-1.5',
-                viewMode === 'grid' ? 'bg-white text-[#0C2686]' : 'text-stone-400',
-              )}
-            >
-              <LayoutGrid className="size-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode('table')}
-              className={cn(
-                'rounded-lg p-1.5',
-                viewMode === 'table' ? 'bg-white text-[#0C2686]' : 'text-stone-400',
-              )}
-            >
-              <List className="size-4" />
-            </button>
-          </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <JournalSelect
+            name="cms-stories-section"
+            variant="boxed"
+            label={t('cms.stories.filterSection')}
+            placeholder={t('cms.stories.filterSectionAll')}
+            options={sectionOptions}
+            value={section}
+            onChange={(value) =>
+              setSection(value as ArticleSection | typeof ALL_SECTIONS)
+            }
+          />
+          <JournalSelect
+            name="cms-stories-author"
+            variant="boxed"
+            label={t('cms.stories.filterAuthor')}
+            placeholder={t('cms.stories.filterAuthorAll')}
+            options={authorOptions}
+            value={authorId}
+            onChange={setAuthorId}
+          />
         </div>
       </div>
 
@@ -253,6 +336,11 @@ export default function CmsStoriesPage() {
                 <div className="flex flex-wrap gap-2">
                   <StatusPill status={story.status} />
                   <StatusPill status={story.translationStatus} />
+                  {(story.relateCount ?? 0) > 0 ? (
+                    <span className="rounded-full bg-[#0C2686]/8 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-[#0C2686]">
+                      {t('cms.stories.colRelates')} · {story.relateCount}
+                    </span>
+                  ) : null}
                 </div>
                 <div>
                   <p className="text-[11px] uppercase tracking-wider text-stone-500">
@@ -311,6 +399,7 @@ export default function CmsStoriesPage() {
                 <th className="px-4 py-3">{t('cms.stories.colSection')}</th>
                 <th className="px-4 py-3">{t('cms.stories.colStatus')}</th>
                 <th className="px-4 py-3">{t('cms.stories.colTranslation')}</th>
+                <th className="px-4 py-3">{t('cms.stories.colRelates')}</th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
@@ -328,6 +417,9 @@ export default function CmsStoriesPage() {
                   </td>
                   <td className="px-4 py-3">
                     <StatusPill status={story.translationStatus} />
+                  </td>
+                  <td className="px-4 py-3 tabular-nums text-stone-600">
+                    {story.relateCount ?? 0}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-3">

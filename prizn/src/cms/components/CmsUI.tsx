@@ -24,6 +24,7 @@ import {
   Layers,
   Mail,
   Bot,
+  Tags,
   ExternalLink,
   ChevronRight,
   TrendingUp,
@@ -61,6 +62,8 @@ export const cmsNavGroups: CmsNavGroup[] = [
     items: [
       { labelKey: 'cms.nav.stories', to: '/cms/stories', icon: BookOpen, badgeColor: 'bg-[#0C2686]/10 text-[#0C2686]' },
       { labelKey: 'cms.nav.series', to: '/cms/series', icon: Layers },
+      { labelKey: 'cms.nav.social', to: '/cms/social', icon: Share2 },
+      { labelKey: 'cms.nav.tags', to: '/cms/tags', icon: Tags },
       { labelKey: 'cms.nav.authors', to: '/cms/authors', icon: Users },
       { labelKey: 'cms.nav.media', to: '/cms/media', icon: Library },
     ],
@@ -77,7 +80,6 @@ export const cmsNavGroups: CmsNavGroup[] = [
   {
     labelKey: 'cms.nav.marketing',
     items: [
-      { labelKey: 'cms.nav.social', to: '/cms/social', icon: Share2 },
       { labelKey: 'cms.nav.seo', to: '/cms/seo', icon: Search },
       { labelKey: 'cms.nav.analytics', to: '/cms/analytics', icon: ChartColumn },
     ],
@@ -359,9 +361,11 @@ export function StatusPill({ status }: { status: string }) {
     running: { style: 'bg-sky-50 text-sky-800 border-sky-200/80', dot: 'bg-sky-500 animate-pulse' },
     ready: { style: 'bg-emerald-50 text-emerald-800 border-emerald-200/80', dot: 'bg-emerald-500' },
     failed: { style: 'bg-rose-50 text-rose-800 border-rose-200/80', dot: 'bg-rose-500' },
+    idle: { style: 'bg-stone-100 text-stone-600 border-stone-200/80', dot: 'bg-stone-400' },
     new: { style: 'bg-violet-50 text-violet-800 border-violet-200/80', dot: 'bg-violet-500 animate-pulse' },
     changes: { style: 'bg-orange-50 text-orange-800 border-orange-200/80', dot: 'bg-orange-500' },
     approved: { style: 'bg-emerald-50 text-emerald-800 border-emerald-200/80', dot: 'bg-emerald-500' },
+    sent: { style: 'bg-emerald-50 text-emerald-800 border-emerald-200/80', dot: 'bg-emerald-500' },
     rejected: { style: 'bg-rose-50 text-rose-800 border-rose-200/80', dot: 'bg-rose-500' },
     admin: { style: 'bg-violet-50 text-violet-800 border-violet-200/80', dot: 'bg-violet-500' },
     editor: { style: 'bg-sky-50 text-sky-800 border-sky-200/80', dot: 'bg-sky-500' },
@@ -370,6 +374,8 @@ export function StatusPill({ status }: { status: string }) {
     negotiating: { style: 'bg-amber-50 text-amber-800 border-amber-200/80', dot: 'bg-amber-500' },
     won: { style: 'bg-emerald-50 text-emerald-800 border-emerald-200/80', dot: 'bg-emerald-500' },
     lost: { style: 'bg-stone-100 text-stone-500 border-stone-200', dot: 'bg-stone-400' },
+    closed: { style: 'bg-stone-100 text-stone-500 border-stone-200', dot: 'bg-stone-400' },
+    cancelled: { style: 'bg-stone-100 text-stone-500 border-stone-200', dot: 'bg-stone-400' },
   }
 
   const current = map[key] ?? {

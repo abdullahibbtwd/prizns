@@ -125,6 +125,67 @@ class EnvironmentVariables {
   @IsOptional()
   @IsString()
   GOOGLE_APPLICATION_CREDENTIALS?: string;
+
+  /** Public site origin for sitemap, canonicals, Stripe redirects. */
+  @IsOptional()
+  @IsString()
+  PUBLIC_SITE_URL?: string;
+
+  @IsOptional()
+  @IsString()
+  STRIPE_SECRET_KEY?: string;
+
+  @IsOptional()
+  @IsString()
+  STRIPE_WEBHOOK_SECRET?: string;
+
+  @IsOptional()
+  @IsString()
+  STRIPE_CURRENCY?: string;
+
+  @IsOptional()
+  @IsString()
+  GEMINI_API_KEY?: string;
+
+  @IsOptional()
+  @IsString()
+  GEMINI_MODEL?: string;
+
+  @IsOptional()
+  @IsBooleanString()
+  FEATURE_AI?: string;
+
+  @IsOptional()
+  @IsBooleanString()
+  FEATURE_TTS?: string;
+
+  @IsOptional()
+  @IsBooleanString()
+  FEATURE_SOCIAL?: string;
+
+  @IsOptional()
+  @IsBooleanString()
+  FEATURE_DIGEST?: string;
+
+  @IsOptional()
+  @IsBooleanString()
+  FEATURE_SHOP?: string;
+
+  @IsOptional()
+  @IsString()
+  TTS_LANGUAGE_CODE?: string;
+
+  @IsOptional()
+  @IsString()
+  TTS_VOICE_NAME?: string;
+
+  @IsOptional()
+  @IsString()
+  RESEND_API_KEY?: string;
+
+  @IsOptional()
+  @IsString()
+  RESEND_FROM?: string;
 }
 
 export function validateEnv(config: Record<string, unknown>) {

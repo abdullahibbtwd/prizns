@@ -150,13 +150,29 @@ export class StorageService implements OnModuleInit {
       throw new ServiceUnavailableException('No file provided');
     }
 
-    const ext = file.originalname.includes('.')
-      ? file.originalname.slice(file.originalname.lastIndexOf('.'))
+    return this.uploadBuffer({
+      buffer: file.buffer,
+      mimeType: file.mimetype,
+      originalName: file.originalname,
+      folder,
+    });
+  }
+
+  async uploadBuffer(input: {
+    buffer: Buffer;
+    mimeType: string;
+    originalName: string;
+    folder?: string;
+  }): Promise<UploadedFile> {
+    const folder = input.folder ?? 'uploads';
+    const ext = input.originalName.includes('.')
+      ? input.originalName.slice(input.originalName.lastIndexOf('.'))
       : '';
     const key = `${folder}/${randomUUID()}${ext}`;
+    const size = input.buffer.length;
 
-    await this.client.putObject(this.bucket, key, file.buffer, file.size, {
-      'Content-Type': file.mimetype,
+    await this.client.putObject(this.bucket, key, input.buffer, size, {
+      'Content-Type': input.mimeType,
     });
 
     const url = this.publicUrlFor(key);
@@ -165,9 +181,9 @@ export class StorageService implements OnModuleInit {
       data: {
         key,
         bucket: this.bucket,
-        originalName: file.originalname,
-        mimeType: file.mimetype,
-        size: file.size,
+        originalName: input.originalName,
+        mimeType: input.mimeType,
+        size,
         url,
       },
     });

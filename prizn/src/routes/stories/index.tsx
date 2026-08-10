@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import { ArrowRight, Clock, MapPin } from 'lucide-react'
 import { JournalShell } from '@/components/concept-3/JournalShell'
+import { PageMeta } from '@/components/PageMeta'
 import { ListingHeader } from '@/components/concept-3/ListingHeader'
 import { EpisodeBadge } from '@/components/concept-3/EpisodeBadge'
 import { SponsoredBadge } from '@/components/concept-3/SponsoredBadge'
@@ -12,6 +13,7 @@ import {
   preferApi,
   usePublicArticles,
   usePublicSeries,
+  usePublicTags,
 } from '@/lib/public-content'
 import { toHumanStoryCard } from '@/lib/section-cards'
 import { cn } from '@/lib/utils'
@@ -20,14 +22,16 @@ export default function StoriesPage() {
   const { t } = useTranslation()
   const [searchParams, setSearchParams] = useSearchParams()
   const selectedSeries = searchParams.get('series') || ''
+  const selectedTopic = searchParams.get('topic') || ''
   const seriesMode =
     searchParams.get('view') === 'series' || Boolean(selectedSeries)
 
-  const { data } = usePublicArticles(
-    'stories',
-    selectedSeries || undefined,
-  )
+  const { data } = usePublicArticles('stories', {
+    series: selectedSeries || undefined,
+    topic: selectedTopic || undefined,
+  })
   const seriesQuery = usePublicSeries()
+  const topicsQuery = usePublicTags('TOPIC')
 
   const stories = preferApi(
     data?.map((article) => ({
@@ -42,29 +46,46 @@ export default function StoriesPage() {
   }))
 
   const setModeAll = () => {
-    setSearchParams({})
+    const next = new URLSearchParams()
+    if (selectedTopic) next.set('topic', selectedTopic)
+    setSearchParams(next)
   }
 
   const setModeSeries = () => {
-    if (selectedSeries) {
-      setSearchParams({ view: 'series', series: selectedSeries })
-      return
-    }
-    setSearchParams({ view: 'series' })
+    const next = new URLSearchParams({ view: 'series' })
+    if (selectedSeries) next.set('series', selectedSeries)
+    if (selectedTopic) next.set('topic', selectedTopic)
+    setSearchParams(next)
   }
 
   const setSeriesFilter = (slug: string) => {
-    if (!slug) {
-      setSearchParams({ view: 'series' })
-      return
-    }
-    setSearchParams({ view: 'series', series: slug })
+    const next = new URLSearchParams({ view: 'series' })
+    if (slug) next.set('series', slug)
+    if (selectedTopic) next.set('topic', selectedTopic)
+    setSearchParams(next)
+  }
+
+  const setTopicFilter = (slug: string) => {
+    const next = new URLSearchParams(searchParams)
+    if (slug) next.set('topic', slug)
+    else next.delete('topic')
+    setSearchParams(next)
   }
 
   return (
     <JournalShell>
       {({ lang }) => (
         <main>
+          <PageMeta
+            lang={lang}
+            title={lang === 'bg' ? 'Човешки истории' : 'Human Stories'}
+            description={
+              lang === 'bg'
+                ? 'Човешки истории от Северозападна България.'
+                : 'Human stories from Northwestern Bulgaria.'
+            }
+            path="/stories"
+          />
           <ListingHeader
             lang={lang}
             eyebrow={t('humanStoriesEyebrow')}
@@ -129,6 +150,41 @@ export default function StoriesPage() {
                 </div>
               ) : null}
             </div>
+
+            {(topicsQuery.data ?? []).length > 0 ? (
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <span className="mr-1 font-sans text-[11px] uppercase tracking-[0.2em] text-[#1A1A1A]/45">
+                  {lang === 'bg' ? 'Тема' : 'Topic'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setTopicFilter('')}
+                  className={cn(
+                    'rounded-full border px-3 py-1.5 font-sans text-[11px] uppercase tracking-[0.16em] transition-colors',
+                    !selectedTopic
+                      ? 'border-[#0C2686] bg-[#0C2686] text-white'
+                      : 'border-[#EAE6DF] bg-white text-[#1A1A1A]/70 hover:border-[#0C2686]/40',
+                  )}
+                >
+                  {lang === 'bg' ? 'Всички' : 'All'}
+                </button>
+                {(topicsQuery.data ?? []).map((tag) => (
+                  <button
+                    key={tag.id}
+                    type="button"
+                    onClick={() => setTopicFilter(tag.slug)}
+                    className={cn(
+                      'rounded-full border px-3 py-1.5 font-sans text-[11px] uppercase tracking-[0.16em] transition-colors',
+                      selectedTopic === tag.slug
+                        ? 'border-[#0C2686] bg-[#0C2686] text-white'
+                        : 'border-[#EAE6DF] bg-white text-[#1A1A1A]/70 hover:border-[#0C2686]/40',
+                    )}
+                  >
+                    {lang === 'bg' ? tag.nameBg : tag.name}
+                  </button>
+                ))}
+              </div>
+            ) : null}
           </div>
 
           <div className="mx-auto max-w-7xl px-6 py-16 md:px-12 md:py-20">
@@ -159,6 +215,7 @@ export default function StoriesPage() {
                           <img
                             src={story.image}
                             alt={story.title}
+                            loading="lazy"
                             className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
                           />
                         ) : null}

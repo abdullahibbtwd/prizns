@@ -102,6 +102,25 @@ export class CreateArticleDto {
   @IsString()
   sponsorName?: string | null;
 
+  @IsOptional()
+  @IsString()
+  behindStoryBg?: string;
+
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsString()
+  seoTitleBg?: string | null;
+
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsString()
+  seoDescriptionBg?: string | null;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  tagIds?: string[];
+
   /** Block array validated lightly — shape enforced in service/CMS form. */
   @IsOptional()
   @IsArray()

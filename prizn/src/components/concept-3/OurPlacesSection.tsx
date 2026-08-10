@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ArrowUpRight } from 'lucide-react'
 import { ViewAllLink } from '@/components/concept-3/ViewAllLink'
+import { SponsoredBadge } from '@/components/concept-3/SponsoredBadge'
 import {
   articlePath,
   preferApi,
@@ -54,15 +55,25 @@ export function OurPlacesSection({ lang }: OurPlacesSectionProps) {
                   <img
                     src={place.image}
                     alt={place.name}
+                    loading="lazy"
                     className="h-full w-full object-cover transition-transform duration-1000 ease-out group-hover:scale-105"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
                   <div className="absolute inset-0 flex flex-col justify-between p-8 text-white md:p-12">
-                    <div className="flex items-center justify-between">
-                      <span className="font-sans text-xs uppercase tracking-[0.3em] text-white/70">
-                        {place.readTime}
-                      </span>
-                      <div className="flex size-10 items-center justify-center rounded-full border border-white/30 text-white backdrop-blur-md transition-all duration-300 group-hover:bg-white group-hover:text-[#1A1A1A]">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-sans text-xs uppercase tracking-[0.3em] text-white/70">
+                          {place.readTime}
+                        </span>
+                        {place.sponsored ? (
+                          <SponsoredBadge
+                            lang={lang}
+                            sponsorName={place.sponsorName}
+                            tone="onDark"
+                          />
+                        ) : null}
+                      </div>
+                      <div className="flex size-10 shrink-0 items-center justify-center rounded-full border border-white/30 text-white backdrop-blur-md transition-all duration-300 group-hover:bg-white group-hover:text-[#1A1A1A]">
                         <ArrowUpRight className="size-5 stroke-[1.5]" />
                       </div>
                     </div>

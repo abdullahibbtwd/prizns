@@ -16,9 +16,21 @@ export type ArticleSection =
   | "voices"
   | "sports"
   | "events"
+  | "news"
   | "video"
   | "campaigns"
   | "gallery";
+
+export type TagKind = "LOCATION" | "TOPIC" | "CATEGORY";
+
+export type CmsTag = {
+  id: string;
+  slug: string;
+  kind: TagKind;
+  nameBg: string;
+  nameEn: string | null;
+  name?: string;
+};
 
 export type BodyBlock =
   | { type: "paragraph"; textBg: string; textEn?: string | null }
@@ -88,8 +100,19 @@ export type CmsArticle = {
   featured: boolean;
   sponsored: boolean;
   sponsorName?: string | null;
+  behindStory?: string;
+  behindStoryBg?: string;
+  seoTitle?: string | null;
+  seoTitleBg?: string | null;
+  seoDescription?: string | null;
+  seoDescriptionBg?: string | null;
+  tags?: CmsTag[];
+  tagIds?: string[];
   translationStatus: TranslationStatus;
   translationError?: string | null;
+  sourceLang?: string | null;
+  narrationStatus?: 'IDLE' | 'PENDING' | 'RUNNING' | 'READY' | 'FAILED';
+  narrationError?: string | null;
   publishedAt?: string | null;
   updatedAt?: string;
   series?: {
@@ -100,6 +123,8 @@ export type CmsArticle = {
     title?: string;
     episodeNumber: number;
   } | null;
+  relateCount?: number;
+  viewerHasRelated?: boolean;
 };
 
 export type CmsAuthorOption = {
@@ -228,6 +253,10 @@ export type ArticleFormValues = {
   featured: boolean;
   sponsored: boolean;
   sponsorName: string;
+  behindStoryBg: string;
+  seoTitleBg: string;
+  seoDescriptionBg: string;
+  tagIds: string[];
   body: BodyBlock[];
   seriesMode: "standalone" | "series";
   seriesId: string;
@@ -242,6 +271,7 @@ export const ARTICLE_SECTIONS: ArticleSection[] = [
   "voices",
   "sports",
   "events",
+  "news",
   "video",
   "campaigns",
   "gallery",

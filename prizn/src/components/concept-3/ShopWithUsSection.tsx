@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ArrowRight } from 'lucide-react'
 
@@ -36,16 +37,16 @@ export function ShopWithUsSection({ lang }: ShopWithUsSectionProps) {
         </h2>
         <p className="mx-auto mt-6 max-w-xl font-sans text-sm font-light leading-relaxed text-white/75 md:text-base">
           {lang === 'bg'
-            ? 'Печатни издания, предмети от местни занаятчии и подаръци, вдъхновени от Северозапада — скоро в PRIZNI.'
-            : 'Print editions, objects from local makers, and gifts inspired by the Northwest — coming soon to PRIZNI.'}
+            ? 'Печатни издания, предмети от местни занаятчии и подаръци, вдъхновени от Северозапада.'
+            : 'Print editions, objects from local makers, and gifts inspired by the Northwest.'}
         </p>
-        <button
-          type="button"
+        <Link
+          to="/shop"
           className="mt-10 inline-flex cursor-pointer items-center gap-2 rounded-full bg-white px-8 py-3.5 font-sans text-xs font-medium uppercase tracking-[0.22em] text-[#1A1A1A] transition-colors duration-300 hover:bg-[#FDFBF7]"
         >
           {lang === 'bg' ? 'Към магазина' : 'Go to shop'}
           <ArrowRight className="size-3.5 stroke-[1.5]" />
-        </button>
+        </Link>
       </motion.div>
     </section>
   )

@@ -23,6 +23,7 @@ const authorSelect = {
   isActive: true,
   translationStatus: true,
   translationError: true,
+  sourceLang: true,
   createdAt: true,
   updatedAt: true,
   _count: { select: { articles: true } },

@@ -82,7 +82,7 @@ export function CookieConsentBanner() {
       role="dialog"
       aria-live="polite"
       aria-label={t.title}
-      className="pointer-events-none fixed inset-x-0 bottom-0 z-[80] flex justify-center p-3 sm:inset-x-auto sm:bottom-5 sm:right-5 sm:justify-end sm:p-0"
+      className="print-hidden pointer-events-none fixed inset-x-0 bottom-0 z-[80] flex justify-center p-3 sm:inset-x-auto sm:bottom-5 sm:right-5 sm:justify-end sm:p-0"
     >
       <div
         className={[

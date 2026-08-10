@@ -15,6 +15,7 @@ import TraditionsPage from '@/routes/traditions'
 import VoicesPage from '@/routes/voices'
 import SportsPage from '@/routes/sports'
 import EventsPage from '@/routes/events'
+import NewsPage from '@/routes/news'
 import VideoPage from '@/routes/video'
 import CampaignsPage from '@/routes/campaigns'
 import GalleryPage from '@/routes/gallery'
@@ -22,6 +23,12 @@ import ArticlePage from '@/routes/article'
 import WriteForUsPage from '@/routes/write-for-us'
 import SupportUsPage from '@/routes/support'
 import PartnershipsPage from '@/routes/partnerships'
+import WhyPrizniPage from '@/routes/why-prizni'
+import ShopPage from '@/routes/shop'
+import ShopProductPage from '@/routes/shop/product'
+import ShopCartPage from '@/routes/shop/cart'
+import ShopTrackPage from '@/routes/shop/track'
+import ShopSuccessPage from '@/routes/shop/success'
 import CmsApp from '@/cms/CmsApp'
 
 export default function App() {
@@ -30,7 +37,9 @@ export default function App() {
       <AnalyticsProvider>
         <ScrollToTop />
         <AnalyticsTracker />
-        <CookieConsentBanner />
+        <div className="print-hidden">
+          <CookieConsentBanner />
+        </div>
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/discover" element={<DiscoverPage />} />
@@ -49,6 +58,8 @@ export default function App() {
           <Route path="/sports/:slug" element={<ArticlePage />} />
           <Route path="/events" element={<EventsPage />} />
           <Route path="/events/:slug" element={<ArticlePage />} />
+          <Route path="/news" element={<NewsPage />} />
+          <Route path="/news/:slug" element={<ArticlePage />} />
           <Route path="/video" element={<VideoPage />} />
           <Route path="/video/:slug" element={<ArticlePage />} />
           <Route path="/campaigns" element={<CampaignsPage />} />
@@ -58,6 +69,12 @@ export default function App() {
           <Route path="/write-for-us" element={<WriteForUsPage />} />
           <Route path="/support" element={<SupportUsPage />} />
           <Route path="/partnerships" element={<PartnershipsPage />} />
+          <Route path="/why-prizni" element={<WhyPrizniPage />} />
+          <Route path="/shop" element={<ShopPage />} />
+          <Route path="/shop/cart" element={<ShopCartPage />} />
+          <Route path="/shop/track" element={<ShopTrackPage />} />
+          <Route path="/shop/success" element={<ShopSuccessPage />} />
+          <Route path="/shop/:slug" element={<ShopProductPage />} />
           <Route path="/cms/*" element={<CmsApp />} />
           <Route path="*" element={<HomePage />} />
         </Routes>

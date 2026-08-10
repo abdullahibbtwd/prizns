@@ -132,6 +132,7 @@ export function AnalyticsTracker() {
         if (metaRef.current.articleId) break
       }
       if (cancelled) return
+      const params = new URLSearchParams(location.search)
       const result = await postBeacon({
         visitorKey,
         sessionId: getAnalyticsSessionId(),
@@ -139,6 +140,10 @@ export function AnalyticsTracker() {
         path: decodedPath,
         articleId: metaRef.current.articleId || undefined,
         title: metaRef.current.title || document.title || undefined,
+        referrer: document.referrer || undefined,
+        utmSource: params.get('utm_source') || undefined,
+        utmMedium: params.get('utm_medium') || undefined,
+        utmCampaign: params.get('utm_campaign') || undefined,
         dwellMs: 0,
       })
       if (!cancelled && result?.pageViewId) {

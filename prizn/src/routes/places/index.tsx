@@ -1,17 +1,25 @@
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ArrowUpRight } from 'lucide-react'
 import { JournalShell } from '@/components/concept-3/JournalShell'
 import { ListingHeader } from '@/components/concept-3/ListingHeader'
+import { SponsoredBadge } from '@/components/concept-3/SponsoredBadge'
 import {
   articlePath,
   preferApi,
   usePublicArticles,
+  usePublicTags,
 } from '@/lib/public-content'
 import { toPlaceCard } from '@/lib/section-cards'
+import { cn } from '@/lib/utils'
 
 export default function PlacesPage() {
-  const { data } = usePublicArticles('places')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const selectedLocation = searchParams.get('location') || ''
+  const { data } = usePublicArticles('places', {
+    location: selectedLocation || undefined,
+  })
+  const locationsQuery = usePublicTags('LOCATION')
 
   return (
     <JournalShell>
@@ -39,6 +47,43 @@ export default function PlacesPage() {
               }
             />
 
+            {(locationsQuery.data ?? []).length > 0 ? (
+              <div className="mx-auto max-w-7xl px-6 pt-10 md:px-12">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="mr-1 font-sans text-[11px] uppercase tracking-[0.2em] text-[#1A1A1A]/45">
+                    {lang === 'bg' ? 'Място' : 'Location'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setSearchParams({})}
+                    className={cn(
+                      'rounded-full border px-3 py-1.5 font-sans text-[11px] uppercase tracking-[0.16em] transition-colors',
+                      !selectedLocation
+                        ? 'border-[#0C2686] bg-[#0C2686] text-white'
+                        : 'border-[#EAE6DF] bg-white text-[#1A1A1A]/70 hover:border-[#0C2686]/40',
+                    )}
+                  >
+                    {lang === 'bg' ? 'Всички' : 'All'}
+                  </button>
+                  {(locationsQuery.data ?? []).map((tag) => (
+                    <button
+                      key={tag.id}
+                      type="button"
+                      onClick={() => setSearchParams({ location: tag.slug })}
+                      className={cn(
+                        'rounded-full border px-3 py-1.5 font-sans text-[11px] uppercase tracking-[0.16em] transition-colors',
+                        selectedLocation === tag.slug
+                          ? 'border-[#0C2686] bg-[#0C2686] text-white'
+                          : 'border-[#EAE6DF] bg-white text-[#1A1A1A]/70 hover:border-[#0C2686]/40',
+                      )}
+                    >
+                      {lang === 'bg' ? tag.nameBg : tag.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
             <div className="mx-auto max-w-7xl px-6 py-16 md:px-12 md:py-20">
               <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
                 {places.map((place, index) => {
@@ -56,15 +101,25 @@ export default function PlacesPage() {
                         <img
                           src={place.image}
                           alt={place.name}
+                          loading="lazy"
                           className="h-full w-full object-cover transition-transform duration-1000 ease-out group-hover:scale-105"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
                         <div className="absolute inset-0 flex flex-col justify-between p-8 text-white md:p-12">
-                          <div className="flex items-center justify-between">
-                            <span className="font-sans text-xs uppercase tracking-[0.3em] text-white/70">
-                              {place.readTime}
-                            </span>
-                            <div className="flex size-10 items-center justify-center rounded-full border border-white/30 text-white backdrop-blur-md transition-all duration-300 group-hover:bg-white group-hover:text-[#1A1A1A]">
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-sans text-xs uppercase tracking-[0.3em] text-white/70">
+                                {place.readTime}
+                              </span>
+                              {place.sponsored ? (
+                                <SponsoredBadge
+                                  lang={lang}
+                                  sponsorName={place.sponsorName}
+                                  tone="onDark"
+                                />
+                              ) : null}
+                            </div>
+                            <div className="flex size-10 shrink-0 items-center justify-center rounded-full border border-white/30 text-white backdrop-blur-md transition-all duration-300 group-hover:bg-white group-hover:text-[#1A1A1A]">
                               <ArrowUpRight className="size-5 stroke-[1.5]" />
                             </div>
                           </div>

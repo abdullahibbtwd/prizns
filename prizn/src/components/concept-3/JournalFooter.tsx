@@ -1,13 +1,17 @@
 import { Link } from 'react-router-dom'
 import { Heart, PenLine } from 'lucide-react'
-import { getJournalNavLinks } from '@/data/concept-3/nav'
+import {
+  getFooterSecondaryLinks,
+  getPrimaryNavLinks,
+} from '@/data/concept-3/nav'
 
 interface JournalFooterProps {
   lang: 'bg' | 'en'
 }
 
 export function JournalFooter({ lang }: JournalFooterProps) {
-  const navLinks = getJournalNavLinks(lang)
+  const primaryLinks = getPrimaryNavLinks(lang)
+  const secondaryLinks = getFooterSecondaryLinks(lang)
 
   return (
     <footer className="overflow-x-hidden border-t border-[#EAE6DF] bg-[#FDFBF7] px-6 py-24 text-[#1A1A1A] md:px-12 md:py-32">
@@ -21,15 +25,30 @@ export function JournalFooter({ lang }: JournalFooterProps) {
 
         <p className="mt-8 max-w-2xl font-sans text-sm font-light leading-relaxed text-[#1A1A1A]/65 md:text-base">
           {lang === 'bg'
-            ? 'Луксозно дигитално издание, посветено на културното наследство, живите традиции и изключителните човешки истории на Северозападна България.'
-            : 'A luxury editorial journal dedicated to preserving the cultural heritage, living traditions, and extraordinary human stories of Northwestern Bulgaria.'}
+            ? 'Топъл дигитален журнал за човешки истории, места и традиции от Северозападна България.'
+            : 'A warm digital journal of human stories, places, and traditions from Northwestern Bulgaria.'}
         </p>
 
         <nav
-          aria-label={lang === 'bg' ? 'Навигация' : 'Browse'}
+          aria-label={lang === 'bg' ? 'Основна навигация' : 'Primary'}
           className="mt-12 flex max-w-4xl flex-wrap items-center justify-center gap-x-5 gap-y-3 font-sans text-[11px] uppercase tracking-[0.2em] text-[#1A1A1A]/70 sm:gap-x-7"
         >
-          {navLinks.map((link) => (
+          {primaryLinks.map((link) => (
+            <Link
+              key={link.to}
+              to={link.to}
+              className="transition-colors hover:text-[#0C2686]"
+            >
+              {link.label}
+            </Link>
+          ))}
+        </nav>
+
+        <nav
+          aria-label={lang === 'bg' ? 'Още раздели' : 'More sections'}
+          className="mt-6 flex max-w-4xl flex-wrap items-center justify-center gap-x-5 gap-y-3 font-sans text-[11px] uppercase tracking-[0.2em] text-[#1A1A1A]/45 sm:gap-x-7"
+        >
+          {secondaryLinks.map((link) => (
             <Link
               key={link.to}
               to={link.to}
@@ -41,6 +60,12 @@ export function JournalFooter({ lang }: JournalFooterProps) {
         </nav>
 
         <div className="mt-10 flex max-w-full flex-wrap items-center justify-center gap-x-6 gap-y-3 font-sans text-xs uppercase tracking-[0.2em] text-[#1A1A1A]/55 sm:gap-x-8">
+          <Link
+            to="/why-prizni"
+            className="transition-colors hover:text-[#0C2686]"
+          >
+            {lang === 'bg' ? 'Защо Prizni' : 'Why Prizni'}
+          </Link>
           <Link
             to="/write-for-us"
             className="inline-flex items-center gap-1.5 transition-colors hover:text-[#0C2686]"

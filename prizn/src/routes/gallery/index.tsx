@@ -80,6 +80,7 @@ export default function GalleryPage() {
                       <img
                         src={item.image}
                         alt={item.title}
+                        loading="lazy"
                         className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
                       />
                       <div className="absolute inset-0 flex items-end bg-gradient-to-t from-black/70 via-transparent to-transparent p-5">

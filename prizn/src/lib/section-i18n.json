@@ -87,6 +87,17 @@
     },
     "categoryBg": "Събития"
   },
+  "news": {
+    "label": {
+      "bg": "Новини",
+      "en": "News"
+    },
+    "publicLabel": {
+      "bg": "Новини",
+      "en": "News"
+    },
+    "categoryBg": "Новини"
+  },
   "video": {
     "label": {
       "bg": "Видео",

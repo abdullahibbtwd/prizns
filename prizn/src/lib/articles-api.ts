@@ -18,6 +18,7 @@ export type CmsArticlesPage = {
 export function listCmsArticles(params?: {
   section?: string;
   status?: ArticleStatus;
+  authorId?: string;
   q?: string;
   sponsored?: boolean;
   page?: number;
@@ -26,6 +27,7 @@ export function listCmsArticles(params?: {
   const search = new URLSearchParams();
   if (params?.section) search.set("section", params.section);
   if (params?.status) search.set("status", params.status);
+  if (params?.authorId) search.set("authorId", params.authorId);
   if (params?.q) search.set("q", params.q);
   if (params?.sponsored === true) search.set("sponsored", "true");
   if (params?.page != null) search.set("page", String(params.page));
@@ -41,7 +43,7 @@ export function getCmsArticle(id: string) {
 export function createCmsArticle(
   body: Omit<
     Partial<ArticleFormValues>,
-    "seriesId" | "seriesMode" | "videoUrl" | "videoMediaId" | "sponsorName"
+    "seriesId" | "seriesMode" | "videoUrl" | "videoMediaId" | "sponsorName" | "seoTitleBg" | "seoDescriptionBg"
   > & {
     titleBg: string;
     categoryBg: string;
@@ -50,6 +52,8 @@ export function createCmsArticle(
     videoUrl?: string | null;
     videoMediaId?: string | null;
     sponsorName?: string | null;
+    seoTitleBg?: string | null;
+    seoDescriptionBg?: string | null;
   },
 ) {
   return api.post<CmsArticle>("/cms/articles", body);
@@ -59,12 +63,14 @@ export function updateCmsArticle(
   id: string,
   body: Omit<
     Partial<ArticleFormValues>,
-    "seriesId" | "seriesMode" | "videoUrl" | "videoMediaId" | "sponsorName"
+    "seriesId" | "seriesMode" | "videoUrl" | "videoMediaId" | "sponsorName" | "seoTitleBg" | "seoDescriptionBg"
   > & {
     seriesId?: string | null;
     videoUrl?: string | null;
     videoMediaId?: string | null;
     sponsorName?: string | null;
+    seoTitleBg?: string | null;
+    seoDescriptionBg?: string | null;
   },
 ) {
   return api.patch<CmsArticle>(`/cms/articles/${id}`, body);
@@ -76,6 +82,16 @@ export function deleteCmsArticle(id: string) {
 
 export function queueArticleTranslation(id: string) {
   return api.post<{ ok: boolean }>(`/cms/articles/${id}/translate`);
+}
+
+export function queueArticleNarration(id: string) {
+  return api.post<{ ok: boolean; queued?: boolean }>(
+    `/cms/articles/${id}/narrate`,
+  );
+}
+
+export function clearArticleNarration(id: string) {
+  return api.delete<{ ok: boolean }>(`/cms/articles/${id}/narration`);
 }
 
 export function listCmsAuthors() {
@@ -139,17 +155,58 @@ export function listPublicMedia(kind: 'IMAGE' | 'VIDEO' | 'AUDIO' = 'IMAGE') {
 
 export function listPublicArticles(
   section?: string,
-  opts?: { series?: string },
+  opts?: {
+    series?: string
+    location?: string
+    topic?: string
+    category?: string
+    hasAudio?: boolean
+  },
 ) {
   const params = new URLSearchParams();
   if (section) params.set("section", section);
   if (opts?.series) params.set("series", opts.series);
+  if (opts?.location) params.set("location", opts.location);
+  if (opts?.topic) params.set("topic", opts.topic);
+  if (opts?.category) params.set("category", opts.category);
+  if (opts?.hasAudio === true) params.set("hasAudio", "true");
   const qs = params.toString();
   return api.get<CmsArticle[]>(`/articles${qs ? `?${qs}` : ""}`);
 }
 
-export function getPublicArticle(section: string, slug: string) {
+export function getPublicArticle(
+  section: string,
+  slug: string,
+  opts?: { visitorKey?: string },
+) {
+  const params = new URLSearchParams();
+  if (opts?.visitorKey) params.set("visitorKey", opts.visitorKey);
+  const qs = params.toString();
   return api.get<CmsArticle>(
-    `/articles/${encodeURIComponent(section)}/${encodeURIComponent(slug)}`,
+    `/articles/${encodeURIComponent(section)}/${encodeURIComponent(slug)}${qs ? `?${qs}` : ""}`,
+  );
+}
+
+export function listRelatedArticles(
+  section: string,
+  slug: string,
+  limit = 3,
+) {
+  const params = new URLSearchParams();
+  if (limit) params.set("limit", String(limit));
+  const qs = params.toString();
+  return api.get<CmsArticle[]>(
+    `/articles/${encodeURIComponent(section)}/${encodeURIComponent(slug)}/related${qs ? `?${qs}` : ""}`,
+  );
+}
+
+export function relateToArticle(
+  section: string,
+  slug: string,
+  visitorKey: string,
+) {
+  return api.post<{ relateCount: number; viewerHasRelated: boolean }>(
+    `/articles/${encodeURIComponent(section)}/${encodeURIComponent(slug)}/reactions`,
+    { kind: "RELATE", visitorKey },
   );
 }
