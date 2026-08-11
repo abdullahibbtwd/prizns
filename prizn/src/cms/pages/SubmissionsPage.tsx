@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { ChevronLeft, ChevronRight, Search } from 'lucide-react'
 import {
   CmsCard,
   CmsPageHeader,
   StatusPill,
 } from '@/cms/components/CmsUI'
+import { JournalSelect } from '@/components/ui/JournalSelect'
 import {
   listCmsSubmissions,
   type SubmissionStatus,
@@ -26,6 +28,7 @@ const PAGE_SIZE_OPTIONS = [5, 10, 20, 50, 100] as const
 const BASE_PATH = '/cms/submissions'
 
 export default function CmsSubmissionsPage() {
+  const { t } = useTranslation()
   const [query, setQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
   const [status, setStatus] = useState<(typeof STATUS_FILTERS)[number]>('all')
@@ -76,12 +79,15 @@ export default function CmsSubmissionsPage() {
     return Array.from({ length: end - start + 1 }, (_, i) => start + i)
   }, [page, totalPages])
 
+  const statusLabel = (item: (typeof STATUS_FILTERS)[number]) =>
+    item === 'all' ? t('cms.common.all') : t(`cms.status.${item}`)
+
   return (
     <div>
       <CmsPageHeader
-        title="Write for Us Queue"
-        description="Review community submissions and open any entry for full details."
-        badge={`${total} Submissions`}
+        title={t('cms.submissions.title')}
+        description={t('cms.submissions.description')}
+        badge={t('cms.submissions.badge', { count: total })}
       />
 
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -90,7 +96,7 @@ export default function CmsSubmissionsPage() {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search title, author, place…"
+            placeholder={t('cms.submissions.searchPlaceholder')}
             className="w-full rounded-xl border border-[#E8E4DC] bg-white py-2.5 pl-10 pr-3 text-sm outline-none focus:border-[#0C2686]"
           />
         </div>
@@ -108,35 +114,33 @@ export default function CmsSubmissionsPage() {
                   : 'border-[#E8E4DC] bg-white text-stone-600 hover:border-[#0C2686]/40',
               )}
             >
-              {item}
+              {statusLabel(item)}
             </button>
           ))}
         </div>
       </div>
 
       {listQuery.isLoading && (
-        <CmsCard className="p-8 text-sm text-stone-600">Loading submissions…</CmsCard>
+        <CmsCard className="p-8 text-sm text-stone-600">
+          {t('cms.submissions.loading')}
+        </CmsCard>
       )}
 
       {listQuery.isError && (
         <CmsCard className="p-8 text-sm text-rose-700">
-          Failed to load submissions. {(listQuery.error as Error).message}
+          {t('cms.submissions.loadFailed')} {(listQuery.error as Error).message}
         </CmsCard>
       )}
 
       {!listQuery.isLoading && !listQuery.isError && total === 0 && !debouncedQuery && status === 'all' && (
         <CmsCard className="p-8 text-sm text-stone-600">
-          No submissions yet. Public entries from{' '}
-          <a href="/write-for-us" className="font-semibold text-[#0C2686] underline">
-            /write-for-us
-          </a>{' '}
-          will appear here.
+          {t('cms.submissions.empty')}
         </CmsCard>
       )}
 
       {!listQuery.isLoading && !listQuery.isError && total === 0 && (debouncedQuery || status !== 'all') && (
         <CmsCard className="p-8 text-sm text-stone-600">
-          No submissions match your filters.
+          {t('cms.submissions.emptyFiltered')}
         </CmsCard>
       )}
 
@@ -146,12 +150,12 @@ export default function CmsSubmissionsPage() {
             <table className="w-full min-w-[720px] text-left text-sm">
               <thead className="border-b border-[#E8E4DC] bg-stone-50 text-xs uppercase tracking-wider text-stone-500">
                 <tr>
-                  <th className="px-4 py-3">Title</th>
-                  <th className="px-4 py-3">Author</th>
-                  <th className="px-4 py-3">Place</th>
-                  <th className="px-4 py-3">Category</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Submitted</th>
+                  <th className="px-4 py-3">{t('cms.submissions.colTitle')}</th>
+                  <th className="px-4 py-3">{t('cms.submissions.colAuthor')}</th>
+                  <th className="px-4 py-3">{t('cms.submissions.colPlace')}</th>
+                  <th className="px-4 py-3">{t('cms.submissions.colCategory')}</th>
+                  <th className="px-4 py-3">{t('cms.submissions.colStatus')}</th>
+                  <th className="px-4 py-3">{t('cms.submissions.colSubmitted')}</th>
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
@@ -186,7 +190,7 @@ export default function CmsSubmissionsPage() {
                         to={`${BASE_PATH}/${item.id}`}
                         className="font-semibold text-[#0C2686] hover:underline"
                       >
-                        Open
+                        {t('cms.common.open')}
                       </Link>
                     </td>
                   </tr>
@@ -200,28 +204,30 @@ export default function CmsSubmissionsPage() {
       {total > 0 && (
         <div className="mt-6 flex flex-col gap-4 rounded-2xl border border-[#E8E4DC] bg-white px-4 py-3 shadow-2xs sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs font-medium text-stone-600">
-            Showing {from}–{to} of {total}
+            {t('cms.common.showing', { from, to, total })}
           </p>
 
           <div className="flex flex-wrap items-center gap-3">
-            <label className="flex items-center gap-2 text-xs font-medium text-stone-600">
-              Per page
-              <select
-                value={pageSize}
-                onChange={(e) =>
+            <div className="flex min-w-[140px] items-center gap-3">
+              <span className="shrink-0 text-xs font-medium text-stone-600">
+                {t('cms.common.perPage')}
+              </span>
+              <JournalSelect
+                name="submissionsPageSize"
+                variant="boxed"
+                value={String(pageSize)}
+                onChange={(value) =>
                   setPageSize(
-                    Number(e.target.value) as (typeof PAGE_SIZE_OPTIONS)[number],
+                    Number(value) as (typeof PAGE_SIZE_OPTIONS)[number],
                   )
                 }
-                className="rounded-lg border border-[#E8E4DC] bg-stone-50 px-2 py-1.5 text-xs font-semibold text-stone-900 outline-none focus:border-[#0C2686]"
-              >
-                {PAGE_SIZE_OPTIONS.map((size) => (
-                  <option key={size} value={size}>
-                    {size}
-                  </option>
-                ))}
-              </select>
-            </label>
+                options={PAGE_SIZE_OPTIONS.map((size) => ({
+                  value: String(size),
+                  label: String(size),
+                }))}
+                className="min-w-[88px] flex-1"
+              />
+            </div>
 
             <div className="flex items-center gap-1">
               <button
@@ -231,7 +237,7 @@ export default function CmsSubmissionsPage() {
                 className="inline-flex items-center gap-1 rounded-xl border border-[#E8E4DC] bg-stone-50 px-2.5 py-1.5 text-xs font-semibold text-stone-700 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <ChevronLeft className="size-3.5" />
-                Prev
+                {t('cms.common.prev')}
               </button>
 
               {pageNumbers.map((num) => (
@@ -257,13 +263,13 @@ export default function CmsSubmissionsPage() {
                 disabled={page >= totalPages || listQuery.isFetching}
                 className="inline-flex items-center gap-1 rounded-xl border border-[#E8E4DC] bg-stone-50 px-2.5 py-1.5 text-xs font-semibold text-stone-700 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
               >
-                Next
+                {t('cms.common.next')}
                 <ChevronRight className="size-3.5" />
               </button>
             </div>
 
             <p className="text-xs font-medium text-stone-500">
-              Page {page} of {totalPages}
+              {t('cms.common.pageOf', { page, totalPages })}
             </p>
           </div>
         </div>

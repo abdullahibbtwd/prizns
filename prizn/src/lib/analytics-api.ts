@@ -10,6 +10,8 @@ export type AnalyticsSummary = {
   avgDwellLabel: string
   totalDwellMs: number
   totalDwellLabel: string
+  loggedInSessions?: number
+  anonymousSessions?: number
   visitorsTrendPct: number
   pageviewsTrendPct: number
   previous: {
@@ -48,6 +50,7 @@ export type BeaconPayload = {
   utmSource?: string
   utmMedium?: string
   utmCampaign?: string
+  readerId?: string
   dwellMs?: number
 }
 

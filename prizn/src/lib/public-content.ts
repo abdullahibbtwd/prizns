@@ -21,6 +21,16 @@ export type PublicAuthor = {
   image: string;
   aliases: string[];
   storyCount: number;
+  badges?: Array<{
+    id: string;
+    slug: string;
+    nameBg: string;
+    nameEn: string | null;
+    descriptionBg: string;
+    descriptionEn: string | null;
+    icon: string;
+    awardedAt: string;
+  }>;
 };
 
 export type PublicSeries = {

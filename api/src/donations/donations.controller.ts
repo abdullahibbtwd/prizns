@@ -8,6 +8,14 @@ import { DonationsService } from './donations.service';
 export class DonationsController {
   constructor(private readonly donations: DonationsService) {}
 
+  @Get('trend')
+  trend(@Query('granularity') granularity?: string) {
+    const g = granularity?.trim().toLowerCase();
+    const parsed =
+      g === 'month' || g === 'year' || g === 'day' ? g : 'day';
+    return this.donations.getCmsTrend(parsed);
+  }
+
   @Get()
   list(
     @Query('page') page?: string,

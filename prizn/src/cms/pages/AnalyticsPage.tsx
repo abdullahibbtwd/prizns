@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { ChartColumn, Clock3, Eye, FileText } from 'lucide-react'
 import {
   CmsCard,
@@ -15,7 +16,14 @@ import { cn } from '@/lib/utils'
 
 const RANGES: AnalyticsRange[] = ['today', 'week', 'month']
 
+const RANGE_KEYS: Record<AnalyticsRange, string> = {
+  today: 'cms.analytics.rangeToday',
+  week: 'cms.analytics.rangeWeek',
+  month: 'cms.analytics.rangeMonth',
+}
+
 export default function CmsAnalyticsPage() {
+  const { t } = useTranslation()
   const [range, setRange] = useState<AnalyticsRange>('today')
 
   const summaryQuery = useQuery({
@@ -25,13 +33,20 @@ export default function CmsAnalyticsPage() {
 
   const data = summaryQuery.data
   const sparkline = data?.daily?.map((d) => d.views) ?? [0, 0, 0, 0]
+  const signedInSessions = data?.loggedInSessions ?? 0
+  const anonymousSessions = data?.anonymousSessions ?? 0
+  const cohortTotal = signedInSessions + anonymousSessions
+  const signedInShare =
+    cohortTotal > 0 ? Math.round((signedInSessions / cohortTotal) * 100) : 0
+  const anonymousShare =
+    cohortTotal > 0 ? Math.round((anonymousSessions / cohortTotal) * 100) : 0
 
   return (
     <div>
       <CmsPageHeader
-        title="Editorial Analytics"
-        description="Visitors, page views, dwell time, and top stories from the public site."
-        badge="Live Metrics"
+        title={t('cms.analytics.title')}
+        description={t('cms.analytics.description')}
+        badge={t('cms.analytics.badge')}
         actions={
           <div className="flex items-center rounded-xl border border-[#E8E4DC] bg-white p-1 shadow-2xs">
             {RANGES.map((item) => (
@@ -46,7 +61,7 @@ export default function CmsAnalyticsPage() {
                     : 'text-stone-600 hover:bg-stone-100 hover:text-stone-900',
                 )}
               >
-                {item}
+                {t(RANGE_KEYS[item])}
               </button>
             ))}
           </div>
@@ -55,13 +70,13 @@ export default function CmsAnalyticsPage() {
 
       {summaryQuery.isError && (
         <CmsCard className="mb-6 p-6 text-sm text-rose-700">
-          Failed to load analytics. {(summaryQuery.error as Error).message}
+          {t('cms.analytics.loadFailed')} {(summaryQuery.error as Error).message}
         </CmsCard>
       )}
 
       <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
-          title="Unique Visitors"
+          title={t('cms.analytics.visitors')}
           value={(data?.visitors ?? 0).toLocaleString()}
           trend={formatTrendPct(data?.visitorsTrendPct ?? 0)}
           trendType={
@@ -71,12 +86,12 @@ export default function CmsAnalyticsPage() {
                 ? 'down'
                 : 'neutral'
           }
-          hint="Distinct readers"
+          hint={t('cms.analytics.visitorsHint')}
           icon={Eye}
           sparklineData={sparkline}
         />
         <StatCard
-          title="Page Views"
+          title={t('cms.analytics.pageviews')}
           value={(data?.pageviews ?? 0).toLocaleString()}
           trend={formatTrendPct(data?.pageviewsTrendPct ?? 0)}
           trendType={
@@ -86,27 +101,64 @@ export default function CmsAnalyticsPage() {
                 ? 'down'
                 : 'neutral'
           }
-          hint="All public pages"
+          hint={t('cms.analytics.pageviewsHint')}
           icon={FileText}
           sparklineData={sparkline}
         />
         <StatCard
-          title="Avg Time on Site"
+          title={t('cms.analytics.avgTime')}
           value={data?.avgDwellLabel ?? '0s'}
-          trend={`Prev ${data?.previous.avgDwellLabel ?? '0s'}`}
+          trend={t('cms.analytics.avgTimePrev', {
+            value: data?.previous.avgDwellLabel ?? '0s',
+          })}
           trendType="neutral"
-          hint="Average dwell per page"
+          hint={t('cms.analytics.avgTimeHint')}
           icon={Clock3}
           sparklineData={sparkline}
         />
         <StatCard
-          title="Total Reading Time"
+          title={t('cms.analytics.totalReading')}
           value={data?.totalDwellLabel ?? '0s'}
-          trend={`${data?.topStories.length ?? 0} stories tracked`}
+          trend={t('cms.analytics.totalReadingTrend', {
+            count: data?.topStories.length ?? 0,
+          })}
           trendType="neutral"
-          hint="Sum of all page dwell"
+          hint={t('cms.analytics.totalReadingHint')}
           icon={ChartColumn}
           sparklineData={sparkline}
+        />
+      </div>
+
+      <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <StatCard
+          title={t('cms.analytics.signedIn')}
+          value={signedInSessions.toLocaleString()}
+          trend={
+            cohortTotal > 0
+              ? t('cms.analytics.signedInTrend', {
+                  pct: signedInShare,
+                  total: cohortTotal,
+                })
+              : t('cms.analytics.noSessions')
+          }
+          trendType="neutral"
+          hint={t('cms.analytics.signedInHint')}
+          icon={Eye}
+        />
+        <StatCard
+          title={t('cms.analytics.anonymous')}
+          value={anonymousSessions.toLocaleString()}
+          trend={
+            cohortTotal > 0
+              ? t('cms.analytics.signedInTrend', {
+                  pct: anonymousShare,
+                  total: cohortTotal,
+                })
+              : t('cms.analytics.noSessions')
+          }
+          trendType="neutral"
+          hint={t('cms.analytics.anonymousHint')}
+          icon={FileText}
         />
       </div>
 
@@ -114,23 +166,23 @@ export default function CmsAnalyticsPage() {
         <CmsCard hover={false} className="overflow-hidden p-0">
           <div className="border-b border-[#E8E4DC] bg-[#FAF8F3] px-5 py-3.5">
             <h2 className="font-heading text-sm font-bold uppercase tracking-wider text-stone-700">
-              Top Pages
+              {t('cms.analytics.topPages')}
             </h2>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[420px] text-left text-sm">
               <thead className="border-b border-[#E8E4DC] bg-stone-50 text-xs uppercase tracking-wider text-stone-500">
                 <tr>
-                  <th className="px-4 py-3">Path</th>
-                  <th className="px-4 py-3">Views</th>
-                  <th className="px-4 py-3">Avg time</th>
+                  <th className="px-4 py-3">{t('cms.analytics.colPath')}</th>
+                  <th className="px-4 py-3">{t('cms.analytics.colViews')}</th>
+                  <th className="px-4 py-3">{t('cms.analytics.colAvgTime')}</th>
                 </tr>
               </thead>
               <tbody>
                 {(data?.topPages ?? []).length === 0 && (
                   <tr>
                     <td colSpan={3} className="px-4 py-8 text-stone-500">
-                      No page views yet. Browse the public site to collect data.
+                      {t('cms.analytics.emptyPages')}
                     </td>
                   </tr>
                 )}
@@ -151,23 +203,23 @@ export default function CmsAnalyticsPage() {
         <CmsCard hover={false} className="overflow-hidden p-0">
           <div className="border-b border-[#E8E4DC] bg-[#FAF8F3] px-5 py-3.5">
             <h2 className="font-heading text-sm font-bold uppercase tracking-wider text-stone-700">
-              Top Stories
+              {t('cms.analytics.topStories')}
             </h2>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[420px] text-left text-sm">
               <thead className="border-b border-[#E8E4DC] bg-stone-50 text-xs uppercase tracking-wider text-stone-500">
                 <tr>
-                  <th className="px-4 py-3">Story</th>
-                  <th className="px-4 py-3">Views</th>
-                  <th className="px-4 py-3">Avg time</th>
+                  <th className="px-4 py-3">{t('cms.analytics.colStory')}</th>
+                  <th className="px-4 py-3">{t('cms.analytics.colViews')}</th>
+                  <th className="px-4 py-3">{t('cms.analytics.colAvgTime')}</th>
                 </tr>
               </thead>
               <tbody>
                 {(data?.topStories ?? []).length === 0 && (
                   <tr>
                     <td colSpan={3} className="px-4 py-8 text-stone-500">
-                      No story reads yet for this period.
+                      {t('cms.analytics.emptyStories')}
                     </td>
                   </tr>
                 )}
@@ -198,15 +250,15 @@ export default function CmsAnalyticsPage() {
         <CmsCard hover={false} className="mt-6 overflow-hidden p-0">
           <div className="border-b border-[#E8E4DC] bg-[#FAF8F3] px-5 py-3.5">
             <h2 className="font-heading text-sm font-bold uppercase tracking-wider text-stone-700">
-              Traffic sources
+              {t('cms.analytics.trafficSources')}
             </h2>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[320px] text-left text-sm">
               <thead className="border-b border-[#E8E4DC] bg-stone-50 text-xs uppercase tracking-wider text-stone-500">
                 <tr>
-                  <th className="px-4 py-3">Source</th>
-                  <th className="px-4 py-3">Views</th>
+                  <th className="px-4 py-3">{t('cms.analytics.colSource')}</th>
+                  <th className="px-4 py-3">{t('cms.analytics.colViews')}</th>
                 </tr>
               </thead>
               <tbody>

@@ -9,6 +9,7 @@ import { ConfigService } from '@nestjs/config';
 import { Prisma, ShopOrderStatus, ShopPaymentMethod } from '@prisma/client';
 import Stripe from 'stripe';
 import { MailService } from '../mail/mail.service';
+import { absoluteSiteUrl } from '../common/money.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { ensureUniqueSlug } from '../common/slug.util';
@@ -76,9 +77,15 @@ export class ShopService {
   }
 
   private currency(): string {
-    return (
-      this.config.get<string>('STRIPE_CURRENCY')?.trim().toLowerCase() || 'bgn'
-    );
+    // Stripe dropped BGN after Bulgaria’s euro adoption — map legacy env to EUR.
+    const raw =
+      this.config.get<string>('STRIPE_CURRENCY')?.trim().toLowerCase() || 'eur';
+    return this.normalizeCurrency(raw);
+  }
+
+  private normalizeCurrency(code: string | null | undefined): string {
+    const raw = (code ?? 'eur').trim().toLowerCase() || 'eur';
+    return raw === 'bgn' ? 'eur' : raw;
   }
 
   private mediaUrl(media: { key: string; url: string } | null | undefined) {
@@ -250,7 +257,7 @@ export class ShopService {
       descriptionBg: row.descriptionBg,
       descriptionEn: row.descriptionEn,
       priceCents: row.priceCents,
-      currency: row.currency,
+      currency: this.normalizeCurrency(row.currency),
       stock: row.stock,
       inStock: row.stock > 0,
       allowCod: row.allowCod,
@@ -365,7 +372,7 @@ export class ShopService {
         descriptionBg: dto.descriptionBg?.trim() ?? '',
         descriptionEn: dto.descriptionEn?.trim() || null,
         priceCents: dto.priceCents,
-        currency: (dto.currency ?? this.currency()).toLowerCase(),
+        currency: this.normalizeCurrency(dto.currency ?? this.currency()),
         stock: dto.stock,
         active: dto.active ?? true,
         allowCod: dto.allowCod ?? false,
@@ -402,7 +409,7 @@ export class ShopService {
           : {}),
         ...(dto.priceCents != null ? { priceCents: dto.priceCents } : {}),
         ...(dto.currency != null
-          ? { currency: dto.currency.toLowerCase() }
+          ? { currency: this.normalizeCurrency(dto.currency) }
           : {}),
         ...(dto.stock != null ? { stock: dto.stock } : {}),
         ...(dto.active != null ? { active: dto.active } : {}),
@@ -457,7 +464,7 @@ export class ShopService {
     }> = [];
 
     for (const product of products) {
-      if (product.currency.toLowerCase() !== currency) {
+      if (this.normalizeCurrency(product.currency) !== currency) {
         throw new BadRequestException(
           `Product currency mismatch for ${product.slug}`,
         );
@@ -547,8 +554,13 @@ export class ShopService {
           },
         },
       })),
-      success_url: `${base}${successPath}?order=success&id=${encodeURIComponent(publicId)}`,
-      cancel_url: `${base}${cancelPath}?order=cancelled`,
+      success_url: absoluteSiteUrl(base, successPath, {
+        order: 'success',
+        id: publicId,
+      }),
+      cancel_url: absoluteSiteUrl(base, cancelPath, {
+        order: 'cancelled',
+      }),
       metadata: {
         kind: 'shop',
         orderId: order.id,
@@ -614,7 +626,7 @@ export class ShopService {
     const etaParts: string[] = [];
 
     for (const product of products) {
-      if (product.currency.toLowerCase() !== currency) {
+      if (this.normalizeCurrency(product.currency) !== currency) {
         throw new BadRequestException(
           `Product currency mismatch for ${product.slug}`,
         );
@@ -1068,7 +1080,7 @@ export class ShopService {
       status: row.status,
       paymentMethod: row.paymentMethod,
       totalCents: row.totalCents,
-      currency: row.currency,
+      currency: this.normalizeCurrency(row.currency),
       estimatedArrival: row.estimatedArrival,
       shipping: {
         name: row.shippingName,

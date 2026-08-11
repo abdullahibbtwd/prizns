@@ -279,7 +279,7 @@ export default function SupportUsPage() {
                     </p>
                     {amount === 'custom' && (
                       <div className="mt-3">
-                        <FieldLabel>{lang === 'bg' ? 'Сума в BGN' : 'Amount in BGN'}</FieldLabel>
+                        <FieldLabel>{lang === 'bg' ? 'Сума в лв.' : 'Amount in BGN'}</FieldLabel>
                         <TextInput
                           type="number"
                           min="1"
@@ -322,7 +322,7 @@ export default function SupportUsPage() {
                         ? 'Пренасочване…'
                         : 'Redirecting…'
                       : lang === 'bg'
-                        ? `Дарете ${selectedAmount || '—'} BGN`
+                        ? `Дарете ${selectedAmount || '—'} лв.`
                         : `Donate ${selectedAmount || '—'} BGN`}
                   </button>
                   {error ? (

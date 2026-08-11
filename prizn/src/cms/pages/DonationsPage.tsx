@@ -1,32 +1,39 @@
 import { useQuery } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { HeartHandshake } from 'lucide-react'
 import {
   CmsCard,
   CmsPageHeader,
   StatusPill,
 } from '@/cms/components/CmsUI'
+import { DonationTrendChart } from '@/cms/components/DonationTrendChart'
 import { listCmsDonations } from '@/lib/donations-api'
+import { pickLang } from '@/lib/pick-lang'
 
 export default function CmsDonationsPage() {
+  const { t, i18n } = useTranslation()
+  const lang = i18n.language === 'en' ? 'en' : 'bg'
+
   const listQuery = useQuery({
-    queryKey: ['cms-donations'],
-    queryFn: () => listCmsDonations({ pageSize: 50 }),
+    queryKey: ['cms-donations', 'COMPLETED'],
+    queryFn: () =>
+      listCmsDonations({ pageSize: 50, status: 'COMPLETED' }),
   })
 
   const items = listQuery.data?.items ?? []
-  const total = listQuery.data?.total ?? items.length
 
   return (
     <div>
-      <CmsPageHeader
-        title="Donations & Grants"
-        description="Track financial backing for field reporting, reading rooms, and looms."
-        badge={`${total} Donations`}
-      />
+      <CmsPageHeader title={t('cms.donations.title')} />
+
+      <div className="mb-8">
+        <DonationTrendChart />
+      </div>
 
       {listQuery.isError && (
         <CmsCard className="mb-6 p-6 text-sm text-rose-700">
-          Failed to load donations. {(listQuery.error as Error).message}
+          {t('cms.donations.loadFailed')}{' '}
+          {(listQuery.error as Error).message}
         </CmsCard>
       )}
 
@@ -35,26 +42,27 @@ export default function CmsDonationsPage() {
           <table className="w-full min-w-[520px] text-left text-sm">
             <thead className="border-b border-[#E8E4DC] bg-stone-50 text-xs uppercase tracking-wider text-stone-500">
               <tr>
-                <th className="px-4 py-3">Amount</th>
-                <th className="px-4 py-3">Email</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Date</th>
+                <th className="px-4 py-3">{t('cms.donations.colAmount')}</th>
+                <th className="px-4 py-3">{t('cms.donations.colStory')}</th>
+                <th className="px-4 py-3">{t('cms.donations.colEmail')}</th>
+                <th className="px-4 py-3">{t('cms.donations.colStatus')}</th>
+                <th className="px-4 py-3">{t('cms.donations.colDate')}</th>
               </tr>
             </thead>
             <tbody>
               {listQuery.isLoading && (
                 <tr>
-                  <td colSpan={4} className="px-4 py-8 text-stone-500">
-                    Loading…
+                  <td colSpan={5} className="px-4 py-8 text-stone-500">
+                    {t('cms.donations.loading')}
                   </td>
                 </tr>
               )}
               {!listQuery.isLoading && items.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-4 py-8 text-stone-500">
+                  <td colSpan={5} className="px-4 py-8 text-stone-500">
                     <span className="inline-flex items-center gap-2">
                       <HeartHandshake className="size-4" />
-                      No donations yet.
+                      {t('cms.donations.empty')}
                     </span>
                   </td>
                 </tr>
@@ -64,8 +72,28 @@ export default function CmsDonationsPage() {
                   <td className="px-4 py-3 font-medium text-stone-900">
                     {(row.amountCents / 100).toFixed(2)}{' '}
                     <span className="text-xs uppercase text-stone-500">
-                      BGN
+                      {row.currency?.toLowerCase() === 'eur' ? 'EUR' : 'лв.'}
                     </span>
+                  </td>
+                  <td className="px-4 py-3 text-stone-700">
+                    {row.article ? (
+                      <a
+                        href={row.article.path}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[#0C2686] hover:underline"
+                      >
+                        {pickLang(
+                          lang,
+                          row.article.titleEn,
+                          row.article.titleBg,
+                        )}
+                      </a>
+                    ) : (
+                      <span className="text-stone-400">
+                        {t('cms.donations.general')}
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-stone-700">
                     {row.email || '—'}
@@ -74,7 +102,9 @@ export default function CmsDonationsPage() {
                     <StatusPill status={row.status} />
                   </td>
                   <td className="px-4 py-3 text-stone-600">
-                    {new Date(row.createdAt).toLocaleString()}
+                    {new Date(row.createdAt).toLocaleString(
+                      lang === 'bg' ? 'bg-BG' : 'en-GB',
+                    )}
                   </td>
                 </tr>
               ))}

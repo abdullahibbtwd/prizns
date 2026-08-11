@@ -8,3 +8,7 @@ export type TranslateJobData = {
   type: 'article' | 'author' | 'series'
   id: string
 }
+
+export type EmbedJobData = {
+  articleId: string
+}

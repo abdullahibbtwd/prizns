@@ -292,59 +292,83 @@ export function CmsSeoPage() {
 }
 
 export function CmsShopPage() {
+  const { t } = useTranslation()
   return (
     <div>
       <CmsPageHeader
-        title="Boutique Shop Cockpit"
-        description="Handcrafted goods, prints, and limited journal editions."
-        badge="Shop"
+        title={t('cms.shopHub.title')}
+        description={t('cms.shopHub.description')}
+        badge={t('cms.shopHub.badge')}
       />
       <CmsCard className="p-6 text-sm text-stone-600">
-        Manage catalog in{' '}
+        {t('cms.shopHub.bodyBefore')}{' '}
         <a href="/cms/products" className="font-semibold text-[#0C2686]">
-          Products
+          {t('cms.shopHub.products')}
         </a>{' '}
-        and fulfillment in{' '}
+        {t('cms.shopHub.bodyMid')}{' '}
         <a href="/cms/orders" className="font-semibold text-[#0C2686]">
-          Orders
+          {t('cms.shopHub.orders')}
         </a>
-        . Public storefront: <code className="text-xs">/shop</code>
+        {t('cms.shopHub.bodyAfter')} <code className="text-xs">/shop</code>
       </CmsCard>
     </div>
   )
 }
 
 export function CmsSettingsPage() {
+  const { t } = useTranslation()
   return (
     <div>
-      <CmsPageHeader title="System Settings" description="Global platform settings, multilingual defaults, and API keys." badge="v2.4 Production" />
-      <ComingSoon icon={Settings} title="Prizni OS Settings" blurb="Configure brand parameters, domain aliases, AI keys, and payment gateways." />
+      <CmsPageHeader
+        title={t('cms.settings.title')}
+        description={t('cms.settings.description')}
+        badge={t('cms.settings.badge')}
+      />
+      <ComingSoon
+        icon={Settings}
+        title={t('cms.settings.soonTitle')}
+        blurb={t('cms.settings.soonBlurb')}
+      />
     </div>
   )
 }
 
+const AI_TOOLS = [
+  { id: 'title', labelKey: 'cms.aiWorkbench.toolTitle' },
+  { id: 'seo', labelKey: 'cms.aiWorkbench.toolSeo' },
+  { id: 'translate', labelKey: 'cms.aiWorkbench.toolTranslate' },
+  { id: 'summary', labelKey: 'cms.aiWorkbench.toolSummary' },
+  { id: 'instagram', labelKey: 'cms.aiWorkbench.toolInstagram' },
+  { id: 'tiktok', labelKey: 'cms.aiWorkbench.toolTiktok' },
+] as const
+
 export function CmsAiPage() {
+  const { t } = useTranslation()
   const [input, setInput] = useState('')
   const [output, setOutput] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const runAiTool = (promptName: string) => {
+  const runAiTool = (toolId: (typeof AI_TOOLS)[number]['id']) => {
     if (!input.trim()) {
-      setOutput('Please paste or type a draft text in the box above first.')
+      setOutput(t('cms.aiWorkbench.needDraft'))
       return
     }
     setLoading(true)
-    setOutput('AI model analyzing draft text...')
+    setOutput(t('cms.aiWorkbench.analyzing'))
+    const toolLabel = t(
+      AI_TOOLS.find((tool) => tool.id === toolId)?.labelKey ??
+        'cms.aiWorkbench.toolTitle',
+    )
     setTimeout(() => {
       setLoading(false)
-      if (promptName === 'Better title') {
+      if (toolId === 'title') {
         setOutput('✨ Suggested Titles:\n1. The Silent Echo of Belogradchik Stones\n2. Walnut Paths: Walking the Forgotten Trails\n3. Hands and Thread: Crafting Memory in Bulgaria')
-      } else if (promptName === 'SEO Meta') {
+      } else if (toolId === 'seo') {
         setOutput('🏷️ SEO Meta Tags:\nTitle: Walnut Paths of Northwestern Bulgaria | Prizni Journal\nDescription: Discover the hidden stone villages and artisan traditions along the Belogradchik cliffs.')
-      } else if (promptName === 'Translation (BG ↔ EN)') {
+      } else if (toolId === 'translate') {
         setOutput('🌐 English Translation:\n"Along the walnut-lined paths of northwestern Bulgaria, time moves at the pace of morning mist over stone roofs..."')
       } else {
-        setOutput(`⚡ AI Output for [${promptName}]:\nDraft analyzed successfully. Dwell time optimized and readability scored at 98.4%.`)
+        setOutput(`⚡ AI Output for [${toolLabel}]:\nDraft analyzed successfully. Dwell time optimized and readability scored at 98.4%.`)
       }
     }, 1200)
   }
@@ -352,42 +376,36 @@ export function CmsAiPage() {
   return (
     <div>
       <CmsPageHeader
-        title="AI Assistant Workbench"
-        description="Transform raw drafts into polished titles, SEO descriptions, translations, and social posts."
-        badge="Gemini Powered"
+        title={t('cms.aiWorkbench.title')}
+        description={t('cms.aiWorkbench.description')}
+        badge={t('cms.aiWorkbench.badge')}
       />
       <CmsCard className="p-6 md:p-8">
         <label className="block font-heading text-sm font-bold uppercase tracking-wider text-stone-700 mb-2">
-          Paste Story Draft or Notes
+          {t('cms.aiWorkbench.draftLabel')}
         </label>
         <textarea
           rows={7}
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Paste draft text here (e.g. There is a specific rhythm to dawn in the stone villages of Northwestern Bulgaria...)"
+          placeholder={t('cms.aiWorkbench.draftPlaceholder')}
           className="w-full rounded-2xl border border-[#E8E4DC] bg-[#FAF8F3] p-4 text-sm font-medium text-stone-900 outline-none focus:border-[#0C2686] focus:ring-2 focus:ring-[#0C2686]/10 transition-all placeholder:text-stone-400"
         />
 
         <div className="mt-5">
           <p className="font-heading text-xs font-bold uppercase tracking-wider text-stone-500 mb-3">
-            Quick AI Transformation Tools
+            {t('cms.aiWorkbench.toolsLabel')}
           </p>
           <div className="flex flex-wrap gap-2.5">
-            {[
-              'Better title',
-              'SEO Meta',
-              'Translation (BG ↔ EN)',
-              'Summary Excerpt',
-              'Instagram Post',
-              'TikTok Script',
-            ].map((tool) => (
+            {AI_TOOLS.map((tool) => (
               <GhostButton
-                key={tool}
+                key={tool.id}
                 disabled={loading}
-                onClick={() => runAiTool(tool)}
+                onClick={() => runAiTool(tool.id)}
                 className="py-2 text-xs font-semibold hover:border-[#0C2686] hover:text-[#0C2686]"
               >
-                <Sparkles className={cn("size-3.5 text-[#0C2686]", loading && "animate-spin")} /> {tool}
+                <Sparkles className={cn("size-3.5 text-[#0C2686]", loading && "animate-spin")} />{' '}
+                {t(tool.labelKey)}
               </GhostButton>
             ))}
           </div>

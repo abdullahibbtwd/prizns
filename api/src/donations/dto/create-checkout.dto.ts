@@ -20,4 +20,9 @@ export class CreateCheckoutDto {
   @IsOptional()
   @IsString()
   name?: string;
+
+  /** When set, ties the donation to a published story (“Support This Story”). */
+  @IsOptional()
+  @IsString()
+  articleId?: string;
 }

@@ -11,6 +11,14 @@ export type AiSuggestionResult = {
   summary: string | null
 }
 
+export type RegionalContextResult = {
+  promptVersion: string
+  lang: 'bg' | 'en'
+  context: string
+  placeNotes: string[]
+  whyItMatters: string | null
+}
+
 export function suggestCmsAi(body: {
   articleId?: string
   titleBg: string
@@ -20,4 +28,12 @@ export function suggestCmsAi(body: {
   lang?: 'bg' | 'en'
 }) {
   return api.post<AiSuggestionResult>('/cms/ai/suggest', body)
+}
+
+export function fetchRegionalContext(body: {
+  section: string
+  slug: string
+  lang?: 'bg' | 'en'
+}) {
+  return api.post<RegionalContextResult>('/ai/regional-context', body)
 }

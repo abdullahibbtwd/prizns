@@ -30,6 +30,10 @@ export function getFooterSecondaryLinks(lang: JournalLang): JournalNavLink[] {
     { label: lang === 'bg' ? 'Събития' : 'Events', to: '/events' },
     { label: lang === 'bg' ? 'Новини' : 'News', to: '/news' },
     { label: lang === 'bg' ? 'Магазин' : 'Shop', to: '/shop' },
+    {
+      label: lang === 'bg' ? 'История на годината' : 'Story of the Year',
+      to: '/story-of-the-year',
+    },
   ]
 }
 

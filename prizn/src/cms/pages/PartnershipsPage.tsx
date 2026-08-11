@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { Building2, Calendar, Mail, UserCheck } from 'lucide-react'
 import {
   CmsCard,
@@ -26,6 +27,7 @@ function excerpt(text: string, max = 140) {
 }
 
 export default function CmsPartnershipsPage() {
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
 
   const listQuery = useQuery({
@@ -52,25 +54,27 @@ export default function CmsPartnershipsPage() {
   return (
     <div>
       <CmsPageHeader
-        title="Partnerships & CRM Pipeline"
-        description="Track alliances with regional tourism boards, ethnographic museums, wineries, and sponsors."
-        badge={`${total} Inquiries`}
+        title={t('cms.partnerships.title')}
+        description={t('cms.partnerships.description')}
+        badge={t('cms.partnerships.badge', { count: total })}
       />
 
       {listQuery.isError && (
         <CmsCard className="mb-6 p-6 text-sm text-rose-700">
-          Failed to load partnerships.{' '}
+          {t('cms.partnerships.loadFailed')}{' '}
           {(listQuery.error as Error).message}
         </CmsCard>
       )}
 
       {listQuery.isLoading && (
-        <CmsCard className="p-6 text-sm text-stone-500">Loading…</CmsCard>
+        <CmsCard className="p-6 text-sm text-stone-500">
+          {t('cms.partnerships.loading')}
+        </CmsCard>
       )}
 
       {!listQuery.isLoading && items.length === 0 && (
         <CmsCard className="p-6 text-sm text-stone-500">
-          No partnership inquiries yet.
+          {t('cms.partnerships.empty')}
         </CmsCard>
       )}
 
@@ -116,11 +120,11 @@ export default function CmsPartnershipsPage() {
               <div className="min-w-[10rem]">
                 <JournalSelect
                   name={`partnership-status-${p.id}`}
-                  label="Status"
-                  placeholder="Status"
+                  label={t('cms.partnerships.status')}
+                  placeholder={t('cms.partnerships.status')}
                   options={STATUS_OPTIONS.map((status) => ({
                     value: status,
-                    label: status,
+                    label: t(`cms.status.${status.toLowerCase()}`),
                   }))}
                   value={p.status}
                   onChange={(value) =>

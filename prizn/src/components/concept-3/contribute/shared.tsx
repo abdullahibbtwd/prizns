@@ -191,9 +191,18 @@ export function ProcessSteps({
   )
 }
 
-export function FieldLabel({ children }: { children: ReactNode }) {
+export function FieldLabel({
+  children,
+  htmlFor,
+}: {
+  children: ReactNode
+  htmlFor?: string
+}) {
   return (
-    <label className="mb-2 block font-sans text-[11px] font-medium uppercase tracking-[0.18em] text-[#1A1A1A]/55">
+    <label
+      htmlFor={htmlFor}
+      className="mb-2 block font-sans text-[11px] font-medium uppercase tracking-[0.18em] text-[#1A1A1A]/55"
+    >
       {children}
     </label>
   )

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { ChevronLeft, ChevronRight, Search, Shield, Users } from 'lucide-react'
 import {
   CmsCard,
@@ -20,6 +21,7 @@ const PAGE_SIZE_OPTIONS = [5, 10, 20, 50] as const
 const ROLE_FILTERS: Array<'all' | CmsUserRole> = ['all', 'ADMIN', 'EDITOR']
 
 export default function CmsUsersPage() {
+  const { t } = useTranslation()
   const { user: me } = useAuth()
   const queryClient = useQueryClient()
   const isAdmin = me?.role === 'ADMIN'
@@ -91,13 +93,13 @@ export default function CmsUsersPage() {
     }) => updateCmsUser(id, { role, isActive }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['cms-users'] })
-      setToast({ open: true, variant: 'success', message: 'User updated.' })
+      setToast({ open: true, variant: 'success', message: t('cms.users.updated') })
     },
     onError: (err: Error) => {
       setToast({
         open: true,
         variant: 'error',
-        message: err.message || 'Failed to update user.',
+        message: err.message || t('cms.users.updateFailed'),
       })
     },
   })
@@ -105,9 +107,9 @@ export default function CmsUsersPage() {
   return (
     <div>
       <CmsPageHeader
-        title="User Management"
-        description="CMS staff accounts and their roles (Admin / Editor)."
-        badge={`${total} Users`}
+        title={t('cms.users.title')}
+        description={t('cms.users.description')}
+        badge={t('cms.users.badge', { count: total })}
       />
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -117,7 +119,7 @@ export default function CmsUsersPage() {
           </div>
           <div>
             <p className="font-heading text-xs font-bold uppercase tracking-wider text-stone-500">
-              Team members
+              {t('cms.users.teamMembers')}
             </p>
             <p className="mt-1 font-heading text-2xl font-bold text-stone-900">{total}</p>
           </div>
@@ -128,10 +130,10 @@ export default function CmsUsersPage() {
           </div>
           <div>
             <p className="font-heading text-xs font-bold uppercase tracking-wider text-stone-500">
-              Roles
+              {t('cms.users.roles')}
             </p>
             <p className="mt-1 text-sm font-semibold text-stone-800">
-              ADMIN · EDITOR
+              {t('cms.roles.admin')} · {t('cms.roles.editor')}
             </p>
           </div>
         </CmsCard>
@@ -143,7 +145,7 @@ export default function CmsUsersPage() {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search name or email…"
+            placeholder={t('cms.users.searchPlaceholder')}
             className="w-full rounded-xl border border-[#E8E4DC] bg-white py-2.5 pl-10 pr-3 text-sm outline-none focus:border-[#0C2686]"
           />
         </div>
@@ -161,25 +163,31 @@ export default function CmsUsersPage() {
                   : 'border-[#E8E4DC] bg-white text-stone-600 hover:border-[#0C2686]/40',
               )}
             >
-              {item === 'all' ? 'All roles' : item}
+              {item === 'all'
+                ? t('cms.users.allRoles')
+                : item === 'ADMIN'
+                  ? t('cms.roles.admin')
+                  : t('cms.roles.editor')}
             </button>
           ))}
         </div>
       </div>
 
       {listQuery.isLoading && (
-        <CmsCard className="p-8 text-sm text-stone-600">Loading users…</CmsCard>
+        <CmsCard className="p-8 text-sm text-stone-600">
+          {t('cms.users.loading')}
+        </CmsCard>
       )}
 
       {listQuery.isError && (
         <CmsCard className="p-8 text-sm text-rose-700">
-          Failed to load users. {(listQuery.error as Error).message}
+          {t('cms.users.loadFailed')} {(listQuery.error as Error).message}
         </CmsCard>
       )}
 
       {!listQuery.isLoading && !listQuery.isError && total === 0 && (
         <CmsCard className="p-8 text-sm text-stone-600">
-          No users found.
+          {t('cms.users.empty')}
         </CmsCard>
       )}
 
@@ -189,10 +197,10 @@ export default function CmsUsersPage() {
             <table className="w-full min-w-[720px] text-left text-sm">
               <thead className="border-b border-[#E8E4DC] bg-stone-50 text-xs uppercase tracking-wider text-stone-500">
                 <tr>
-                  <th className="px-4 py-3">User</th>
-                  <th className="px-4 py-3">Role</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Joined</th>
+                  <th className="px-4 py-3">{t('cms.users.colUser')}</th>
+                  <th className="px-4 py-3">{t('cms.users.colRole')}</th>
+                  <th className="px-4 py-3">{t('cms.users.colStatus')}</th>
+                  <th className="px-4 py-3">{t('cms.users.colJoined')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -206,7 +214,7 @@ export default function CmsUsersPage() {
                         {item.name || '—'}
                         {me?.id === item.id && (
                           <span className="ml-2 text-[10px] font-semibold uppercase tracking-wider text-[#0C2686]">
-                            You
+                            {t('cms.common.you')}
                           </span>
                         )}
                       </p>
@@ -226,8 +234,8 @@ export default function CmsUsersPage() {
                               })
                             }}
                             options={[
-                              { value: 'ADMIN', label: 'ADMIN' },
-                              { value: 'EDITOR', label: 'EDITOR' },
+                              { value: 'ADMIN', label: t('cms.roles.admin') },
+                              { value: 'EDITOR', label: t('cms.roles.editor') },
                             ]}
                           />
                         </div>
@@ -255,7 +263,9 @@ export default function CmsUsersPage() {
                               'cursor-not-allowed opacity-60',
                           )}
                         >
-                          {item.isActive ? 'Active' : 'Inactive'}
+                          {item.isActive
+                            ? t('cms.common.active')
+                            : t('cms.common.inactive')}
                         </button>
                       ) : (
                         <StatusPill status={item.isActive ? 'active' : 'archived'} />
@@ -273,12 +283,14 @@ export default function CmsUsersPage() {
       {total > 0 && (
         <div className="mt-6 flex flex-col gap-4 rounded-2xl border border-[#E8E4DC] bg-white px-4 py-3 shadow-2xs sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs font-medium text-stone-600">
-            Showing {from}–{to} of {total}
+            {t('cms.common.showing', { from, to, total })}
           </p>
 
           <div className="flex flex-wrap items-center gap-4">
             <div className="flex min-w-[140px] items-center gap-3">
-              <span className="shrink-0 text-xs font-medium text-stone-600">Per page</span>
+              <span className="shrink-0 text-xs font-medium text-stone-600">
+                {t('cms.common.perPage')}
+              </span>
               <JournalSelect
                 name="usersPageSize"
                 value={String(pageSize)}
@@ -301,7 +313,7 @@ export default function CmsUsersPage() {
                 className="inline-flex items-center gap-1 rounded-xl border border-[#E8E4DC] bg-stone-50 px-2.5 py-1.5 text-xs font-semibold text-stone-700 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <ChevronLeft className="size-3.5" />
-                Prev
+                {t('cms.common.prev')}
               </button>
 
               {pageNumbers.map((num) => (
@@ -327,13 +339,13 @@ export default function CmsUsersPage() {
                 disabled={page >= totalPages || listQuery.isFetching}
                 className="inline-flex items-center gap-1 rounded-xl border border-[#E8E4DC] bg-stone-50 px-2.5 py-1.5 text-xs font-semibold text-stone-700 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
               >
-                Next
+                {t('cms.common.next')}
                 <ChevronRight className="size-3.5" />
               </button>
             </div>
 
             <p className="text-xs font-medium text-stone-500">
-              Page {page} of {totalPages}
+              {t('cms.common.pageOf', { page, totalPages })}
             </p>
           </div>
         </div>
@@ -341,7 +353,7 @@ export default function CmsUsersPage() {
 
       {!isAdmin && (
         <p className="mt-4 text-xs text-stone-500">
-          Role and status changes require an Admin account.
+          {t('cms.users.adminOnly')}
         </p>
       )}
 

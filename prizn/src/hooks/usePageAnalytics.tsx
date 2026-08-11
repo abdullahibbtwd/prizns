@@ -19,6 +19,7 @@ import {
   setAnalyticsSessionId,
   type CookieConsent,
 } from '@/lib/cookie-consent'
+import { useReaderAuth } from '@/lib/reader-auth'
 
 const HEARTBEAT_MS = 15000
 
@@ -86,15 +87,21 @@ export function AnalyticsTracker() {
   const location = useLocation()
   const consent = useAnalyticsConsent()
   const { meta } = useContext(AnalyticsMetaContext)
+  const { reader } = useReaderAuth()
   const pageViewIdRef = useRef<string | null>(null)
   const segmentStartedAtRef = useRef(Date.now())
   const accumulatedMsRef = useRef(0)
   const pathRef = useRef(location.pathname)
   const metaRef = useRef(meta)
+  const readerIdRef = useRef(reader?.id)
 
   useEffect(() => {
     metaRef.current = meta
   }, [meta])
+
+  useEffect(() => {
+    readerIdRef.current = reader?.id
+  }, [reader?.id])
 
   useEffect(() => {
     if (consent !== 'accepted') return
@@ -144,6 +151,7 @@ export function AnalyticsTracker() {
         utmSource: params.get('utm_source') || undefined,
         utmMedium: params.get('utm_medium') || undefined,
         utmCampaign: params.get('utm_campaign') || undefined,
+        readerId: readerIdRef.current || undefined,
         dwellMs: 0,
       })
       if (!cancelled && result?.pageViewId) {
@@ -162,6 +170,7 @@ export function AnalyticsTracker() {
         path: pathRef.current,
         articleId: metaRef.current.articleId || undefined,
         title: metaRef.current.title || undefined,
+        readerId: readerIdRef.current || undefined,
         dwellMs: currentDwellMs(),
       })
     }

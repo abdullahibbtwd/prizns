@@ -53,6 +53,11 @@ export class AnalyticsBeaconDto {
   utmCampaign?: string;
 
   @IsOptional()
+  @IsString()
+  @MinLength(1)
+  readerId?: string;
+
+  @IsOptional()
   @Transform(({ value }) =>
     value === undefined || value === null || value === ''
       ? undefined

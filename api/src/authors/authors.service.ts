@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { ArticleStatus, TranslationStatus } from '@prisma/client';
+import { BadgesService } from '../badges/badges.service';
 import { ensureUniqueSlug } from '../common/slug.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAuthorDto } from './dto/create-author.dto';
@@ -53,7 +54,10 @@ const publicAuthorSelect = {
 
 @Injectable()
 export class AuthorsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly badges: BadgesService,
+  ) {}
 
   listActive() {
     return this.prisma.author.findMany({
@@ -77,7 +81,7 @@ export class AuthorsService {
       orderBy: { nameBg: 'asc' },
       select: publicAuthorSelect,
     });
-    return rows.map((row) => this.toPublicDto(row));
+    return Promise.all(rows.map((row) => this.toPublicDto(row)));
   }
 
   async getPublicBySlug(slug: string) {
@@ -88,7 +92,7 @@ export class AuthorsService {
     return row ? this.toPublicDto(row) : null;
   }
 
-  private toPublicDto(
+  private async toPublicDto(
     row: {
       id: string;
       slug: string;
@@ -107,6 +111,7 @@ export class AuthorsService {
       _count: { articles: number };
     },
   ) {
+    const badges = await this.badges.badgesForAuthor(row.id);
     return {
       id: row.id,
       slug: row.slug,
@@ -124,6 +129,7 @@ export class AuthorsService {
       image: row.imageUrl ?? '',
       aliases: row.aliases,
       storyCount: row._count.articles,
+      badges,
     };
   }
 

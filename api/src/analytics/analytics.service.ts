@@ -84,6 +84,7 @@ export class AnalyticsService {
       const created = await this.prisma.analyticsSession.create({
         data: {
           visitorKey: dto.visitorKey.trim().slice(0, 80),
+          readerId: dto.readerId?.trim() || null,
           userAgent: userAgent?.slice(0, 400) || null,
           lastSeenAt: now,
         },
@@ -92,7 +93,12 @@ export class AnalyticsService {
     } else {
       await this.prisma.analyticsSession.update({
         where: { id: sessionId },
-        data: { lastSeenAt: now },
+        data: {
+          lastSeenAt: now,
+          ...(dto.readerId?.trim()
+            ? { readerId: dto.readerId.trim() }
+            : {}),
+        },
       });
     }
 
@@ -146,19 +152,32 @@ export class AnalyticsService {
       startedAt: { gte: start, lt: end },
     };
 
-    const [pageviews, dwell, visitors] = await Promise.all([
-      this.prisma.pageView.count({ where }),
-      this.prisma.pageView.aggregate({
-        where: { ...where, dwellMs: { gt: 0 } },
-        _avg: { dwellMs: true },
-        _sum: { dwellMs: true },
-      }),
-      this.prisma.pageView.findMany({
-        where,
-        select: { session: { select: { visitorKey: true } } },
-        distinct: ['sessionId'],
-      }),
-    ]);
+    const [pageviews, dwell, visitors, loggedInSessions, anonymousSessions] =
+      await Promise.all([
+        this.prisma.pageView.count({ where }),
+        this.prisma.pageView.aggregate({
+          where: { ...where, dwellMs: { gt: 0 } },
+          _avg: { dwellMs: true },
+          _sum: { dwellMs: true },
+        }),
+        this.prisma.pageView.findMany({
+          where,
+          select: { session: { select: { visitorKey: true } } },
+          distinct: ['sessionId'],
+        }),
+        this.prisma.analyticsSession.count({
+          where: {
+            lastSeenAt: { gte: start, lt: end },
+            readerId: { not: null },
+          },
+        }),
+        this.prisma.analyticsSession.count({
+          where: {
+            lastSeenAt: { gte: start, lt: end },
+            readerId: null,
+          },
+        }),
+      ]);
 
     const uniqueVisitors = new Set(
       visitors.map((row) => row.session.visitorKey),
@@ -169,6 +188,8 @@ export class AnalyticsService {
       pageviews,
       avgDwellMs: Math.round(dwell._avg.dwellMs ?? 0),
       totalDwellMs: dwell._sum.dwellMs ?? 0,
+      loggedInSessions,
+      anonymousSessions,
     };
   }
 
@@ -254,6 +275,8 @@ export class AnalyticsService {
       avgDwellLabel: formatDuration(current.avgDwellMs),
       totalDwellMs: current.totalDwellMs,
       totalDwellLabel: formatDuration(current.totalDwellMs),
+      loggedInSessions: current.loggedInSessions,
+      anonymousSessions: current.anonymousSessions,
       visitorsTrendPct: trendPct(current.visitors, previous.visitors),
       pageviewsTrendPct: trendPct(current.pageviews, previous.pageviews),
       previous: {

@@ -1,5 +1,6 @@
 ﻿import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import {
   ChevronLeft,
   ChevronRight,
@@ -35,6 +36,7 @@ import { cn } from '@/lib/utils'
 const PAGE_SIZE_OPTIONS = [5, 10, 20, 50, 100] as const
 
 export default function CmsNewsletterPage() {
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
   const [query, setQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
@@ -93,14 +95,14 @@ export default function CmsNewsletterPage() {
       setToast({
         open: true,
         variant: 'success',
-        message: `Episode sent to ${result.recipientCount} subscriber${result.recipientCount === 1 ? '' : 's'}.`,
+        message: t('cms.newsletter.sentOk', { count: result.recipientCount }),
       })
     },
     onError: (err: Error) => {
       setToast({
         open: true,
         variant: 'error',
-        message: (err as ApiError)?.message || err.message || 'Send failed',
+        message: (err as ApiError)?.message || err.message || t('cms.newsletter.sendFailed'),
       })
     },
   })
@@ -111,6 +113,7 @@ export default function CmsNewsletterPage() {
   const totalLabel = total.toLocaleString()
   const nextEpisode = previewQuery.data?.next
   const history = historyQuery.data ?? []
+  const subscriberCount = previewQuery.data?.subscriberCount ?? 0
 
   useEffect(() => {
     if (page > totalPages) setPage(totalPages)
@@ -141,14 +144,14 @@ export default function CmsNewsletterPage() {
       setToast({
         open: true,
         variant: 'success',
-        message: 'Subscriber removed.',
+        message: t('cms.newsletter.removed'),
       })
     },
     onError: (err: Error) => {
       setToast({
         open: true,
         variant: 'error',
-        message: err.message || 'Failed to remove subscriber.',
+        message: err.message || t('cms.newsletter.removeFailed'),
       })
     },
   })
@@ -156,26 +159,25 @@ export default function CmsNewsletterPage() {
   return (
     <div>
       <CmsPageHeader
-        title="Newsletter Hub"
-        description="Episode of the Day digests via Resend, plus subscribers from the public form."
-        badge={`${totalLabel} Readers`}
+        title={t('cms.newsletter.title')}
+        description={t('cms.newsletter.description')}
+        badge={t('cms.newsletter.badge', { count: totalLabel })}
       />
 
       <CmsCard className="mb-8 space-y-4 p-5">
         <div className="flex items-center gap-2">
           <Radio className="size-4 text-[#0C2686]" />
-          <h2 className="text-sm font-semibold">Episode of the Day</h2>
+          <h2 className="text-sm font-semibold">{t('cms.newsletter.episodeTitle')}</h2>
         </div>
         <p className="text-xs text-stone-500">
-          Sends the next undigested published episode from an active series to all
-          subscribers. Same episode cannot be sent twice.
+          {t('cms.newsletter.episodeHint')}
         </p>
 
         {previewQuery.isLoading ? (
-          <p className="text-sm text-stone-500">Loading next episode…</p>
+          <p className="text-sm text-stone-500">{t('cms.newsletter.loadingEpisode')}</p>
         ) : !nextEpisode ? (
           <p className="text-sm text-stone-500">
-            No undigested published episode found. Add episodes to an active series.
+            {t('cms.newsletter.noEpisode')}
           </p>
         ) : (
           <div className="rounded-xl border border-[#E8E4DC] bg-[#FAF8F3] p-4">
@@ -190,10 +192,11 @@ export default function CmsNewsletterPage() {
             ) : null}
             <p className="mt-2 text-xs text-stone-500">{nextEpisode.path}</p>
             <p className="mt-3 text-xs text-stone-500">
-              {previewQuery.data?.subscriberCount ?? 0} subscriber
-              {(previewQuery.data?.subscriberCount ?? 0) === 1 ? '' : 's'}
+              {subscriberCount === 1
+                ? t('cms.newsletter.subscriberOne', { count: subscriberCount })
+                : t('cms.newsletter.subscribers', { count: subscriberCount })}
               {previewQuery.data?.mailConfigured === false
-                ? ' · Resend not configured'
+                ? ` · ${t('cms.newsletter.resendMissing')}`
                 : ''}
             </p>
             <div className="mt-4">
@@ -201,13 +204,16 @@ export default function CmsNewsletterPage() {
                 type="button"
                 disabled={
                   sendMutation.isPending ||
-                  (previewQuery.data?.subscriberCount ?? 0) < 1 ||
+                  subscriberCount < 1 ||
                   previewQuery.data?.mailConfigured === false
                 }
                 onClick={() => {
                   if (
                     window.confirm(
-                      `Send "${nextEpisode.titleBg}" to ${previewQuery.data?.subscriberCount ?? 0} subscribers?`,
+                      t('cms.newsletter.sendConfirm', {
+                        title: nextEpisode.titleBg,
+                        count: subscriberCount,
+                      }),
                     )
                   ) {
                     sendMutation.mutate()
@@ -215,7 +221,9 @@ export default function CmsNewsletterPage() {
                 }}
               >
                 <Send className="size-3.5" />
-                {sendMutation.isPending ? 'Sending…' : 'Send now'}
+                {sendMutation.isPending
+                  ? t('cms.newsletter.sending')
+                  : t('cms.newsletter.sendNow')}
               </PrimaryButton>
             </div>
           </div>
@@ -224,7 +232,7 @@ export default function CmsNewsletterPage() {
         {history.length > 0 ? (
           <div className="space-y-2 border-t border-[#E8E4DC] pt-4">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-stone-500">
-              Recent sends
+              {t('cms.newsletter.recentSends')}
             </p>
             {history.slice(0, 8).map((item) => (
               <div
@@ -236,8 +244,11 @@ export default function CmsNewsletterPage() {
                     {item.article.titleBg}
                   </p>
                   <p className="text-[11px] text-stone-500">
-                    {item.series.titleBg} · {item.recipientCount} recipients ·{' '}
-                    {new Date(item.sentAt).toLocaleString()}
+                    {item.series.titleBg} ·{' '}
+                    {t('cms.newsletter.recipients', {
+                      count: item.recipientCount,
+                    })}{' '}
+                    · {new Date(item.sentAt).toLocaleString()}
                   </p>
                 </div>
                 <StatusPill status={item.status} />
@@ -249,7 +260,7 @@ export default function CmsNewsletterPage() {
 
       <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard
-          title="Active Subscribers"
+          title={t('cms.newsletter.statSubscribers')}
           value={totalLabel}
           trend="0%"
           trendType="neutral"
@@ -257,17 +268,17 @@ export default function CmsNewsletterPage() {
           sparklineData={[0, 0, 0, 0, 0]}
         />
         <StatCard
-          title="Digest sends"
+          title={t('cms.newsletter.statDigests')}
           value={String(history.filter((h) => h.status === 'SENT').length)}
-          trend="Episode of the Day"
+          trend={t('cms.newsletter.episodeTitle')}
           trendType="neutral"
           icon={BookOpen}
           sparklineData={[0, 0, 0, 0]}
         />
         <StatCard
-          title="Average Open Rate"
+          title={t('cms.newsletter.statOpenRate')}
           value="—"
-          trend="via Resend later"
+          trend={t('cms.newsletter.statOpenHint')}
           trendType="neutral"
           icon={TrendingUp}
           sparklineData={[0, 0, 0, 0]}
@@ -280,31 +291,33 @@ export default function CmsNewsletterPage() {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by email…"
+            placeholder={t('cms.newsletter.searchPlaceholder')}
             className="w-full rounded-xl border border-[#E8E4DC] bg-white py-2.5 pl-10 pr-3 text-sm outline-none focus:border-[#0C2686]"
           />
         </div>
       </div>
 
       {listQuery.isLoading && (
-        <CmsCard className="p-8 text-sm text-stone-600">Loading subscribers…</CmsCard>
+        <CmsCard className="p-8 text-sm text-stone-600">
+          {t('cms.newsletter.loading')}
+        </CmsCard>
       )}
 
       {listQuery.isError && (
         <CmsCard className="p-8 text-sm text-rose-700">
-          Failed to load subscribers. {(listQuery.error as Error).message}
+          {t('cms.newsletter.loadFailed')} {(listQuery.error as Error).message}
         </CmsCard>
       )}
 
       {!listQuery.isLoading && !listQuery.isError && total === 0 && !debouncedQuery && (
         <CmsCard className="p-8 text-sm text-stone-600">
-          No subscribers yet. Emails from the homepage newsletter form will appear here.
+          {t('cms.newsletter.empty')}
         </CmsCard>
       )}
 
       {!listQuery.isLoading && !listQuery.isError && total === 0 && Boolean(debouncedQuery) && (
         <CmsCard className="p-8 text-sm text-stone-600">
-          No subscribers match your search.
+          {t('cms.newsletter.empty')}
         </CmsCard>
       )}
 
@@ -314,9 +327,9 @@ export default function CmsNewsletterPage() {
             <table className="w-full min-w-[560px] text-left text-sm">
               <thead className="border-b border-[#E8E4DC] bg-stone-50 text-xs uppercase tracking-wider text-stone-500">
                 <tr>
-                  <th className="px-4 py-3">Email</th>
+                  <th className="px-4 py-3">{t('cms.newsletter.colEmail')}</th>
                   <th className="px-4 py-3">Source</th>
-                  <th className="px-4 py-3">Subscribed</th>
+                  <th className="px-4 py-3">{t('cms.newsletter.colJoined')}</th>
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
@@ -336,14 +349,20 @@ export default function CmsNewsletterPage() {
                         type="button"
                         disabled={deleteMutation.isPending}
                         onClick={() => {
-                          if (window.confirm(`Remove ${item.email}?`)) {
+                          if (
+                            window.confirm(
+                              t('cms.newsletter.removeConfirm', {
+                                email: item.email,
+                              }),
+                            )
+                          ) {
                             deleteMutation.mutate(item.id)
                           }
                         }}
                         className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-50 disabled:opacity-50"
                       >
                         <Trash2 className="size-3.5" />
-                        Remove
+                        {t('cms.newsletter.remove')}
                       </button>
                     </td>
                   </tr>
@@ -357,12 +376,14 @@ export default function CmsNewsletterPage() {
       {total > 0 && (
         <div className="mt-6 flex flex-col gap-4 rounded-2xl border border-[#E8E4DC] bg-white px-4 py-3 shadow-2xs sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs font-medium text-stone-600">
-            Showing {from}–{to} of {total}
+            {t('cms.common.showing', { from, to, total })}
           </p>
 
           <div className="flex flex-wrap items-center gap-4">
             <div className="flex min-w-[140px] items-center gap-3">
-              <span className="shrink-0 text-xs font-medium text-stone-600">Per page</span>
+              <span className="shrink-0 text-xs font-medium text-stone-600">
+                {t('cms.common.perPage')}
+              </span>
               <JournalSelect
                 name="pageSize"
                 value={String(pageSize)}
@@ -385,7 +406,7 @@ export default function CmsNewsletterPage() {
                 className="inline-flex items-center gap-1 rounded-xl border border-[#E8E4DC] bg-stone-50 px-2.5 py-1.5 text-xs font-semibold text-stone-700 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <ChevronLeft className="size-3.5" />
-                Prev
+                {t('cms.common.prev')}
               </button>
 
               {pageNumbers.map((num) => (
@@ -411,13 +432,13 @@ export default function CmsNewsletterPage() {
                 disabled={page >= totalPages || listQuery.isFetching}
                 className="inline-flex items-center gap-1 rounded-xl border border-[#E8E4DC] bg-stone-50 px-2.5 py-1.5 text-xs font-semibold text-stone-700 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
               >
-                Next
+                {t('cms.common.next')}
                 <ChevronRight className="size-3.5" />
               </button>
             </div>
 
             <p className="text-xs font-medium text-stone-500">
-              Page {page} of {totalPages}
+              {t('cms.common.pageOf', { page, totalPages })}
             </p>
           </div>
         </div>

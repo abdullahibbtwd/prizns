@@ -610,7 +610,7 @@ export default function CmsProductsPage() {
               <tr key={product.id} className="border-b border-[#E8E4DC]/70">
                 <td className="px-4 py-3 font-medium">{product.titleBg}</td>
                 <td className="px-4 py-3">
-                  {(product.priceCents / 100).toFixed(2)} BGN
+                  {(product.priceCents / 100).toFixed(2)} EUR
                 </td>
                 <td className="px-4 py-3">
                   <input

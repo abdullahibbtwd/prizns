@@ -1,5 +1,5 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { NavLink, Link, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
@@ -23,6 +23,7 @@ import {
   Library,
   Layers,
   Mail,
+  MessageCircle,
   Bot,
   Tags,
   ExternalLink,
@@ -32,12 +33,15 @@ import {
   Minus,
   Sparkle,
   X,
+  Award,
+  Trophy,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { cmsStories, cmsAuthors, cmsSubmissions } from '@/cms/data/mock'
+import { cmsGlobalSearch } from '@/lib/cms-search-api'
 import { listCmsArticles } from '@/lib/articles-api'
 import { listCmsAuthors, listCmsSeries } from '@/lib/cms-content-api'
 import { useAuth } from '@/lib/auth'
+import { pickLang } from '@/lib/pick-lang'
 
 export interface CmsNavItem {
   labelKey: string
@@ -74,7 +78,10 @@ export const cmsNavGroups: CmsNavGroup[] = [
       { labelKey: 'cms.nav.submissions', to: '/cms/submissions', icon: PenLine },
       { labelKey: 'cms.nav.donations', to: '/cms/donations', icon: HeartHandshake },
       { labelKey: 'cms.nav.partnerships', to: '/cms/partnerships', icon: Handshake },
+      { labelKey: 'cms.nav.contact', to: '/cms/contact', icon: MessageCircle },
       { labelKey: 'cms.nav.newsletter', to: '/cms/newsletter', icon: Mail },
+      { labelKey: 'cms.nav.badges', to: '/cms/badges', icon: Award },
+      { labelKey: 'cms.nav.storyYear', to: '/cms/story-year', icon: Trophy },
     ],
   },
   {
@@ -375,7 +382,9 @@ export function StatusPill({ status }: { status: string }) {
     won: { style: 'bg-emerald-50 text-emerald-800 border-emerald-200/80', dot: 'bg-emerald-500' },
     lost: { style: 'bg-stone-100 text-stone-500 border-stone-200', dot: 'bg-stone-400' },
     closed: { style: 'bg-stone-100 text-stone-500 border-stone-200', dot: 'bg-stone-400' },
+    replied: { style: 'bg-sky-50 text-sky-800 border-sky-200/80', dot: 'bg-sky-500' },
     cancelled: { style: 'bg-stone-100 text-stone-500 border-stone-200', dot: 'bg-stone-400' },
+    open: { style: 'bg-emerald-50 text-emerald-800 border-emerald-200/80', dot: 'bg-emerald-500 animate-pulse' },
   }
 
   const current = map[key] ?? {
@@ -569,41 +578,70 @@ export function QuickSearchModal({
   isOpen: boolean
   onClose: () => void
 }) {
+  const { t, i18n } = useTranslation()
+  const lang = i18n.language === 'en' ? 'en' : 'bg'
   const [query, setQuery] = useState('')
+  const [debounced, setDebounced] = useState('')
   const navigate = useNavigate()
 
-  if (!isOpen) return null
+  useEffect(() => {
+    if (!isOpen) {
+      setQuery('')
+      setDebounced('')
+    }
+  }, [isOpen])
 
-  const filteredStories = cmsStories.filter(
-    (s) =>
-      s.title.toLowerCase().includes(query.toLowerCase()) ||
-      s.author.toLowerCase().includes(query.toLowerCase()),
-  )
-  const filteredSubmissions = cmsSubmissions.filter((sub) =>
-    sub.title.toLowerCase().includes(query.toLowerCase()),
-  )
-  const filteredAuthors = cmsAuthors.filter((a) =>
-    a.name.toLowerCase().includes(query.toLowerCase()),
-  )
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebounced(query.trim()), 250)
+    return () => window.clearTimeout(timer)
+  }, [query])
+
+  const enabled = isOpen && debounced.length >= 2
+  const searchQuery = useQuery({
+    queryKey: ['cms-global-search', debounced],
+    queryFn: () => cmsGlobalSearch(debounced),
+    enabled,
+    placeholderData: (prev) => prev,
+  })
+
+  if (!isOpen) return null
 
   const handleSelect = (url: string) => {
     navigate(url)
     onClose()
   }
 
+  const data = searchQuery.data
+  const hasResults =
+    (data?.stories.length ?? 0) +
+      (data?.authors.length ?? 0) +
+      (data?.submissions.length ?? 0) +
+      (data?.tags.length ?? 0) >
+    0
+
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 px-4 bg-stone-900/60 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="relative w-full max-w-2xl rounded-2xl border border-[#E8E4DC] bg-white shadow-2xl overflow-hidden">
-        <div className="flex items-center gap-3 border-b border-[#E8E4DC] px-4 py-3.5 bg-[#FAF8F3]">
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center bg-stone-900/60 px-4 pt-20 backdrop-blur-xs animate-in fade-in duration-200"
+      onClick={onClose}
+      role="presentation"
+    >
+      <div
+        className="relative w-full max-w-2xl overflow-hidden rounded-2xl border border-[#E8E4DC] bg-white shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+      >
+        <div className="flex items-center gap-3 border-b border-[#E8E4DC] bg-[#FAF8F3] px-4 py-3.5">
           <Search className="size-5 text-[#0C2686]" />
           <input
             autoFocus
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search stories, authors, submissions, places..."
+            placeholder={t('cms.quickSearch.placeholder')}
             className="flex-1 bg-transparent text-base font-medium text-stone-900 outline-none placeholder:text-stone-400"
           />
           <button
+            type="button"
             onClick={onClose}
             className="rounded-lg p-1 text-stone-400 hover:bg-stone-200 hover:text-stone-800"
           >
@@ -611,90 +649,167 @@ export function QuickSearchModal({
           </button>
         </div>
 
-        <div className="max-h-[60vh] overflow-y-auto p-4 space-y-4">
-          {query.trim() === '' ? (
-            <div className="text-center py-8 text-stone-600">
-              <Sparkles className="size-8 mx-auto text-[#0C2686]/40 mb-2" />
-              <p className="text-sm font-medium">Type to search the editorial database</p>
-              <p className="text-xs text-stone-400 mt-1">
-                Quick jump to stories, drafts, submissions, authors, or places
+        <div className="max-h-[60vh] space-y-4 overflow-y-auto p-4">
+          {debounced.length < 2 ? (
+            <div className="py-8 text-center text-stone-600">
+              <Sparkles className="mx-auto mb-2 size-8 text-[#0C2686]/40" />
+              <p className="text-sm font-medium">
+                {t('cms.quickSearch.emptyHint')}
+              </p>
+              <p className="mt-1 text-xs text-stone-400">
+                {t('cms.quickSearch.emptyBody')}
               </p>
             </div>
+          ) : searchQuery.isFetching && !data ? (
+            <p className="py-8 text-center text-sm text-stone-500">
+              {t('cms.quickSearch.loading')}
+            </p>
+          ) : !hasResults ? (
+            <p className="py-8 text-center text-sm text-stone-500">
+              {t('cms.quickSearch.noResults', { q: debounced })}
+            </p>
           ) : (
             <>
-              {filteredStories.length > 0 && (
+              {(data?.stories.length ?? 0) > 0 && (
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-stone-600 mb-2">
-                    Stories ({filteredStories.length})
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-stone-600">
+                    {t('cms.quickSearch.stories', {
+                      count: data!.stories.length,
+                    })}
                   </p>
                   <div className="space-y-1">
-                    {filteredStories.map((story) => (
-                      <div
+                    {data!.stories.map((story) => (
+                      <button
                         key={story.id}
-                        onClick={() => handleSelect(`/cms/stories/${story.id}`)}
-                        className="flex items-center justify-between p-2.5 rounded-xl hover:bg-stone-100 cursor-pointer transition-colors"
+                        type="button"
+                        onClick={() =>
+                          handleSelect(`/cms/stories/${story.id}`)
+                        }
+                        className="flex w-full items-center justify-between rounded-xl p-2.5 text-left transition-colors hover:bg-stone-100"
                       >
-                        <div className="flex items-center gap-3">
-                          <BookOpen className="size-4 text-[#0C2686]" />
-                          <div>
-                            <p className="text-sm font-semibold text-stone-900">{story.title}</p>
-                            <p className="text-xs text-stone-600">{story.author} · {story.category}</p>
+                        <div className="flex min-w-0 items-center gap-3">
+                          <BookOpen className="size-4 shrink-0 text-[#0C2686]" />
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold text-stone-900">
+                              {pickLang(lang, story.titleEn, story.titleBg)}
+                            </p>
+                            <p className="truncate text-xs text-stone-600">
+                              {pickLang(
+                                lang,
+                                story.authorEn,
+                                story.authorBg,
+                              ) || '—'}{' '}
+                              · {story.categoryBg}
+                            </p>
                           </div>
                         </div>
                         <StatusPill status={story.status} />
-                      </div>
+                      </button>
                     ))}
                   </div>
                 </div>
               )}
 
-              {filteredSubmissions.length > 0 && (
+              {(data?.submissions.length ?? 0) > 0 && (
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-stone-600 mb-2">
-                    Submissions ({filteredSubmissions.length})
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-stone-600">
+                    {t('cms.quickSearch.submissions', {
+                      count: data!.submissions.length,
+                    })}
                   </p>
                   <div className="space-y-1">
-                    {filteredSubmissions.map((sub) => (
-                      <div
+                    {data!.submissions.map((sub) => (
+                      <button
                         key={sub.id}
-                        onClick={() => handleSelect(`/cms/submissions`)}
-                        className="flex items-center justify-between p-2.5 rounded-xl hover:bg-stone-100 cursor-pointer transition-colors"
+                        type="button"
+                        onClick={() =>
+                          handleSelect(`/cms/submissions/${sub.id}`)
+                        }
+                        className="flex w-full items-center justify-between rounded-xl p-2.5 text-left transition-colors hover:bg-stone-100"
                       >
-                        <div className="flex items-center gap-3">
-                          <PenLine className="size-4 text-amber-600" />
-                          <div>
-                            <p className="text-sm font-semibold text-stone-900">{sub.title}</p>
-                            <p className="text-xs text-stone-600">{sub.name} · {sub.village}</p>
+                        <div className="flex min-w-0 items-center gap-3">
+                          <PenLine className="size-4 shrink-0 text-amber-600" />
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold text-stone-900">
+                              {sub.title}
+                            </p>
+                            <p className="truncate text-xs text-stone-600">
+                              {sub.name} · {sub.place}
+                            </p>
                           </div>
                         </div>
                         <StatusPill status={sub.status} />
-                      </div>
+                      </button>
                     ))}
                   </div>
                 </div>
               )}
 
-              {filteredAuthors.length > 0 && (
+              {(data?.authors.length ?? 0) > 0 && (
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-stone-600 mb-2">
-                    Authors ({filteredAuthors.length})
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-stone-600">
+                    {t('cms.quickSearch.authors', {
+                      count: data!.authors.length,
+                    })}
                   </p>
                   <div className="space-y-1">
-                    {filteredAuthors.map((author) => (
-                      <div
+                    {data!.authors.map((author) => (
+                      <button
                         key={author.id}
-                        onClick={() => handleSelect(`/cms/authors`)}
-                        className="flex items-center justify-between p-2.5 rounded-xl hover:bg-stone-100 cursor-pointer transition-colors"
+                        type="button"
+                        onClick={() =>
+                          handleSelect(`/cms/authors/${author.id}`)
+                        }
+                        className="flex w-full items-center justify-between rounded-xl p-2.5 text-left transition-colors hover:bg-stone-100"
                       >
-                        <div className="flex items-center gap-3">
-                          <Users className="size-4 text-violet-600" />
-                          <div>
-                            <p className="text-sm font-semibold text-stone-900">{author.name}</p>
-                            <p className="text-xs text-stone-600">{author.role} · {author.location}</p>
+                        <div className="flex min-w-0 items-center gap-3">
+                          <Users className="size-4 shrink-0 text-violet-600" />
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold text-stone-900">
+                              {pickLang(lang, author.nameEn, author.nameBg)}
+                            </p>
+                            <p className="truncate text-xs text-stone-600">
+                              {pickLang(lang, author.roleEn, author.roleBg)} ·{' '}
+                              {author.locationBg}
+                            </p>
                           </div>
                         </div>
-                        <span className="text-xs font-semibold text-stone-500">{author.stories} stories</span>
-                      </div>
+                        <span className="shrink-0 text-xs font-semibold text-stone-500">
+                          {t('cms.quickSearch.storiesCount', {
+                            count: author.stories,
+                          })}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {(data?.tags.length ?? 0) > 0 && (
+                <div>
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-stone-600">
+                    {t('cms.quickSearch.tags', { count: data!.tags.length })}
+                  </p>
+                  <div className="space-y-1">
+                    {data!.tags.map((tag) => (
+                      <button
+                        key={tag.id}
+                        type="button"
+                        onClick={() => handleSelect('/cms/tags')}
+                        className="flex w-full items-center justify-between rounded-xl p-2.5 text-left transition-colors hover:bg-stone-100"
+                      >
+                        <div className="flex min-w-0 items-center gap-3">
+                          <Tags className="size-4 shrink-0 text-emerald-700" />
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold text-stone-900">
+                              {pickLang(lang, tag.nameEn, tag.nameBg)}
+                            </p>
+                            <p className="truncate text-xs text-stone-600">
+                              {tag.kind} · /{tag.slug}
+                            </p>
+                          </div>
+                        </div>
+                      </button>
                     ))}
                   </div>
                 </div>

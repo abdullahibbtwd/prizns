@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import {
@@ -25,6 +26,9 @@ import {
 } from './section.util';
 import { ensureUniqueSlug } from '../common/slug.util';
 import { StorageService } from '../storage/storage.service';
+import { BadgesService } from '../badges/badges.service';
+import { DigestService } from '../digest/digest.service';
+import { AiService } from '../ai/ai.service';
 
 type GalleryMedia = {
   id: string;
@@ -61,10 +65,33 @@ type ArticleWithRelations = Article & {
 
 @Injectable()
 export class ArticlesService {
+  private readonly logger = new Logger(ArticlesService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
+    private readonly badges: BadgesService,
+    private readonly digest: DigestService,
+    private readonly ai: AiService,
   ) {}
+
+  /** Non-blocking Episode of the Day when a published series story lands. */
+  private queueEpisodeDigest(articleId: string, status: string) {
+    if (status !== ArticleStatus.PUBLISHED) return;
+    void this.digest.trySendForPublishedArticle(articleId).catch((error) => {
+      this.logger.error(
+        `Episode digest queue error for ${articleId}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    });
+  }
+
+  /** Refresh Gemini embedding for semantic related (no-op if AI off). */
+  private queueArticleEmbed(articleId: string, status: string) {
+    if (status !== ArticleStatus.PUBLISHED) return;
+    void this.ai.enqueueEmbed(articleId);
+  }
 
   private mediaUrl(
     media: { key: string; url: string } | null | undefined,
@@ -571,6 +598,67 @@ export class ArticlesService {
     });
     if (!current) throw new NotFoundException('Article not found');
 
+    const currentEmbedding = AiService.parseEmbedding(current.embedding);
+    if (currentEmbedding) {
+      const semantic = await this.listRelatedSemantic(
+        current.id,
+        currentEmbedding,
+        take,
+      );
+      if (semantic.length > 0) return semantic;
+    }
+
+    return this.listRelatedByTags(current, take);
+  }
+
+  /** Cosine similarity over published articles that already have embeddings. */
+  private async listRelatedSemantic(
+    articleId: string,
+    currentEmbedding: number[],
+    take: number,
+  ) {
+    const candidates = await this.prisma.article.findMany({
+      where: {
+        status: ArticleStatus.PUBLISHED,
+        id: { not: articleId },
+        embedding: { not: Prisma.DbNull },
+      },
+      include: this.include,
+      orderBy: [{ publishedAt: 'desc' }, { updatedAt: 'desc' }],
+      take: 80,
+    });
+
+    const scored = candidates
+      .map((row) => {
+        const vector = AiService.parseEmbedding(row.embedding);
+        if (!vector) return { row, score: 0 };
+        return {
+          row,
+          score: AiService.cosineSimilarity(currentEmbedding, vector),
+        };
+      })
+      .filter((item) => item.score >= 0.35)
+      .sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        const aTime = a.row.publishedAt?.getTime() ?? 0;
+        const bTime = b.row.publishedAt?.getTime() ?? 0;
+        return bTime - aTime;
+      })
+      .slice(0, take);
+
+    return scored.map((item) => this.toPublicDto(item.row));
+  }
+
+  private async listRelatedByTags(
+    current: {
+      id: string;
+      section: Article['section'];
+      authorId: string | null;
+      articleTags: Array<{ tagId: string; tag: Tag }>;
+      seriesEpisodes?: Array<{ seriesId: string }>;
+    },
+    take: number,
+  ) {
     const tagIds = current.articleTags.map((row) => row.tagId);
     const tagKindById = new Map(
       current.articleTags.map((row) => [row.tagId, row.tag.kind]),
@@ -806,6 +894,17 @@ export class ArticlesService {
     }
 
     await this.syncSeriesMembership(row.id, dto.seriesId);
+    if (
+      (dto.status ?? ArticleStatus.DRAFT) === ArticleStatus.PUBLISHED &&
+      dto.authorId
+    ) {
+      await this.badges.evaluateAuthor(dto.authorId);
+    }
+    this.queueEpisodeDigest(
+      row.id,
+      dto.status ?? ArticleStatus.DRAFT,
+    );
+    this.queueArticleEmbed(row.id, dto.status ?? ArticleStatus.DRAFT);
     return this.getCmsById(row.id);
   }
 
@@ -973,7 +1072,14 @@ export class ArticlesService {
     }
 
     await this.syncSeriesMembership(id, dto.seriesId);
-    return this.getCmsById(id);
+    const result = await this.getCmsById(id);
+    const authorId = result.authorId ?? dto.authorId ?? existing.authorId;
+    if (result.status === ArticleStatus.PUBLISHED && authorId) {
+      await this.badges.evaluateAuthor(authorId);
+    }
+    this.queueEpisodeDigest(id, result.status);
+    this.queueArticleEmbed(id, result.status);
+    return result;
   }
 
   async remove(id: string) {

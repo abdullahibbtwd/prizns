@@ -17,6 +17,8 @@ import { JournalShell } from '@/components/concept-3/JournalShell'
 import { Logo } from '@/components/Logo'
 import { PageMeta } from '@/components/PageMeta'
 import { SponsoredBadge } from '@/components/concept-3/SponsoredBadge'
+import { SupportThisStory } from '@/components/concept-3/SupportThisStory'
+import { RegionalContextExplainer } from '@/components/concept-3/RegionalContextExplainer'
 import { getAuthorForArticle } from '@/data/concept-3/authors'
 import type { ArticleBlock, JournalArticle } from '@/data/concept-3/articleTypes'
 import type { JournalLang } from '@/components/concept-3/JournalShell'
@@ -30,6 +32,12 @@ import {
 import type { CmsArticle } from '@/lib/cms-types'
 import { useAnalyticsMeta } from '@/hooks/usePageAnalytics'
 import { ensureReactionVisitorKey } from '@/lib/cookie-consent'
+import { useReaderAuth } from '@/lib/reader-auth'
+import {
+  getSaveStatus,
+  saveArticle,
+  unsaveArticle,
+} from '@/lib/reader-api'
 
 function pick(lang: JournalLang, en: string, bg: string) {
   return lang === 'bg' ? bg : en
@@ -263,15 +271,36 @@ function ArticleContent({
   const { t } = useTranslation()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const { reader, enabled: readerAuthEnabled, openSignIn } = useReaderAuth()
   const [readingProgress, setReadingProgress] = useState(0)
   const [relateCount, setRelateCount] = useState(initialRelateCount)
   const [hasRelated, setHasRelated] = useState(initialHasRelated)
+  const [saved, setSaved] = useState(false)
   const author = getAuthorForArticle(article)
+  const articleId = article.sourceId
 
   useEffect(() => {
     setRelateCount(initialRelateCount)
     setHasRelated(initialHasRelated)
   }, [article.slug, initialRelateCount, initialHasRelated])
+
+  useEffect(() => {
+    if (!reader || !articleId || !readerAuthEnabled) {
+      setSaved(false)
+      return
+    }
+    let cancelled = false
+    void getSaveStatus(articleId)
+      .then((result) => {
+        if (!cancelled) setSaved(result.saved)
+      })
+      .catch(() => {
+        if (!cancelled) setSaved(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [reader, articleId, readerAuthEnabled, article.slug])
 
   const relateMutation = useMutation({
     mutationFn: () =>
@@ -284,6 +313,34 @@ function ArticleContent({
       })
     },
   })
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      if (!articleId) throw new Error('Missing article')
+      if (saved) {
+        await unsaveArticle(articleId)
+        return false
+      }
+      await saveArticle(articleId)
+      return true
+    },
+    onSuccess: (next) => {
+      setSaved(next)
+      void queryClient.invalidateQueries({ queryKey: ['reader-saves'] })
+    },
+  })
+
+  const handleBookmark = () => {
+    if (!articleId || !readerAuthEnabled) return
+    if (!reader) {
+      openSignIn({
+        intent: { type: 'save', articleId },
+        returnUrl: window.location.pathname + window.location.search,
+      })
+      return
+    }
+    saveMutation.mutate()
+  }
 
   useEffect(() => {
     const onScroll = () => {
@@ -365,10 +422,15 @@ function ArticleContent({
             </button>
             <button
               type="button"
-              className="cursor-pointer rounded-full p-2 text-[#1A1A1A]/60 transition-colors hover:bg-black/5 hover:text-[#0C2686]"
-              aria-label={t('bookmark')}
+              onClick={handleBookmark}
+              disabled={saveMutation.isPending || !readerAuthEnabled}
+              className="cursor-pointer rounded-full p-2 text-[#1A1A1A]/60 transition-colors hover:bg-black/5 hover:text-[#0C2686] disabled:opacity-40"
+              aria-label={saved ? t('bookmarkSaved') : t('bookmark')}
+              title={saved ? t('bookmarkSaved') : t('bookmark')}
             >
-              <Bookmark className="size-4 stroke-[1.5]" />
+              <Bookmark
+                className={`size-4 stroke-[1.5] ${saved ? 'fill-[#0C2686] text-[#0C2686]' : ''}`}
+              />
             </button>
             <button
               type="button"
@@ -574,6 +636,14 @@ function ArticleContent({
             </p>
           </aside>
         ) : null}
+
+        <RegionalContextExplainer
+          section={section}
+          slug={article.slug}
+          lang={lang}
+        />
+
+        <SupportThisStory articleId={articleId} lang={lang} />
 
         <div className="mt-16 border-t border-[#EAE6DF] pt-12 text-center">
           <span className="mb-4 block font-heading text-3xl uppercase tracking-[0.2em] text-[#1A1A1A]/30">

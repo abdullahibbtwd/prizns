@@ -1,6 +1,6 @@
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowLeft, ArrowRight, MapPin, PenLine } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Award, MapPin, PenLine } from 'lucide-react'
 import { JournalShell } from '@/components/concept-3/JournalShell'
 import { Logo } from '@/components/Logo'
 import type { JournalAuthor } from '@/data/concept-3/authors'
@@ -10,8 +10,13 @@ import { useJournalLang } from '@/hooks/useJournalLang'
 import { listPublicArticles } from '@/lib/articles-api'
 import { getPublicAuthor } from '@/lib/public-content'
 
-function pick(lang: JournalLang, en: string, bg: string) {
-  return lang === 'bg' ? bg : en
+function pick(
+  lang: JournalLang,
+  en: string | null | undefined,
+  bg: string | null | undefined,
+) {
+  if (lang === 'bg') return (bg || en || '').trim()
+  return (en || bg || '').trim()
 }
 
 function AuthorContent({
@@ -114,6 +119,25 @@ function AuthorContent({
                   ? 'published story'
                   : 'published stories'}
             </p>
+
+            {(author.badges?.length ?? 0) > 0 && (
+              <div className="mt-8 flex flex-wrap gap-2">
+                {author.badges!.map((badge) => (
+                  <span
+                    key={badge.id}
+                    title={pick(
+                      lang,
+                      badge.descriptionEn,
+                      badge.descriptionBg,
+                    )}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-[#0C2686]/20 bg-[#0C2686]/5 px-3 py-1.5 font-sans text-[10px] uppercase tracking-widest text-[#0C2686]"
+                  >
+                    <Award className="size-3" />
+                    {pick(lang, badge.nameEn, badge.nameBg)}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         </section>
 
@@ -219,6 +243,7 @@ export default function AuthorPage() {
         bio: apiAuthor.bio,
         bioBg: apiAuthor.bioBg,
         aliases: apiAuthor.aliases,
+        badges: apiAuthor.badges,
       }
     : undefined
 

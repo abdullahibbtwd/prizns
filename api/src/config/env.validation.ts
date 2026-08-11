@@ -152,6 +152,10 @@ class EnvironmentVariables {
   GEMINI_MODEL?: string;
 
   @IsOptional()
+  @IsString()
+  GEMINI_EMBEDDING_MODEL?: string;
+
+  @IsOptional()
   @IsBooleanString()
   FEATURE_AI?: string;
 
@@ -170,6 +174,10 @@ class EnvironmentVariables {
   @IsOptional()
   @IsBooleanString()
   FEATURE_SHOP?: string;
+
+  @IsOptional()
+  @IsBooleanString()
+  FEATURE_READER_AUTH?: string;
 
   @IsOptional()
   @IsString()

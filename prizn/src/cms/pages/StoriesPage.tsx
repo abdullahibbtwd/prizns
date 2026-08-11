@@ -453,24 +453,26 @@ export default function CmsStoriesPage() {
           </p>
 
           <div className="flex flex-wrap items-center gap-3">
-            <label className="flex items-center gap-2 text-xs font-medium text-stone-600">
-              {t('cms.stories.perPage')}
-              <select
-                value={pageSize}
-                onChange={(e) =>
+            <div className="flex min-w-[140px] items-center gap-3">
+              <span className="shrink-0 text-xs font-medium text-stone-600">
+                {t('cms.stories.perPage')}
+              </span>
+              <JournalSelect
+                name="storiesPageSize"
+                variant="boxed"
+                value={String(pageSize)}
+                onChange={(value) =>
                   setPageSize(
-                    Number(e.target.value) as (typeof PAGE_SIZE_OPTIONS)[number],
+                    Number(value) as (typeof PAGE_SIZE_OPTIONS)[number],
                   )
                 }
-                className="rounded-lg border border-[#E8E4DC] bg-stone-50 px-2 py-1.5 text-xs font-semibold text-stone-900 outline-none focus:border-[#0C2686]"
-              >
-                {PAGE_SIZE_OPTIONS.map((size) => (
-                  <option key={size} value={size}>
-                    {size}
-                  </option>
-                ))}
-              </select>
-            </label>
+                options={PAGE_SIZE_OPTIONS.map((size) => ({
+                  value: String(size),
+                  label: String(size),
+                }))}
+                className="min-w-[88px] flex-1"
+              />
+            </div>
 
             <div className="flex items-center gap-1">
               <button

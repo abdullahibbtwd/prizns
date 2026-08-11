@@ -14,6 +14,8 @@ import CmsSubmissionsPage from '@/cms/pages/SubmissionsPage'
 import CmsSubmissionDetailPage from '@/cms/pages/SubmissionDetailPage'
 import CmsDonationsPage from '@/cms/pages/DonationsPage'
 import CmsPartnershipsPage from '@/cms/pages/PartnershipsPage'
+import CmsContactPage from '@/cms/pages/ContactPage'
+import CmsContactDetailPage from '@/cms/pages/ContactDetailPage'
 import CmsNewsletterPage from '@/cms/pages/NewsletterPage'
 import CmsTagsPage from '@/cms/pages/TagsPage'
 import CmsUsersPage from '@/cms/pages/UsersPage'
@@ -28,6 +30,8 @@ import {
 } from '@/cms/pages/ContentPages'
 import CmsProductsPage from '@/cms/pages/ProductsPage'
 import CmsOrdersPage from '@/cms/pages/OrdersPage'
+import CmsBadgesPage from '@/cms/pages/BadgesPage'
+import CmsStoryYearPage from '@/cms/pages/StoryYearPage'
 
 export default function CmsApp() {
   return (
@@ -50,7 +54,11 @@ export default function CmsApp() {
             <Route path="submissions/:id" element={<CmsSubmissionDetailPage />} />
             <Route path="donations" element={<CmsDonationsPage />} />
             <Route path="partnerships" element={<CmsPartnershipsPage />} />
+            <Route path="contact" element={<CmsContactPage />} />
+            <Route path="contact/:id" element={<CmsContactDetailPage />} />
             <Route path="newsletter" element={<CmsNewsletterPage />} />
+            <Route path="badges" element={<CmsBadgesPage />} />
+            <Route path="story-year" element={<CmsStoryYearPage />} />
             <Route path="social" element={<CmsSocialPage />} />
             <Route path="seo" element={<CmsSeoPage />} />
             <Route path="analytics" element={<CmsAnalyticsPage />} />

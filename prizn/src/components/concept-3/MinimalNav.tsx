@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { Search, X, Globe, Menu, Heart, ChevronDown, PenLine, Handshake } from 'lucide-react'
+import { Search, X, Globe, Menu, Heart, ChevronDown, PenLine, Handshake, Bookmark } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Logo } from '@/components/Logo'
 import { cn } from '@/lib/utils'
@@ -9,6 +9,7 @@ import {
   getPrimaryNavLinks,
   getTertiaryNavLinks,
 } from '@/data/concept-3/nav'
+import { useReaderAuth } from '@/lib/reader-auth'
 
 interface MinimalNavProps {
   lang: 'bg' | 'en'
@@ -24,6 +25,7 @@ export function MinimalNav({ lang, setLang, variant = 'hero' }: MinimalNavProps)
   const [contributeOpen, setContributeOpen] = useState(false)
   const contributeRef = useRef<HTMLDivElement>(null)
   const isSolid = variant === 'solid' || scrolled
+  const { reader, enabled: readerAuthEnabled, openSignIn } = useReaderAuth()
 
   useEffect(() => {
     if (variant === 'solid') {
@@ -78,6 +80,20 @@ export function MinimalNav({ lang, setLang, variant = 'hero' }: MinimalNavProps)
     ...mobileSecondary,
     ...contributeLinks.map(({ label, href }) => ({ label, to: href })),
     { label: lang === 'bg' ? 'Защо Prizni' : 'Why Prizni', to: '/why-prizni' },
+    ...(readerAuthEnabled
+      ? [
+          {
+            label: reader
+              ? lang === 'bg'
+                ? 'Запазени'
+                : 'Saved'
+              : lang === 'bg'
+                ? 'Вход'
+                : 'Sign in',
+            to: reader ? '/me' : '#signin',
+          },
+        ]
+      : []),
   ]
 
   const searchSuggestions = [
@@ -214,6 +230,39 @@ export function MinimalNav({ lang, setLang, variant = 'hero' }: MinimalNavProps)
               </AnimatePresence>
             </div>
 
+            {readerAuthEnabled && (
+              reader ? (
+                <Link
+                  to="/me"
+                  className={cn(
+                    'hidden items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[11px] font-sans uppercase tracking-[0.16em] transition-colors sm:inline-flex',
+                    isSolid
+                      ? 'text-[#1A1A1A]/70 hover:text-[#0C2686] hover:bg-black/5'
+                      : 'text-white/85 hover:text-white hover:bg-white/10',
+                  )}
+                  aria-label={lang === 'bg' ? 'Запазени' : 'Saved'}
+                >
+                  <Bookmark className="size-3.5 stroke-[1.5]" />
+                  <span className="hidden lg:inline">
+                    {lang === 'bg' ? 'Запазени' : 'Saved'}
+                  </span>
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => openSignIn({ returnUrl: '/me' })}
+                  className={cn(
+                    'hidden cursor-pointer items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[11px] font-sans uppercase tracking-[0.16em] transition-colors sm:inline-flex',
+                    isSolid
+                      ? 'text-[#1A1A1A]/70 hover:text-[#0C2686] hover:bg-black/5'
+                      : 'text-white/85 hover:text-white hover:bg-white/10',
+                  )}
+                >
+                  {lang === 'bg' ? 'Вход' : 'Sign in'}
+                </button>
+              )
+            )}
+
             <button
               onClick={() => setLang(lang === 'bg' ? 'en' : 'bg')}
               className={cn(
@@ -250,16 +299,30 @@ export function MinimalNav({ lang, setLang, variant = 'hero' }: MinimalNavProps)
             className="fixed inset-x-0 top-[70px] z-30 max-h-[calc(100svh-70px)] overflow-y-auto bg-[#FDFBF7] border-b border-[#EAE6DF] px-8 py-8 shadow-xl md:hidden"
           >
             <div className="flex flex-col gap-5 text-center">
-              {mobileLinks.map((link) => (
-                <Link
-                  key={link.to}
-                  to={link.to}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="font-heading text-xl tracking-widest text-journal-ink hover:text-journal-navy"
-                >
-                  {link.label}
-                </Link>
-              ))}
+              {mobileLinks.map((link) =>
+                link.to === '#signin' ? (
+                  <button
+                    key={link.to}
+                    type="button"
+                    onClick={() => {
+                      setMobileMenuOpen(false)
+                      openSignIn({ returnUrl: '/me' })
+                    }}
+                    className="cursor-pointer font-heading text-xl tracking-widest text-journal-ink hover:text-journal-navy"
+                  >
+                    {link.label}
+                  </button>
+                ) : (
+                  <Link
+                    key={link.to}
+                    to={link.to}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="font-heading text-xl tracking-widest text-journal-ink hover:text-journal-navy"
+                  >
+                    {link.label}
+                  </Link>
+                ),
+              )}
 
               <div className="mt-2 flex flex-col gap-3 border-t border-[#EAE6DF] pt-5">
                 <button

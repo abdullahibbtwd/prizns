@@ -9,6 +9,7 @@ import { ArticlesModule } from './articles/articles.module';
 import { AuthModule } from './auth/auth.module';
 import { AuthorsModule } from './authors/authors.module';
 import { validateEnv } from './config/env.validation';
+import { BadgesModule } from './badges/badges.module';
 import { DigestModule } from './digest/digest.module';
 import { DonationsModule } from './donations/donations.module';
 import { HealthModule } from './health/health.module';
@@ -17,13 +18,17 @@ import { MailModule } from './mail/mail.module';
 import { MediaModule } from './media/media.module';
 import { NewsletterModule } from './newsletter/newsletter.module';
 import { PartnershipsModule } from './partnerships/partnerships.module';
+import { ContactModule } from './contact/contact.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { ReaderAuthModule } from './reader-auth/reader-auth.module';
+import { ReaderModule } from './reader/reader.module';
 import { RedisModule } from './redis/redis.module';
 import { SeoModule } from './seo/seo.module';
 import { SeriesModule } from './series/series.module';
 import { ShopModule } from './shop/shop.module';
 import { SocialModule } from './social/social.module';
 import { StorageModule } from './storage/storage.module';
+import { StoryYearModule } from './story-year/story-year.module';
 import { SubmissionsModule } from './submissions/submissions.module';
 import { TagsModule } from './tags/tags.module';
 import { TodosModule } from './todos/todos.module';
@@ -45,6 +50,10 @@ import { UsersModule } from './users/users.module';
     RedisModule,
     JobsModule,
     AuthModule,
+    ReaderAuthModule,
+    ReaderModule,
+    BadgesModule,
+    StoryYearModule,
     AuthorsModule,
     MediaModule,
     ArticlesModule,
@@ -52,6 +61,7 @@ import { UsersModule } from './users/users.module';
     TagsModule,
     SubmissionsModule,
     PartnershipsModule,
+    ContactModule,
     NewsletterModule,
     DonationsModule,
     ShopModule,

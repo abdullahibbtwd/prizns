@@ -41,6 +41,21 @@ enum PartnershipStatus {
   CLOSED
 }
 
+enum ContactInquiryStatus {
+  NEW
+  REVIEW
+  REPLIED
+  CLOSED
+}
+
+enum ContactInquiryCategory {
+  BUSINESS
+  STORY_TIP
+  SPAM
+  GENERAL
+  UNKNOWN
+}
+
 enum DonationStatus {
   PENDING
   COMPLETED
@@ -149,6 +164,7 @@ model Author {
   createdAt         DateTime          @default(now()) @map("created_at")
   updatedAt         DateTime          @updatedAt @map("updated_at")
   articles          Article[]
+  badges            AuthorBadge[]
 
   @@map("authors")
 }
@@ -240,6 +256,9 @@ model Article {
   sourceLang        String?              @map("source_lang")
   narrationStatus   NarrationStatus      @default(IDLE) @map("narration_status")
   narrationError    String?              @map("narration_error")
+  /** Gemini text embedding (float vector) for semantic related articles. */
+  embedding         Json?
+  embeddingUpdatedAt DateTime?           @map("embedding_updated_at")
   authorId          String?              @map("author_id")
   author            Author?              @relation(fields: [authorId], references: [id], onDelete: SetNull)
   heroMediaId       String?              @map("hero_media_id")
@@ -254,6 +273,9 @@ model Article {
   reactions         ArticleReaction[]
   socialPosts       SocialPost[]
   digestSends       EpisodeDigestSend[]
+  savedBy           SavedArticle[]
+  storyYearNominations StoryYearNomination[]
+  donations         Donation[]
   createdAt         DateTime             @default(now()) @map("created_at")
   updatedAt         DateTime             @updatedAt @map("updated_at")
 
@@ -263,7 +285,7 @@ model Article {
   @@map("articles")
 }
 
-/** Soft engagement — anonymous “I Relate” (no reader accounts). */
+/** Soft engagement — anonymous “I Relate” (reader accounts optional later). */
 model ArticleReaction {
   id         String   @id @default(cuid())
   articleId  String   @map("article_id")
@@ -324,6 +346,28 @@ model PartnershipInquiry {
   @@map("partnership_inquiries")
 }
 
+model ContactInquiry {
+  id             String                  @id @default(cuid())
+  name           String
+  email          String
+  subject        String
+  message        String
+  honeypot       String?                 @map("honeypot")
+  status         ContactInquiryStatus    @default(NEW)
+  notes          String?
+  aiCategory     ContactInquiryCategory? @map("ai_category")
+  aiSummary      String?                 @map("ai_summary")
+  classifiedAt   DateTime?               @map("classified_at")
+  autoRepliedAt  DateTime?               @map("auto_replied_at")
+  createdAt      DateTime                @default(now()) @map("created_at")
+  updatedAt      DateTime                @updatedAt @map("updated_at")
+
+  @@index([status, createdAt])
+  @@index([aiCategory, createdAt])
+  @@index([email])
+  @@map("contact_inquiries")
+}
+
 model Donation {
   id               String         @id @default(cuid())
   amountCents      Int            @map("amount_cents")
@@ -331,12 +375,15 @@ model Donation {
   status           DonationStatus @default(PENDING)
   email            String?
   name             String?
+  articleId        String?        @map("article_id")
+  article          Article?       @relation(fields: [articleId], references: [id], onDelete: SetNull)
   stripeSessionId  String?        @unique @map("stripe_session_id")
   stripePaymentIntentId String?   @map("stripe_payment_intent_id")
   createdAt        DateTime       @default(now()) @map("created_at")
   updatedAt        DateTime       @updatedAt @map("updated_at")
 
   @@index([status, createdAt])
+  @@index([articleId])
   @@map("donations")
 }
 
@@ -367,7 +414,7 @@ model Product {
   descriptionBg       String      @default("") @map("description_bg")
   descriptionEn       String?     @map("description_en")
   priceCents          Int         @map("price_cents")
-  currency            String      @default("bgn")
+  currency            String      @default("eur")
   stock               Int         @default(0)
   active              Boolean     @default(true)
   /** Allow cash / pay on delivery for this product. */
@@ -411,7 +458,7 @@ model ShopOrder {
   status                ShopOrderStatus   @default(PENDING)
   paymentMethod         ShopPaymentMethod @default(STRIPE) @map("payment_method")
   totalCents            Int               @map("total_cents")
-  currency              String            @default("bgn")
+  currency              String            @default("eur")
   estimatedArrival      String?           @map("estimated_arrival")
   shippingName          String?           @map("shipping_name")
   shippingLine1         String?           @map("shipping_line1")
@@ -612,15 +659,83 @@ model EditorialTodo {
   @@map("editorial_todos")
 }
 
+/** Public reader identity (Magic Link) — separate from staff User. */
+model Reader {
+  id           String               @id @default(cuid())
+  email        String               @unique
+  name         String?
+  locale       String?
+  lastLoginAt  DateTime?            @map("last_login_at")
+  createdAt    DateTime             @default(now()) @map("created_at")
+  updatedAt    DateTime             @updatedAt @map("updated_at")
+  magicLinks   MagicLinkToken[]
+  refreshTokens ReaderRefreshToken[]
+  savedArticles SavedArticle[]
+  analyticsSessions AnalyticsSession[]
+  storyYearVotes StoryYearVote[]
+
+  @@map("readers")
+}
+
+model MagicLinkToken {
+  id         String    @id @default(cuid())
+  readerId   String    @map("reader_id")
+  reader     Reader    @relation(fields: [readerId], references: [id], onDelete: Cascade)
+  tokenHash  String    @unique @map("token_hash")
+  expiresAt  DateTime  @map("expires_at")
+  consumedAt DateTime? @map("consumed_at")
+  intent     Json?
+  returnUrl  String?   @map("return_url")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@index([readerId])
+  @@index([expiresAt])
+  @@map("magic_link_tokens")
+}
+
+model ReaderRefreshToken {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique @map("token_hash")
+  sessionId String    @map("session_id")
+  readerId  String    @map("reader_id")
+  reader    Reader    @relation(fields: [readerId], references: [id], onDelete: Cascade)
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  userAgent String?   @map("user_agent")
+  ip        String?
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([readerId])
+  @@index([sessionId])
+  @@map("reader_refresh_tokens")
+}
+
+model SavedArticle {
+  id        String   @id @default(cuid())
+  readerId  String   @map("reader_id")
+  reader    Reader   @relation(fields: [readerId], references: [id], onDelete: Cascade)
+  articleId String   @map("article_id")
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([readerId, articleId])
+  @@index([readerId, createdAt])
+  @@index([articleId])
+  @@map("saved_articles")
+}
+
 model AnalyticsSession {
   id         String     @id @default(cuid())
   visitorKey String     @map("visitor_key")
+  readerId   String?    @map("reader_id")
+  reader     Reader?    @relation(fields: [readerId], references: [id], onDelete: SetNull)
   startedAt  DateTime   @default(now()) @map("started_at")
   lastSeenAt DateTime   @default(now()) @map("last_seen_at")
   userAgent  String?    @map("user_agent")
   pageViews  PageView[]
 
   @@index([visitorKey, startedAt])
+  @@index([readerId, startedAt])
   @@index([startedAt])
   @@map("analytics_sessions")
 }
@@ -646,4 +761,97 @@ model PageView {
   @@index([sessionId])
   @@index([utmSource, startedAt])
   @@map("page_views")
+}
+
+enum StoryYearCampaignStatus {
+  DRAFT
+  OPEN
+  CLOSED
+}
+
+/** Contributor achievement badges (e.g. Chronicler after N published stories). */
+model Badge {
+  id           String        @id @default(cuid())
+  slug         String        @unique
+  nameBg       String        @map("name_bg")
+  nameEn       String?       @map("name_en")
+  descriptionBg String       @default("") @map("description_bg")
+  descriptionEn String?      @map("description_en")
+  /** Lucide-friendly key or short label shown in UI */
+  icon         String        @default("award")
+  /** Auto-award when author reaches this many PUBLISHED articles. Null = manual only. */
+  minPublished Int?          @map("min_published")
+  isActive     Boolean       @default(true) @map("is_active")
+  sortOrder    Int           @default(0) @map("sort_order")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+  authors      AuthorBadge[]
+
+  @@index([isActive, sortOrder])
+  @@map("badges")
+}
+
+model AuthorBadge {
+  id        String   @id @default(cuid())
+  authorId  String   @map("author_id")
+  author    Author   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  badgeId   String   @map("badge_id")
+  badge     Badge    @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+  awardedAt DateTime @default(now()) @map("awarded_at")
+  /** auto | manual */
+  source    String   @default("auto")
+
+  @@unique([authorId, badgeId])
+  @@index([badgeId])
+  @@map("author_badges")
+}
+
+model StoryYearCampaign {
+  id             String                   @id @default(cuid())
+  year           Int                      @unique
+  titleBg        String                   @map("title_bg")
+  titleEn        String?                  @map("title_en")
+  descriptionBg  String                   @default("") @map("description_bg")
+  descriptionEn  String?                  @map("description_en")
+  status         StoryYearCampaignStatus  @default(DRAFT)
+  opensAt        DateTime?                @map("opens_at")
+  closesAt       DateTime?                @map("closes_at")
+  createdAt      DateTime                 @default(now()) @map("created_at")
+  updatedAt      DateTime                 @updatedAt @map("updated_at")
+  nominations    StoryYearNomination[]
+  votes          StoryYearVote[]
+
+  @@map("story_year_campaigns")
+}
+
+model StoryYearNomination {
+  id         String            @id @default(cuid())
+  campaignId String            @map("campaign_id")
+  campaign   StoryYearCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  articleId  String            @map("article_id")
+  article    Article           @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  sortOrder  Int               @default(0) @map("sort_order")
+  createdAt  DateTime          @default(now()) @map("created_at")
+  votes      StoryYearVote[]
+
+  @@unique([campaignId, articleId])
+  @@index([campaignId, sortOrder])
+  @@map("story_year_nominations")
+}
+
+model StoryYearVote {
+  id            String              @id @default(cuid())
+  campaignId    String              @map("campaign_id")
+  campaign      StoryYearCampaign   @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  nominationId  String              @map("nomination_id")
+  nomination    StoryYearNomination @relation(fields: [nominationId], references: [id], onDelete: Cascade)
+  articleId     String              @map("article_id")
+  readerId      String              @map("reader_id")
+  reader        Reader              @relation(fields: [readerId], references: [id], onDelete: Cascade)
+  createdAt     DateTime            @default(now()) @map("created_at")
+
+  @@unique([campaignId, readerId])
+  @@index([nominationId])
+  @@index([articleId])
+  @@map("story_year_votes")
 }

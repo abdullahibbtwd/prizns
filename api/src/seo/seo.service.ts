@@ -15,6 +15,7 @@ const STATIC_ROUTES = [
   '/write-for-us',
   '/support',
   '/partnerships',
+  '/story-of-the-year',
 ] as const;
 
 const SITE_NAME = 'Prizni';
@@ -93,12 +94,152 @@ export class SeoService {
     return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${body}\n</urlset>\n`;
   }
 
+  private async publishedFeedArticles() {
+    return this.prisma.article.findMany({
+      where: { status: ArticleStatus.PUBLISHED },
+      select: {
+        id: true,
+        path: true,
+        titleBg: true,
+        titleEn: true,
+        subtitleBg: true,
+        subtitleEn: true,
+        seoDescriptionBg: true,
+        seoDescriptionEn: true,
+        publishedAt: true,
+        updatedAt: true,
+        author: { select: { nameBg: true, nameEn: true } },
+        heroMedia: { select: { url: true } },
+      },
+      orderBy: { publishedAt: 'desc' },
+      take: 50,
+    });
+  }
+
+  private articleAbsUrl(path: string): string {
+    const base = this.siteUrl();
+    const normalized = path.startsWith('/') ? path : `/${path}`;
+    return `${base}${normalized}`;
+  }
+
+  private articleTitle(row: {
+    titleEn: string | null;
+    titleBg: string;
+  }): string {
+    return (row.titleEn?.trim() || row.titleBg).trim();
+  }
+
+  private articleDescription(row: {
+    seoDescriptionEn: string | null;
+    seoDescriptionBg: string | null;
+    subtitleEn: string | null;
+    subtitleBg: string;
+  }): string {
+    return (
+      row.seoDescriptionEn?.trim() ||
+      row.seoDescriptionBg?.trim() ||
+      row.subtitleEn?.trim() ||
+      row.subtitleBg.trim() ||
+      DEFAULT_DESCRIPTION
+    );
+  }
+
+  /** RSS 2.0 — thin syndication wrapper over published stories. */
+  async rssXml(): Promise<string> {
+    const base = this.siteUrl();
+    const articles = await this.publishedFeedArticles();
+    const lastBuild = (
+      articles[0]?.publishedAt ??
+      articles[0]?.updatedAt ??
+      new Date()
+    ).toUTCString();
+
+    const items = articles
+      .map((article) => {
+        const link = this.articleAbsUrl(article.path);
+        const title = this.escapeXml(this.articleTitle(article));
+        const description = this.escapeXml(this.articleDescription(article));
+        const pubDate = (
+          article.publishedAt ??
+          article.updatedAt
+        ).toUTCString();
+        const author =
+          article.author?.nameEn?.trim() ||
+          article.author?.nameBg?.trim() ||
+          SITE_NAME;
+        const enclosure = article.heroMedia?.url?.trim()
+          ? `\n      <enclosure url="${this.escapeXml(article.heroMedia.url.trim())}" type="image/jpeg" />`
+          : '';
+        return `    <item>
+      <title>${title}</title>
+      <link>${this.escapeXml(link)}</link>
+      <guid isPermaLink="true">${this.escapeXml(link)}</guid>
+      <pubDate>${pubDate}</pubDate>
+      <description>${description}</description>
+      <author>${this.escapeXml(author)}</author>${enclosure}
+    </item>`;
+      })
+      .join('\n');
+
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>${SITE_NAME}</title>
+    <link>${this.escapeXml(base)}</link>
+    <description>${this.escapeXml(DEFAULT_DESCRIPTION)}</description>
+    <language>bg</language>
+    <lastBuildDate>${lastBuild}</lastBuildDate>
+    <atom:link href="${this.escapeXml(`${base}/feed.xml`)}" rel="self" type="application/rss+xml" />
+${items}
+  </channel>
+</rss>
+`;
+  }
+
+  /** JSON Feed 1.1 — partner-friendly sibling of RSS. */
+  async jsonFeed(): Promise<string> {
+    const base = this.siteUrl();
+    const articles = await this.publishedFeedArticles();
+    const feed = {
+      version: 'https://jsonfeed.org/version/1.1',
+      title: SITE_NAME,
+      home_page_url: base,
+      feed_url: `${base}/feed.json`,
+      description: DEFAULT_DESCRIPTION,
+      language: 'bg',
+      items: articles.map((article) => {
+        const url = this.articleAbsUrl(article.path);
+        const title = this.articleTitle(article);
+        const summary = this.articleDescription(article);
+        const authorName =
+          article.author?.nameEn?.trim() ||
+          article.author?.nameBg?.trim() ||
+          undefined;
+        return {
+          id: article.id,
+          url,
+          title,
+          summary,
+          date_published: (
+            article.publishedAt ?? article.updatedAt
+          ).toISOString(),
+          date_modified: article.updatedAt.toISOString(),
+          authors: authorName ? [{ name: authorName }] : undefined,
+          image: article.heroMedia?.url?.trim() || undefined,
+        };
+      }),
+    };
+    return `${JSON.stringify(feed, null, 2)}\n`;
+  }
+
   robotsTxt(): string {
     const base = this.siteUrl();
     return [
       'User-agent: *',
       'Allow: /',
       `Sitemap: ${base}/sitemap.xml`,
+      `# RSS: ${base}/feed.xml`,
+      `# JSON Feed: ${base}/feed.json`,
       '',
     ].join('\n');
   }

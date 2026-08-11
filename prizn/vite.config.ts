@@ -25,6 +25,21 @@ export default defineConfig(({ mode }) => {
           target: `http://localhost:${env.API_PORT || 3003}`,
           changeOrigin: true,
         },
+        '/feed.xml': {
+          target: `http://localhost:${env.API_PORT || 3003}`,
+          changeOrigin: true,
+          rewrite: (p) => `/api${p}`,
+        },
+        '/feed.json': {
+          target: `http://localhost:${env.API_PORT || 3003}`,
+          changeOrigin: true,
+          rewrite: (p) => `/api${p}`,
+        },
+        '/sitemap.xml': {
+          target: `http://localhost:${env.API_PORT || 3003}`,
+          changeOrigin: true,
+          rewrite: (p) => `/api${p}`,
+        },
       },
     },
   }

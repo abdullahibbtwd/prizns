@@ -78,6 +78,63 @@ export class DigestService {
     }))
   }
 
+  /**
+   * Fire-and-forget Episode of the Day when a series story is published.
+   * Skips when FEATURE_DIGEST is off, mail missing, not in an ACTIVE series,
+   * or already SENT. Never throws to the caller.
+   */
+  async trySendForPublishedArticle(articleId: string): Promise<void> {
+    const flag = this.config
+      .get<string>('FEATURE_DIGEST')
+      ?.trim()
+      .toLowerCase()
+    if (flag === 'false' || flag === '0') return
+
+    if (!this.mail.isConfigured()) {
+      this.logger.warn(
+        `Skip auto digest for ${articleId}: RESEND not configured`,
+      )
+      return
+    }
+
+    const membership = await this.prisma.seriesEpisode.findFirst({
+      where: {
+        articleId,
+        article: { status: ArticleStatus.PUBLISHED },
+        series: { status: SeriesStatus.ACTIVE },
+      },
+      select: { seriesId: true, articleId: true },
+    })
+    if (!membership) return
+
+    const already = await this.prisma.episodeDigestSend.findUnique({
+      where: {
+        seriesId_articleId: {
+          seriesId: membership.seriesId,
+          articleId: membership.articleId,
+        },
+      },
+      select: { status: true },
+    })
+    if (already?.status === DigestSendStatus.SENT) return
+
+    try {
+      const result = await this.sendNow({
+        seriesId: membership.seriesId,
+        articleId: membership.articleId,
+      })
+      this.logger.log(
+        `Auto Episode of the Day sent for article ${articleId} → ${result.recipientCount} subscribers`,
+      )
+    } catch (error: unknown) {
+      this.logger.error(
+        `Auto digest failed for ${articleId}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      )
+    }
+  }
+
   async sendNow(dto: SendDigestDto) {
     if (!this.mail.isConfigured()) {
       throw new ServiceUnavailableException(

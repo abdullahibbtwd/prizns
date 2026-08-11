@@ -14,6 +14,7 @@ import { WriteForUsSection } from '@/components/concept-3/WriteForUsSection'
 import { ShopWithUsSection } from '@/components/concept-3/ShopWithUsSection'
 import { SupportSection } from '@/components/concept-3/SupportSection'
 import { NewsletterSection } from '@/components/concept-3/NewsletterSection'
+import { StoryYearSection } from '@/components/concept-3/StoryYearSection'
 
 export default function HomePage() {
   return (
@@ -37,6 +38,7 @@ export default function HomePage() {
           <EditorialHero lang={lang} />
           <EditorsLetter lang={lang} />
           <FeaturedStoryCard lang={lang} />
+          <StoryYearSection lang={lang} />
           <OurPlacesSection lang={lang} />
           <HumanStoriesSection lang={lang} />
           <AuthorsSection lang={lang} />

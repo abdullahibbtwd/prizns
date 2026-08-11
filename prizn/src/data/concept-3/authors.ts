@@ -18,6 +18,14 @@ export interface JournalAuthor {
   bioBg: string
   /** Extra bylines that should resolve to this author */
   aliases?: string[]
+  badges?: Array<{
+    id: string
+    slug: string
+    nameBg: string
+    nameEn: string | null
+    descriptionBg: string
+    descriptionEn: string | null
+  }>
 }
 
 export const journalAuthors: JournalAuthor[] = [

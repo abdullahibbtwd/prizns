@@ -13,6 +13,20 @@ export class SeoController {
     res.type('text/xml').send(xml);
   }
 
+  @Get('feed.xml')
+  @Header('Content-Type', 'application/rss+xml; charset=utf-8')
+  async rss(@Res() res: Response) {
+    const xml = await this.seo.rssXml();
+    res.type('application/rss+xml').send(xml);
+  }
+
+  @Get('feed.json')
+  @Header('Content-Type', 'application/feed+json; charset=utf-8')
+  async jsonFeed(@Res() res: Response) {
+    const json = await this.seo.jsonFeed();
+    res.type('application/feed+json').send(json);
+  }
+
   @Get('robots.txt')
   @Header('Content-Type', 'text/plain; charset=utf-8')
   robots(@Res() res: Response) {

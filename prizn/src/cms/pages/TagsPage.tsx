@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { Tags, Trash2 } from 'lucide-react'
 import {
   CmsCard,
@@ -21,13 +22,10 @@ import {
   type TagKind,
 } from '@/lib/tags-api'
 
-const KIND_OPTIONS: Array<{ value: TagKind; label: string; hint: string }> = [
-  { value: 'LOCATION', label: 'Location', hint: 'Village or town' },
-  { value: 'TOPIC', label: 'Topic', hint: 'Crafts, food, memory…' },
-  { value: 'CATEGORY', label: 'Category', hint: 'Editorial grouping' },
-]
+const KIND_VALUES: TagKind[] = ['LOCATION', 'TOPIC', 'CATEGORY']
 
 export default function CmsTagsPage() {
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
   const [kind, setKind] = useState<TagKind>('LOCATION')
   const [nameBg, setNameBg] = useState('')
@@ -37,6 +35,30 @@ export default function CmsTagsPage() {
     variant: 'success' | 'error'
     message: string
   }>({ open: false, variant: 'success', message: '' })
+
+  const kindOptions = useMemo(
+    () => [
+      {
+        value: 'LOCATION' as const,
+        label: t('cms.tags.kindLocation'),
+        hint: t('cms.tags.kindLocationHint'),
+      },
+      {
+        value: 'TOPIC' as const,
+        label: t('cms.tags.kindTopic'),
+        hint: t('cms.tags.kindTopicHint'),
+      },
+      {
+        value: 'CATEGORY' as const,
+        label: t('cms.tags.kindCategory'),
+        hint: t('cms.tags.kindCategoryHint'),
+      },
+    ],
+    [t],
+  )
+
+  const kindLabel = (value: TagKind) =>
+    kindOptions.find((o) => o.value === value)?.label ?? value
 
   const listQuery = useQuery({
     queryKey: ['cms-tags', filterKind || 'all'],
@@ -65,13 +87,13 @@ export default function CmsTagsPage() {
     onSuccess: async () => {
       setNameBg('')
       await queryClient.invalidateQueries({ queryKey: ['cms-tags'] })
-      setToast({ open: true, variant: 'success', message: 'Tag created.' })
+      setToast({ open: true, variant: 'success', message: t('cms.tags.created') })
     },
     onError: (err: Error) => {
       setToast({
         open: true,
         variant: 'error',
-        message: err.message || 'Failed to create tag.',
+        message: err.message || t('cms.tags.createFailed'),
       })
     },
   })
@@ -80,13 +102,13 @@ export default function CmsTagsPage() {
     mutationFn: (id: string) => deleteCmsTag(id),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['cms-tags'] })
-      setToast({ open: true, variant: 'success', message: 'Tag deleted.' })
+      setToast({ open: true, variant: 'success', message: t('cms.tags.deleted') })
     },
     onError: (err: Error) => {
       setToast({
         open: true,
         variant: 'error',
-        message: err.message || 'Failed to delete tag.',
+        message: err.message || t('cms.tags.deleteFailed'),
       })
     },
   })
@@ -94,27 +116,27 @@ export default function CmsTagsPage() {
   return (
     <div>
       <CmsPageHeader
-        title="Tags"
-        description="Create location, topic, and category tags. Attach them to stories in the story editor."
-        badge={`${tags.length} tags`}
+        title={t('cms.tags.title')}
+        description={t('cms.tags.description')}
+        badge={t('cms.tags.badge', { count: tags.length })}
       />
 
       <Alert
         open={toast.open}
         variant={toast.variant}
         message={toast.message}
-        onClose={() => setToast((t) => ({ ...t, open: false }))}
+        onClose={() => setToast((prev) => ({ ...prev, open: false }))}
       />
 
       <CmsCard className="mb-6 space-y-5 p-5">
         <h2 className="flex items-center gap-2 text-sm font-semibold text-stone-800">
           <Tags className="size-4 text-[#0C2686]" />
-          Create tag
+          {t('cms.tags.createTitle')}
         </h2>
 
-        <CmsField label="Kind">
+        <CmsField label={t('cms.tags.kind')}>
           <CmsRadioGroup className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-            {KIND_OPTIONS.map((option) => (
+            {kindOptions.map((option) => (
               <CmsRadio
                 key={option.value}
                 name="tag-kind"
@@ -128,11 +150,11 @@ export default function CmsTagsPage() {
         </CmsField>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_auto]">
-          <CmsField label="Name">
+          <CmsField label={t('cms.tags.name')}>
             <CmsInput
               value={nameBg}
               onChange={(e) => setNameBg(e.target.value)}
-              placeholder="e.g. Лом or Lom"
+              placeholder={t('cms.tags.namePlaceholder')}
             />
           </CmsField>
           <div className="flex items-end">
@@ -142,22 +164,24 @@ export default function CmsTagsPage() {
               onClick={() => createMutation.mutate()}
               className="w-full md:min-w-[7.5rem]"
             >
-              {createMutation.isPending ? 'Saving…' : 'Create'}
+              {createMutation.isPending
+                ? t('cms.common.saving')
+                : t('cms.common.create')}
             </PrimaryButton>
           </div>
         </div>
       </CmsCard>
 
       <div className="mb-4 max-w-xs">
-        <CmsField label="Filter">
+        <CmsField label={t('cms.tags.filter')}>
           <JournalSelect
             name="filterKind"
             variant="boxed"
-            label="Filter"
-            placeholder="All kinds"
+            label={t('cms.tags.filter')}
+            placeholder={t('cms.tags.allKinds')}
             options={[
-              { value: '', label: 'All kinds' },
-              ...KIND_OPTIONS.map(({ value, label }) => ({ value, label })),
+              { value: '', label: t('cms.tags.allKinds') },
+              ...kindOptions.map(({ value, label }) => ({ value, label })),
             ]}
             value={filterKind}
             onChange={(value) => setFilterKind(value as TagKind | '')}
@@ -166,20 +190,22 @@ export default function CmsTagsPage() {
       </div>
 
       {listQuery.isLoading ? (
-        <CmsCard className="p-6 text-sm text-stone-500">Loading tags…</CmsCard>
+        <CmsCard className="p-6 text-sm text-stone-500">
+          {t('cms.tags.loading')}
+        </CmsCard>
       ) : tags.length === 0 ? (
         <CmsCard className="p-6 text-sm text-stone-500">
-          No tags yet. Create the first one above.
+          {t('cms.tags.empty')}
         </CmsCard>
       ) : (
         <div className="space-y-4">
-          {(Object.keys(grouped) as TagKind[]).map((groupKind) => {
+          {KIND_VALUES.map((groupKind) => {
             const items = grouped[groupKind]
             if (!items.length) return null
             return (
               <CmsCard key={groupKind} className="overflow-hidden p-0">
                 <div className="border-b border-[#E8E4DC] bg-stone-50 px-4 py-3 text-xs font-semibold uppercase tracking-wider text-stone-500">
-                  {groupKind}
+                  {kindLabel(groupKind)}
                 </div>
                 <ul className="divide-y divide-[#E8E4DC]/70">
                   {items.map((tag) => (
@@ -199,11 +225,17 @@ export default function CmsTagsPage() {
                         type="button"
                         className="rounded-lg border border-[#E8E4DC] p-2 text-stone-500 transition-colors hover:border-rose-200 hover:text-rose-600"
                         onClick={() => {
-                          if (window.confirm(`Delete tag “${tag.nameBg}”?`)) {
+                          if (
+                            window.confirm(
+                              t('cms.tags.deleteConfirm', { name: tag.nameBg }),
+                            )
+                          ) {
                             deleteMutation.mutate(tag.id)
                           }
                         }}
-                        aria-label={`Delete ${tag.nameBg}`}
+                        aria-label={t('cms.tags.deleteConfirm', {
+                          name: tag.nameBg,
+                        })}
                       >
                         <Trash2 className="size-4" />
                       </button>

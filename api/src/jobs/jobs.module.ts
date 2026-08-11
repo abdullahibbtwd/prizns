@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { BullModule } from '@nestjs/bullmq'
+import { AiModule } from '../ai/ai.module'
 import { TranslationModule } from '../translation/translation.module'
 import { TtsModule } from '../tts/tts.module'
 import {
@@ -13,6 +14,7 @@ import {
 import { JobsService } from './jobs.service'
 import { TranslateProcessor } from './translate.processor'
 import { TtsProcessor } from './tts.processor'
+import { EmbedProcessor } from './embed.processor'
 
 @Module({
   imports: [
@@ -40,8 +42,9 @@ import { TtsProcessor } from './tts.processor'
     ),
     TranslationModule,
     TtsModule,
+    AiModule,
   ],
-  providers: [JobsService, TranslateProcessor, TtsProcessor],
+  providers: [JobsService, TranslateProcessor, TtsProcessor, EmbedProcessor],
   exports: [JobsService, BullModule],
 })
 export class JobsModule {}
