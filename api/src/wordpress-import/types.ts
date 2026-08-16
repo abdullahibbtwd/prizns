@@ -66,6 +66,8 @@ export type WpInlineImage = {
   src: string;
   caption: string;
   alt: string;
+  /** Relative path inside an export package, e.g. `images/abc-hero.jpg`. */
+  file?: string;
 };
 
 export type MappedWpArticle = {

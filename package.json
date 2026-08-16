@@ -14,6 +14,8 @@
     "prisma:seed": "npm run prisma:seed --prefix api",
     "import:wordpress": "npm run import:wordpress --prefix api",
     "import:wordpress:batch": "npm run import:wordpress:batch --prefix api",
+    "import:wordpress:export": "npm run import:wordpress:export --prefix api",
+    "import:wordpress:package": "npm run import:wordpress:package --prefix api",
     "test:web": "npm test --prefix prizn",
     "test:web:cov": "npm run test:cov --prefix prizn",
     "test:api": "npm test --prefix api",

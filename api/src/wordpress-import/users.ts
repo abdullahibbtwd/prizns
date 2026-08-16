@@ -9,6 +9,8 @@ export type MappedWpUser = {
   slug: string;
   bioBg: string | null;
   imageUrl: string | null;
+  /** Relative path inside an export package for a downloaded avatar. */
+  imageFile?: string;
   role: Role;
 };
 

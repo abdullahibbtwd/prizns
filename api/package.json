@@ -28,7 +28,9 @@
     "prisma:seed": "prisma db seed",
     "prisma:seed:build": "tsc -p tsconfig.seed.json",
     "import:wordpress": "node dist/wordpress-import/import-wordpress.js",
-    "import:wordpress:batch": "node dist/wordpress-import/import-wordpress.js --users --limit=20"
+    "import:wordpress:batch": "node dist/wordpress-import/import-wordpress.js --users --limit=20",
+    "import:wordpress:export": "ts-node --transpile-only src/wordpress-import/import-wordpress.ts --export=../wordpress-export --limit=20",
+    "import:wordpress:package": "node dist/wordpress-import/import-wordpress.js --package=../wordpress-export --users"
   },
   "prisma": {
     "seed": "node prisma/run-seed.cjs"

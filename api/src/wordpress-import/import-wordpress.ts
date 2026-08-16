@@ -1,25 +1,35 @@
 /**
  * Import WordPress REST users + posts into the current journal (Prisma + MinIO).
  *
- * Production / Coolify API container (already in /app, no ts-node):
+ * Local — fetch WP, write a migration package (no database):
+ *   npm run import:wordpress:export --prefix api -- --limit=20
+ *
+ * Coolify — import that package (no WordPress network):
+ *   node dist/wordpress-import/import-wordpress.js --package=/migration --users
+ *
+ * Live WP (only when the API can reach the site):
  *   node dist/wordpress-import/import-wordpress.js --users --limit=20
- *
- * Local (after api build, from repo root):
- *   npm run import:wordpress:batch
- *
- * Single post:
- *   node dist/wordpress-import/import-wordpress.js --slug=...
  */
 import { createHash } from 'crypto';
 import { setDefaultResultOrder } from 'dns';
 import { config } from 'dotenv';
-import { readFile } from 'fs/promises';
-import { resolve } from 'path';
+import { access, mkdir, readFile, writeFile } from 'fs/promises';
+import { dirname, join, relative, resolve, sep } from 'path';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient, type ArticleSection } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import * as Minio from 'minio';
 import { mapWpPost, parseWpPostsJson } from './map';
+import {
+  articleToExportJson,
+  buildWordpressPackage,
+  isWordpressPackage,
+  parseArticlesFile,
+  parseAuthorsJson,
+  parseCategoriesJson,
+  type PackagedAuthor,
+  type PackagedCategory,
+} from './package';
 import type { MappedWpArticle, WpInlineImage, WpPost, WpUser } from './types';
 import {
   mapWpUser,
@@ -49,6 +59,14 @@ type Flags = {
   translate?: boolean;
   'dry-run'?: boolean;
   'skip-media'?: boolean;
+  export?: string;
+  package?: string;
+  images?: string;
+};
+
+type MediaDirs = {
+  packageDir: string;
+  imagesDir: string;
 };
 
 function parseFlags(argv: string[]): Flags {
@@ -168,12 +186,61 @@ async function loadPosts(flags: Flags): Promise<WpPost[]> {
   return posts.slice(0, Number.isFinite(limit) ? limit : posts.length);
 }
 
+async function pathExists(path: string): Promise<boolean> {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function resolvePackagedImage(
+  file: string,
+  dirs: MediaDirs,
+): Promise<string> {
+  const name = file.replace(/^images[/\\]/, '');
+  const candidates = [
+    resolve(dirs.packageDir, file),
+    resolve(dirs.imagesDir, name),
+    resolve(dirs.imagesDir, file),
+  ];
+  for (const abs of candidates) {
+    const relPackage = relative(dirs.packageDir, abs);
+    const relImages = relative(dirs.imagesDir, abs);
+    const inside =
+      (!relPackage.startsWith('..') && !relPackage.startsWith(sep)) ||
+      (!relImages.startsWith('..') && !relImages.startsWith(sep));
+    if (!inside) continue;
+    if (await pathExists(abs)) return abs;
+  }
+  throw new Error(`Packaged image not found: ${file}`);
+}
+
+function uniqueImageName(src: string, used: Set<string>): string {
+  const base =
+    src.split('/').pop()?.split('?')[0]?.replace(/[^a-zA-Z0-9._-]/g, '') ||
+    'image.jpg';
+  const hash = createHash('sha1').update(src).digest('hex').slice(0, 8);
+  let name = `${hash}-${base}`;
+  let i = 2;
+  while (used.has(name)) {
+    name = `${hash}-${i}-${base}`;
+    i += 1;
+  }
+  return name;
+}
+
 function mediaKey(image: WpInlineImage, hintId?: number): string {
   const file =
     image.src.split('/').pop()?.split('?')[0]?.replace(/[^a-zA-Z0-9._-]/g, '') ||
+    image.file?.split(/[/\\]/).pop()?.replace(/[^a-zA-Z0-9._-]/g, '') ||
     'image.jpg';
   if (hintId) return `wp/${hintId}/${file}`;
-  const hash = createHash('sha1').update(image.src).digest('hex').slice(0, 12);
+  const hash = createHash('sha1')
+    .update(image.src || image.file || file)
+    .digest('hex')
+    .slice(0, 12);
   return `wp/url-${hash}/${file}`;
 }
 
@@ -214,25 +281,31 @@ function createMinio() {
 async function importImage(
   prisma: PrismaClient,
   image: WpInlineImage,
-  opts: { skipMedia: boolean; hintId?: number },
-): Promise<string | null> {
+  opts: { skipMedia: boolean; hintId?: number; mediaDirs?: MediaDirs },
+): Promise<{ id: string; url: string } | null> {
   const key = mediaKey(image, opts.hintId);
   const existing = await prisma.mediaAsset.findUnique({ where: { key } });
-  if (existing) return existing.id;
+  if (existing) return { id: existing.id, url: existing.url };
 
   const originalName = key.split('/').pop() ?? 'image.jpg';
-  let url = image.src;
+  let url = image.src || '';
   let size: number | null = null;
   let mimeType = mimeFromName(originalName);
 
   if (!opts.skipMedia) {
     const minio = createMinio();
     try {
-      const response = await fetch(image.src, { headers: { 'User-Agent': UA } });
-      if (!response.ok) throw new Error(`download ${response.status}`);
-      const buffer = Buffer.from(await response.arrayBuffer());
+      let buffer: Buffer;
+      if (image.file && opts.mediaDirs) {
+        buffer = await readFile(await resolvePackagedImage(image.file, opts.mediaDirs));
+        mimeType = mimeFromName(originalName, mimeType);
+      } else {
+        const response = await fetch(image.src, { headers: { 'User-Agent': UA } });
+        if (!response.ok) throw new Error(`download ${response.status}`);
+        buffer = Buffer.from(await response.arrayBuffer());
+        mimeType = response.headers.get('content-type')?.split(';')[0] || mimeType;
+      }
       size = buffer.length;
-      mimeType = response.headers.get('content-type')?.split(';')[0] || mimeType;
       if (minio) {
         await minio.client.putObject(minio.bucket, key, buffer, size, {
           'Content-Type': mimeType,
@@ -252,6 +325,9 @@ async function importImage(
         });
       }
     } catch (error) {
+      if (image.file && opts.mediaDirs) {
+        throw error;
+      }
       console.warn(
         `  media kept remote (${image.src}): ${
           error instanceof Error ? error.message : String(error)
@@ -272,7 +348,7 @@ async function importImage(
       creditBg: image.caption || null,
     },
   });
-  return created.id;
+  return { id: created.id, url: created.url };
 }
 
 async function upsertAuthor(
@@ -340,6 +416,7 @@ async function importWpUser(
     passwordHash: string;
     skipTranslate: boolean;
     adminEmail: string;
+    mediaDirs?: MediaDirs;
   },
 ): Promise<{ authorId: string; action: 'created' | 'linked' | 'skipped' }> {
   const alias = wpUserAlias(mapped.wpId);
@@ -409,6 +486,30 @@ async function importWpUser(
       });
 
   const action = existingUser ? 'linked' : 'created';
+
+  if (mapped.imageFile && opts.mediaDirs) {
+    const imported = await importImage(
+      prisma,
+      {
+        src: mapped.imageUrl || mapped.imageFile,
+        caption: '',
+        alt: mapped.name,
+        file: mapped.imageFile,
+      },
+      { skipMedia: false, mediaDirs: opts.mediaDirs, hintId: mapped.wpId },
+    );
+    if (imported) {
+      await prisma.author.update({
+        where: { id: author.id },
+        data: { imageUrl: imported.url },
+      });
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { imageUrl: imported.url },
+      });
+    }
+  }
+
   return { authorId: author.id, action };
 }
 
@@ -463,17 +564,24 @@ async function saveArticle(
     skipMedia: boolean;
     skipTranslate: boolean;
     authorsByWpId: Map<number, string>;
+    mediaDirs?: MediaDirs;
   },
 ) {
   const status = opts.draft ? 'DRAFT' : mapped.status;
   const author = await upsertAuthor(prisma, mapped, opts);
   const heroMediaId = mapped.heroImage
-    ? await importImage(prisma, mapped.heroImage, { skipMedia: opts.skipMedia })
+    ? (await importImage(prisma, mapped.heroImage, {
+        skipMedia: opts.skipMedia,
+        mediaDirs: opts.mediaDirs,
+      }))?.id ?? null
     : null;
   const galleryIds: string[] = [];
   for (const image of mapped.galleryImages) {
-    const id = await importImage(prisma, image, { skipMedia: opts.skipMedia });
-    if (id) galleryIds.push(id);
+    const imported = await importImage(prisma, image, {
+      skipMedia: opts.skipMedia,
+      mediaDirs: opts.mediaDirs,
+    });
+    if (imported) galleryIds.push(imported.id);
   }
 
   const data = {
@@ -528,6 +636,173 @@ async function saveArticle(
   return { id: row.id, action: existing ? ('updated' as const) : ('created' as const) };
 }
 
+async function upsertPackageCategories(
+  prisma: PrismaClient,
+  categories: PackagedCategory[],
+) {
+  for (const category of categories) {
+    await prisma.category.upsert({
+      where: { slug: category.slug },
+      update: {},
+      create: {
+        slug: category.slug,
+        nameBg: category.nameBg,
+        sourceLang: 'bg',
+        translationStatus: 'READY',
+      },
+    });
+  }
+}
+
+async function downloadToPackage(
+  src: string,
+  imagesDir: string,
+  used: Set<string>,
+): Promise<string | undefined> {
+  try {
+    const response = await fetch(src, { headers: { 'User-Agent': UA } });
+    if (!response.ok) throw new Error(`download ${response.status}`);
+    const buffer = Buffer.from(await response.arrayBuffer());
+    const name = uniqueImageName(src, used);
+    used.add(name);
+    await writeFile(join(imagesDir, name), buffer);
+    return `images/${name}`;
+  } catch (error) {
+    console.warn(
+      `  skip image ${src}: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    return undefined;
+  }
+}
+
+async function attachLocalImages(
+  articles: MappedWpArticle[],
+  authors: PackagedAuthor[],
+  imagesDir: string,
+) {
+  const used = new Set<string>();
+  const cache = new Map<string, string | undefined>();
+
+  const download = async (src: string) => {
+    if (!src) return undefined;
+    if (cache.has(src)) return cache.get(src);
+    const file = await downloadToPackage(src, imagesDir, used);
+    cache.set(src, file);
+    return file;
+  };
+
+  for (const article of articles) {
+    if (article.heroImage) {
+      const file = await download(article.heroImage.src);
+      if (file) article.heroImage = { ...article.heroImage, file };
+    }
+    article.galleryImages = await Promise.all(
+      article.galleryImages.map(async (image) => {
+        const file = await download(image.src);
+        return file ? { ...image, file } : image;
+      }),
+    );
+  }
+
+  for (const author of authors) {
+    if (!author.imageUrl) continue;
+    const file = await download(author.imageUrl);
+    if (file) author.imageFile = file;
+  }
+}
+
+function authorsFromArticles(articles: MappedWpArticle[]): PackagedAuthor[] {
+  const byKey = new Map<string, PackagedAuthor>();
+  for (const article of articles) {
+    const key = article.wpAuthorId
+      ? `id:${article.wpAuthorId}`
+      : `slug:${article.authorSlug}`;
+    if (byKey.has(key)) continue;
+    byKey.set(key, {
+      wpId: article.wpAuthorId ?? 0,
+      email: `${article.authorSlug}@imported.prizni.local`,
+      name: article.authorNameBg,
+      slug: article.authorSlug,
+      bioBg: article.authorBioBg,
+      imageUrl: null,
+      role: 'AUTHOR',
+    });
+  }
+  return [...byKey.values()];
+}
+
+async function writeExportPackage(
+  exportDir: string,
+  pkg: ReturnType<typeof buildWordpressPackage>,
+) {
+  await mkdir(join(exportDir, 'images'), { recursive: true });
+  await writeFile(
+    join(exportDir, 'articles.json'),
+    JSON.stringify(
+      {
+        version: pkg.version,
+        origin: pkg.origin,
+        exportedAt: pkg.exportedAt,
+        articles: pkg.articles.map(articleToExportJson),
+      },
+      null,
+      2,
+    ),
+  );
+  await writeFile(
+    join(exportDir, 'authors.json'),
+    JSON.stringify({ authors: pkg.authors }, null, 2),
+  );
+  await writeFile(
+    join(exportDir, 'categories.json'),
+    JSON.stringify({ categories: pkg.categories }, null, 2),
+  );
+}
+
+async function loadExportPackage(flags: Flags): Promise<{
+  packageDir: string;
+  imagesDir: string;
+  articles: MappedWpArticle[];
+  authors: PackagedAuthor[];
+  categories: PackagedCategory[];
+}> {
+  const packageDir = resolve(
+    flags.package || (flags.file ? dirname(flags.file) : ''),
+  );
+  const articlesPath = flags.file
+    ? resolve(flags.file)
+    : join(packageDir, 'articles.json');
+  const raw = JSON.parse(await readFile(articlesPath, 'utf8')) as unknown;
+  if (!isWordpressPackage(raw)) {
+    throw new Error(
+      `${articlesPath} is not a mapped export package. Create one with --export=./wordpress-export`,
+    );
+  }
+  const parsed = parseArticlesFile(raw);
+  let authors: PackagedAuthor[] = [];
+  const authorsPath = join(packageDir, 'authors.json');
+  if (await pathExists(authorsPath)) {
+    authors = parseAuthorsJson(
+      JSON.parse(await readFile(authorsPath, 'utf8')) as unknown,
+    );
+  }
+  let categories: PackagedCategory[] = [];
+  const categoriesPath = join(packageDir, 'categories.json');
+  if (await pathExists(categoriesPath)) {
+    categories = parseCategoriesJson(
+      JSON.parse(await readFile(categoriesPath, 'utf8')) as unknown,
+    );
+  }
+  const imagesDir = resolve(flags.images || join(packageDir, 'images'));
+  return {
+    packageDir,
+    imagesDir,
+    articles: parsed.articles,
+    authors,
+    categories,
+  };
+}
+
 function formatNetworkError(url: string, error: unknown): string {
   const cause =
     error instanceof Error && error.cause instanceof Error ? error.cause : error;
@@ -546,15 +821,162 @@ function formatNetworkError(url: string, error: unknown): string {
   ].join(' ');
 }
 
+async function importMappedPackage(
+  flags: Flags,
+  skipTranslate: boolean,
+) {
+  const loaded = await loadExportPackage(flags);
+  const importUsers = Boolean(flags.users) || loaded.authors.length > 0;
+  const mediaDirs: MediaDirs = {
+    packageDir: loaded.packageDir,
+    imagesDir: loaded.imagesDir,
+  };
+
+  console.log(
+    `Package ${loaded.packageDir}: ${loaded.authors.length} author(s), ${loaded.articles.length} article(s), images ${loaded.imagesDir}`,
+  );
+
+  if (flags['dry-run']) {
+    for (const author of loaded.authors) {
+      console.log(`[dry-run] user #${author.wpId} ${author.email} ← ${author.name}`);
+    }
+    for (const article of loaded.articles) {
+      console.log(
+        `[dry-run] #${article.wpId} ${article.path} ← ${article.titleBg}`,
+      );
+    }
+    return;
+  }
+
+  if (!process.env.DATABASE_URL) {
+    throw new Error('DATABASE_URL is required');
+  }
+
+  const sharedPassword =
+    process.env.WORDPRESS_IMPORT_USER_PASSWORD?.trim() || '';
+  if (importUsers && loaded.authors.some((author) => author.email) && sharedPassword.length < 8) {
+    throw new Error(
+      'Set WORDPRESS_IMPORT_USER_PASSWORD in .env (min 8 characters) before importing users.',
+    );
+  }
+
+  const prisma = new PrismaClient({
+    adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
+  });
+  const authorsByWpId = new Map<number, string>();
+  const adminEmail = (process.env.ADMIN_EMAIL ?? 'admin@prizn.local')
+    .toLowerCase()
+    .trim();
+
+  try {
+    if (loaded.categories.length > 0) {
+      await upsertPackageCategories(prisma, loaded.categories);
+    }
+    if (importUsers && loaded.authors.length > 0) {
+      const passwordHash = await bcrypt.hash(sharedPassword, 12);
+      console.log(
+        `CMS login password for imported users: ${sharedPassword}\nThey can change it under Profile after signing in.`,
+      );
+      for (const author of loaded.authors) {
+        if (!author.email) continue;
+        const result = await importWpUser(prisma, author, {
+          passwordHash,
+          skipTranslate,
+          adminEmail,
+          mediaDirs,
+        });
+        if (author.wpId) authorsByWpId.set(author.wpId, result.authorId);
+        console.log(
+          `[${result.action}] user #${author.wpId} ${author.email} → author ${result.authorId}`,
+        );
+      }
+    }
+
+    for (const article of loaded.articles) {
+      const result = await saveArticle(prisma, article, {
+        update: Boolean(flags.update),
+        draft: Boolean(flags.draft),
+        skipMedia: Boolean(flags['skip-media']),
+        skipTranslate,
+        authorsByWpId,
+        mediaDirs,
+      });
+      console.log(
+        `[${result.action}] #${article.wpId} ${article.path} (${result.id})`,
+      );
+    }
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
+async function exportFromWordpress(flags: Flags, origin: string) {
+  const postLimit = flags.limit ?? '20';
+  const exportDir = resolve(
+    typeof flags.export === 'string' ? flags.export : '../wordpress-export',
+  );
+  console.log(`Exporting from ${origin} → ${exportDir}`);
+
+  let wpUsers: WpUser[] = [];
+  try {
+    wpUsers = await loadUsers(origin);
+    console.log(`Loaded ${wpUsers.length} WordPress user(s).`);
+  } catch (error) {
+    console.warn(
+      `Users not exported (${error instanceof Error ? error.message : String(error)})`,
+    );
+  }
+
+  const posts = await loadPosts({ ...flags, file: undefined, limit: postLimit });
+  console.log(`Loaded ${posts.length} WordPress post(s).`);
+  const articles = posts.map(mapWpPost);
+  const authors: PackagedAuthor[] =
+    wpUsers.length > 0 ? wpUsers.map(mapWpUser) : authorsFromArticles(articles);
+
+  const imagesDir = join(exportDir, 'images');
+  await mkdir(imagesDir, { recursive: true });
+  if (!flags['skip-media']) {
+    await attachLocalImages(articles, authors, imagesDir);
+  }
+
+  const pkg = buildWordpressPackage({ origin, articles, authors });
+  await writeExportPackage(exportDir, pkg);
+  console.log(
+    `Wrote ${articles.length} article(s), ${authors.length} author(s), ${pkg.categories.length} categor${pkg.categories.length === 1 ? 'y' : 'ies'} to ${exportDir}`,
+  );
+}
+
 async function main() {
   const flags = parseFlags(process.argv.slice(2));
+  const skipTranslate = !flags.translate;
+
+  if (flags.export) {
+    const origin = wpOrigin(
+      flags.from || process.env.WORDPRESS_URL || 'https://prizni.bg',
+    );
+    await exportFromWordpress(flags, origin);
+    return;
+  }
+
+  if (flags.package) {
+    await importMappedPackage(flags, skipTranslate);
+    return;
+  }
+
+  if (flags.file) {
+    const raw = JSON.parse(await readFile(resolve(flags.file), 'utf8')) as unknown;
+    if (isWordpressPackage(raw)) {
+      await importMappedPackage(flags, skipTranslate);
+      return;
+    }
+  }
+
   const origin = wpOrigin(
     flags.from || process.env.WORDPRESS_URL || 'https://prizni.bg',
   );
   console.log(
     `WordPress origin: ${origin}${process.env.WORDPRESS_URL ? '' : ' (default; set WORDPRESS_URL in Coolify)'}`,
   );
-  const skipTranslate = !flags.translate;
   const importUsers = Boolean(flags.users);
   const postLimit = flags.limit
     ? flags.limit

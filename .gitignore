@@ -37,5 +37,6 @@ Thumbs.db
 # Prisma
 api/generated/
 
-# Docker
-*.pid
+# WordPress migration package (local export → VPS import)
+wordpress-export/
+
