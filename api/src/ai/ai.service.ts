@@ -50,14 +50,30 @@ export class AiService {
     this.apiKey = this.config.get<string>('GEMINI_API_KEY') || undefined
     this.modelName =
       this.config.get<string>('GEMINI_MODEL') || 'gemini-2.0-flash'
-    this.embeddingModel =
-      this.config.get<string>('GEMINI_EMBEDDING_MODEL') || 'text-embedding-004'
+    this.embeddingModel = this.resolveEmbeddingModel(
+      this.config.get<string>('GEMINI_EMBEDDING_MODEL') || 'gemini-embedding-001',
+    )
     const flag = this.config.get<string>('FEATURE_AI')
     this.enabled = flag === undefined || flag === '' || flag === 'true'
   }
 
   isEnabled() {
     return this.enabled && Boolean(this.apiKey)
+  }
+
+  private resolveEmbeddingModel(name: string) {
+    const trimmed = name.trim()
+    if (
+      trimmed === 'text-embedding-004' ||
+      trimmed === 'embedding-001' ||
+      trimmed === 'models/text-embedding-004'
+    ) {
+      this.logger.warn(
+        `${trimmed} is retired; using gemini-embedding-001 instead`,
+      )
+      return 'gemini-embedding-001'
+    }
+    return trimmed || 'gemini-embedding-001'
   }
 
   /** Soft in-memory rate limit for public AI endpoints. */
@@ -142,14 +158,22 @@ export class AiService {
     if (!this.apiKey) {
       throw new ServiceUnavailableException('GEMINI_API_KEY is not configured')
     }
-    const genAI = new GoogleGenerativeAI(this.apiKey)
-    const model = genAI.getGenerativeModel({ model: this.embeddingModel })
-    const result = await model.embedContent(text.slice(0, EMBED_TEXT_MAX))
-    const values = result.embedding?.values
-    if (!values?.length) {
-      throw new Error('Gemini returned an empty embedding')
+    try {
+      const genAI = new GoogleGenerativeAI(this.apiKey)
+      const model = genAI.getGenerativeModel({ model: this.embeddingModel })
+      const result = await model.embedContent(text.slice(0, EMBED_TEXT_MAX))
+      const values = result.embedding?.values
+      if (!values?.length) {
+        throw new Error('Gemini returned an empty embedding')
+      }
+      return values.map((n) => Number(n))
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error)
+      this.logger.error(`Embedding failed (${this.embeddingModel}): ${message}`)
+      throw new ServiceUnavailableException(
+        `Embedding failed: ${message}`,
+      )
     }
-    return values.map((n) => Number(n))
   }
 
   static parseEmbedding(raw: unknown): number[] | null {
@@ -482,6 +506,148 @@ ${bodyPreview || '(empty)'}`
       throw new ServiceUnavailableException(
         `Regional context failed: ${message}`,
       )
+    }
+  }
+
+  /**
+   * Retrieve published stories by embedding, then answer only from those
+   * excerpts. Refuses when nothing in the archive is close enough.
+   */
+  async askArchive(input: { question: string; lang?: 'bg' | 'en' }): Promise<{
+    refused: boolean
+    answer: string | null
+    lang: 'bg' | 'en'
+    citations: Array<{
+      path: string
+      title: string
+      titleBg: string
+      score: number
+    }>
+  }> {
+    if (!this.enabled) {
+      throw new ServiceUnavailableException('AI assistant is disabled')
+    }
+    if (!this.apiKey) {
+      throw new ServiceUnavailableException(
+        'GEMINI_API_KEY is not configured',
+      )
+    }
+
+    const question = input.question.trim()
+    const cyrillic = (question.match(/\p{Script=Cyrillic}/gu) ?? []).length
+    const latin = (question.match(/[A-Za-z]/g) ?? []).length
+    const lang: 'bg' | 'en' =
+      input.lang ?? (cyrillic >= latin && cyrillic > 0 ? 'bg' : 'en')
+    const langLabel = lang === 'bg' ? 'Bulgarian' : 'English'
+
+    const queryVector = await this.embedText(question)
+    const candidates = await this.prisma.article.findMany({
+      where: {
+        status: ArticleStatus.PUBLISHED,
+        embedding: { not: Prisma.DbNull },
+      },
+      select: {
+        id: true,
+        path: true,
+        titleBg: true,
+        titleEn: true,
+        subtitleBg: true,
+        subtitleEn: true,
+        locationBg: true,
+        categoryBg: true,
+        body: true,
+        embedding: true,
+      },
+      orderBy: [{ publishedAt: 'desc' }, { updatedAt: 'desc' }],
+      take: 80,
+    })
+
+    const staleIds: string[] = []
+    const scored = candidates
+      .map((row) => {
+        const vector = AiService.parseEmbedding(row.embedding)
+        if (!vector) return null
+        if (vector.length !== queryVector.length) {
+          staleIds.push(row.id)
+          return null
+        }
+        const score = AiService.cosineSimilarity(queryVector, vector)
+        if (score < 0.32) return null
+        return { row, score }
+      })
+      .filter((item): item is NonNullable<typeof item> => Boolean(item))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 6)
+
+    if (staleIds.length > 0) {
+      this.logger.warn(
+        `Re-queueing ${staleIds.length} story embeddings for ${this.embeddingModel}`,
+      )
+      for (const id of staleIds) {
+        void this.enqueueEmbed(id)
+      }
+    }
+
+    if (scored.length === 0) {
+      return { refused: true, answer: null, lang, citations: [] }
+    }
+
+    const excerpts = scored.map((item, index) => {
+      const title =
+        lang === 'en'
+          ? item.row.titleEn?.trim() || item.row.titleBg
+          : item.row.titleBg
+      const excerpt = this.buildEmbedText(item.row).slice(0, 1200)
+      return `[${index + 1}] ${title} (${item.row.path})\n${excerpt}`
+    })
+
+    const prompt = `You answer questions for readers of Prizni using ONLY the numbered archive excerpts below.
+
+Return ONLY valid JSON:
+{
+  "answer": "short answer in ${langLabel}, or empty string if the excerpts do not contain the answer",
+  "used": [1]
+}
+
+Rules:
+- Write the answer in ${langLabel} only
+- Cite sources inline as [1], [2] matching the excerpt numbers
+- If the excerpts do not support an answer, return answer as an empty string
+- Do not invent places, dates, people, or traditions not present in the excerpts
+- Do not use general knowledge about Bulgaria beyond the excerpts
+
+Question: ${question}
+
+Excerpts:
+${excerpts.join('\n\n')}`
+
+    const genAI = new GoogleGenerativeAI(this.apiKey)
+    const model = genAI.getGenerativeModel({
+      model: this.modelName,
+      generationConfig: {
+        temperature: 0.2,
+        responseMimeType: 'application/json',
+      },
+    })
+
+    try {
+      const result = await model.generateContent(prompt)
+      const parsed = this.parseJson(result.response.text())
+      const answer = this.asString(parsed.answer)
+      const citations = scored.map((item) => ({
+        path: item.row.path.startsWith('/') ? item.row.path : `/${item.row.path}`,
+        title: item.row.titleEn?.trim() || item.row.titleBg,
+        titleBg: item.row.titleBg,
+        score: Math.round(item.score * 1000) / 1000,
+      }))
+      if (!answer) {
+        return { refused: true, answer: null, lang, citations }
+      }
+      return { refused: false, answer, lang, citations }
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error)
+      this.logger.error(`Ask archive failed: ${message}`)
+      throw new ServiceUnavailableException(`Ask archive failed: ${message}`)
     }
   }
 

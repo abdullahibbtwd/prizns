@@ -219,5 +219,31 @@ export function validateEnv(config: Record<string, unknown>) {
     );
   }
 
+  assertProductionSecurity(validated);
+
   return validated;
+}
+
+function assertProductionSecurity(env: EnvironmentVariables) {
+  if (env.NODE_ENV !== 'production') return;
+
+  if ((env.JWT_ACCESS_SECRET?.length ?? 0) < 32) {
+    throw new Error(
+      'JWT_ACCESS_SECRET must be at least 32 characters in production.',
+    );
+  }
+  if ((env.JWT_REFRESH_SECRET?.length ?? 0) < 32) {
+    throw new Error(
+      'JWT_REFRESH_SECRET must be at least 32 characters in production.',
+    );
+  }
+  if (env.COOKIE_SECURE !== 'true') {
+    throw new Error('COOKIE_SECURE must be true in production.');
+  }
+  if (!env.CORS_ORIGIN?.trim()) {
+    throw new Error('CORS_ORIGIN must be set in production.');
+  }
+  if (env.ADMIN_PASSWORD && env.ADMIN_PASSWORD.length < 16) {
+    throw new Error('ADMIN_PASSWORD must be at least 16 characters in production.');
+  }
 }

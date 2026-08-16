@@ -27,6 +27,10 @@ export class TranslateProcessor extends WorkerHost {
     }
     if (type === 'series') {
       await this.translation.processSeries(id)
+      return
+    }
+    if (type === 'category') {
+      await this.translation.processCategory(id)
     }
   }
 

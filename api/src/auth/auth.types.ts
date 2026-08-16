@@ -1,3 +1,5 @@
+import type { Role } from '@prisma/client';
+
 export const AUTH_COOKIES = {
   access: 'prizn_access',
   refresh: 'prizn_refresh',
@@ -7,14 +9,17 @@ export type AuthUserPayload = {
   id: string;
   email: string;
   name: string | null;
-  role: 'ADMIN' | 'EDITOR';
+  role: Role;
+  imageUrl: string | null;
+  emailVerified: boolean;
+  sessionId?: string;
 };
 
 export type JwtAccessPayload = {
   sub: string;
   sid: string;
   email: string;
-  role: 'ADMIN' | 'EDITOR';
+  role: Role;
   type: 'access';
 };
 
@@ -28,7 +33,7 @@ export type JwtRefreshPayload = {
 export type SessionRecord = {
   userId: string;
   email: string;
-  role: 'ADMIN' | 'EDITOR';
+  role: Role;
   name: string | null;
   createdAt: string;
 };

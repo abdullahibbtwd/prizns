@@ -135,6 +135,49 @@ export class DigestService {
     }
   }
 
+  /**
+   * Daily Episode of the Day. No-op (does not throw) when disabled, mail
+   * missing, nothing left to send, or nobody is subscribed. Mail failures
+   * still throw so BullMQ can retry.
+   */
+  async sendDaily(): Promise<{
+    status: 'skipped' | 'sent'
+    reason?: string
+    articleId?: string
+    recipientCount?: number
+  }> {
+    const flag = this.config
+      .get<string>('FEATURE_DIGEST')
+      ?.trim()
+      .toLowerCase()
+    if (flag === 'false' || flag === '0') {
+      return { status: 'skipped', reason: 'disabled' }
+    }
+    if (!this.mail.isConfigured()) {
+      return { status: 'skipped', reason: 'mail' }
+    }
+
+    const next = await this.findNextEpisode()
+    if (!next) {
+      return { status: 'skipped', reason: 'no-episode' }
+    }
+
+    const subscribers = await this.subscriberCount()
+    if (subscribers === 0) {
+      return { status: 'skipped', reason: 'no-subscribers' }
+    }
+
+    const result = await this.sendNow({
+      seriesId: next.seriesId,
+      articleId: next.articleId,
+    })
+    return {
+      status: 'sent',
+      articleId: next.articleId,
+      recipientCount: result.recipientCount,
+    }
+  }
+
   async sendNow(dto: SendDigestDto) {
     if (!this.mail.isConfigured()) {
       throw new ServiceUnavailableException(

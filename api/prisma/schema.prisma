@@ -11,6 +11,11 @@ datasource db {
 enum Role {
   ADMIN
   EDITOR
+  AUTHOR
+  CONTRIBUTOR
+  SUBSCRIBER
+  SEO_EDITOR
+  SEO_MANAGER
 }
 
 enum ArticleSection {
@@ -98,12 +103,22 @@ model User {
   passwordHash  String         @map("password_hash")
   name          String?
   role          Role           @default(EDITOR)
-  isActive      Boolean        @default(true) @map("is_active")
-  createdAt     DateTime       @default(now()) @map("created_at")
+  imageUrl      String?        @map("image_url")
+  bio           String?
+  websiteUrl    String?        @map("website_url")
+  facebookUrl   String?        @map("facebook_url")
+  instagramUrl  String?        @map("instagram_url")
+  youtubeUrl    String?        @map("youtube_url")
+  linkedinUrl   String?        @map("linkedin_url")
+  xUsername     String?        @map("x_username")
+  isActive         Boolean        @default(true) @map("is_active")
+  emailVerifiedAt  DateTime?      @map("email_verified_at")
+  createdAt        DateTime       @default(now()) @map("created_at")
   updatedAt     DateTime       @updatedAt @map("updated_at")
   files         FileObject[]
   refreshTokens RefreshToken[]
   todos         EditorialTodo[]
+  author        Author?
 
   @@map("users")
 }
@@ -161,6 +176,8 @@ model Author {
   translationStatus TranslationStatus @default(PENDING) @map("translation_status")
   translationError  String?           @map("translation_error")
   sourceLang        String?           @map("source_lang")
+  userId            String?           @unique @map("user_id")
+  user              User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
   createdAt         DateTime          @default(now()) @map("created_at")
   updatedAt         DateTime          @updatedAt @map("updated_at")
   articles          Article[]
@@ -244,6 +261,8 @@ model Article {
   body              Json                 @default("[]")
   featured          Boolean              @default(false)
   sponsored         Boolean              @default(false)
+  /** Editorial mark: sources were checked. Not an author badge. */
+  sourced           Boolean              @default(false)
   sponsorName       String?              @map("sponsor_name")
   behindStoryBg     String               @default("") @map("behind_story_bg")
   behindStoryEn     String?              @map("behind_story_en")
@@ -270,6 +289,7 @@ model Article {
   galleryItems      ArticleGalleryItem[]
   seriesEpisodes    SeriesEpisode[]
   articleTags       ArticleTag[]
+  articleCategories ArticleCategory[]
   reactions         ArticleReaction[]
   socialPosts       SocialPost[]
   digestSends       EpisodeDigestSend[]
@@ -299,18 +319,30 @@ model ArticleReaction {
   @@map("article_reactions")
 }
 
+enum GeocodeStatus {
+  idle
+  ok
+  failed
+  manual
+}
+
 model Tag {
-  id          String       @id @default(cuid())
-  slug        String
-  kind        TagKind
-  nameBg      String       @map("name_bg")
-  nameEn      String?      @map("name_en")
-  articleTags ArticleTag[]
-  createdAt   DateTime     @default(now()) @map("created_at")
-  updatedAt   DateTime     @updatedAt @map("updated_at")
+  id             String         @id @default(cuid())
+  slug           String
+  kind           TagKind
+  nameBg         String         @map("name_bg")
+  nameEn         String?        @map("name_en")
+  lat            Float?
+  lng            Float?
+  geocodeStatus  GeocodeStatus  @default(idle) @map("geocode_status")
+  geocodedAt     DateTime?      @map("geocoded_at")
+  articleTags    ArticleTag[]
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
 
   @@unique([kind, slug])
   @@index([kind, nameBg])
+  @@index([kind, lat, lng])
   @@map("tags")
 }
 
@@ -323,6 +355,39 @@ model ArticleTag {
   @@id([articleId, tagId])
   @@index([tagId])
   @@map("article_tags")
+}
+
+model Category {
+  id                String             @id @default(cuid())
+  slug              String             @unique
+  nameBg            String             @map("name_bg")
+  nameEn            String?            @map("name_en")
+  descriptionBg     String?            @map("description_bg")
+  descriptionEn     String?            @map("description_en")
+  parentId          String?            @map("parent_id")
+  parent            Category?          @relation("CategoryTree", fields: [parentId], references: [id], onDelete: Restrict)
+  children          Category[]         @relation("CategoryTree")
+  translationStatus TranslationStatus  @default(PENDING) @map("translation_status")
+  translationError  String?            @map("translation_error")
+  sourceLang        String?            @map("source_lang")
+  articleCategories ArticleCategory[]
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
+
+  @@index([parentId])
+  @@index([nameBg])
+  @@map("categories")
+}
+
+model ArticleCategory {
+  articleId  String   @map("article_id")
+  categoryId String   @map("category_id")
+  article    Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([articleId, categoryId])
+  @@index([categoryId])
+  @@map("article_categories")
 }
 
 model PartnershipInquiry {
@@ -724,15 +789,22 @@ model SavedArticle {
   @@map("saved_articles")
 }
 
+enum AnalyticsClickKind {
+  internal
+  outbound
+  cta
+}
+
 model AnalyticsSession {
-  id         String     @id @default(cuid())
-  visitorKey String     @map("visitor_key")
-  readerId   String?    @map("reader_id")
-  reader     Reader?    @relation(fields: [readerId], references: [id], onDelete: SetNull)
-  startedAt  DateTime   @default(now()) @map("started_at")
-  lastSeenAt DateTime   @default(now()) @map("last_seen_at")
-  userAgent  String?    @map("user_agent")
+  id         String           @id @default(cuid())
+  visitorKey String           @map("visitor_key")
+  readerId   String?          @map("reader_id")
+  reader     Reader?          @relation(fields: [readerId], references: [id], onDelete: SetNull)
+  startedAt  DateTime         @default(now()) @map("started_at")
+  lastSeenAt DateTime         @default(now()) @map("last_seen_at")
+  userAgent  String?          @map("user_agent")
   pageViews  PageView[]
+  clicks     AnalyticsClick[]
 
   @@index([visitorKey, startedAt])
   @@index([readerId, startedAt])
@@ -761,6 +833,26 @@ model PageView {
   @@index([sessionId])
   @@index([utmSource, startedAt])
   @@map("page_views")
+}
+
+model AnalyticsClick {
+  id         String             @id @default(cuid())
+  sessionId  String?            @map("session_id")
+  session    AnalyticsSession?  @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  visitorKey String             @map("visitor_key")
+  readerId   String?            @map("reader_id")
+  path       String
+  href       String
+  label      String             @default("")
+  kind       AnalyticsClickKind
+  articleId  String?            @map("article_id")
+  createdAt  DateTime           @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@index([href, createdAt])
+  @@index([articleId, createdAt])
+  @@index([sessionId])
+  @@map("analytics_clicks")
 }
 
 enum StoryYearCampaignStatus {

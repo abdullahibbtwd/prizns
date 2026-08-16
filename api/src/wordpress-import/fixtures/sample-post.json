@@ -1,0 +1,39 @@
+{
+  "id": 20220,
+  "date_gmt": "2026-08-14T12:27:13",
+  "slug": "dvizhenieto-kato-chast-ot-choveka-sportniat-psiholog-vladimir-novkov",
+  "status": "publish",
+  "title": { "rendered": "Движението като част от човека: спортният психолог Владимир Новков" },
+  "excerpt": { "rendered": "<p>Всеки от нас има поне един познат&#8230;</p>" },
+  "content": { "rendered": "<p>Всеки от нас има поне един познат.</p><h3><b>За избора на спорта</b></h3><p>Навън бягането е рутина.</p>" },
+  "yoast_head_json": {
+    "title": "Движението като част от човека | Prizni.bg",
+    "description": "Владимир Новков е спортен психолог.",
+    "author": "Изабел Спасова",
+    "twitter_misc": { "Est. reading time": "8 минути" },
+    "schema": {
+      "@graph": [
+        {
+          "@type": "Person",
+          "name": "Изабел Спасова",
+          "url": "https://prizni.bg/author/izabel/"
+        }
+      ]
+    }
+  },
+  "_embedded": {
+    "author": [{ "code": "rest_user_invalid_id" }],
+    "wp:featuredmedia": [
+      {
+        "source_url": "https://prizni.bg/wp-content/uploads/2026/08/Vladimir-Novkov-sporten-psiholog-intervyu.jpg",
+        "caption": { "rendered": "<p>Снимка: личен архив</p>" }
+      }
+    ],
+    "wp:term": [
+      [
+        { "name": "Местни легенди", "slug": "mestni-legendi", "taxonomy": "category" },
+        { "name": "Портрети", "slug": "portreti", "taxonomy": "category" }
+      ]
+    ]
+  }
+}

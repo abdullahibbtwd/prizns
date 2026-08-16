@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -49,5 +50,10 @@ export class AuthorsController {
       await this.translation.enqueueAuthor(author.id);
     }
     return author;
+  }
+
+  @Delete(':id')
+  remove(@Param('id') id: string) {
+    return this.authors.remove(id);
   }
 }

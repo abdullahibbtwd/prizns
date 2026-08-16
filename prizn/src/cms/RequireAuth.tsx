@@ -1,6 +1,10 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '@/lib/auth'
 
+function isEmailVerified(user: { emailVerified?: boolean } | null) {
+  return user?.emailVerified !== false
+}
+
 /** Client-side gate for /cms/* — backend still enforces auth on APIs. */
 export function RequireAuth() {
   const { user, loading } = useAuth()
@@ -16,6 +20,10 @@ export function RequireAuth() {
 
   if (!user) {
     return <Navigate to="/cms/login" replace state={{ from: location.pathname }} />
+  }
+
+  if (!isEmailVerified(user)) {
+    return <Navigate to="/cms/verify-email" replace />
   }
 
   return <Outlet />

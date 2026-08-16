@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -56,5 +57,10 @@ export class SeriesController {
   @Put(':id/episodes')
   setEpisodes(@Param('id') id: string, @Body() dto: SetSeriesEpisodesDto) {
     return this.series.setEpisodes(id, dto);
+  }
+
+  @Delete(':id')
+  remove(@Param('id') id: string) {
+    return this.series.remove(id);
   }
 }

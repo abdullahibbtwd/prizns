@@ -1,0 +1,99 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DATABASE_URL: postgresql://prizn_test:prizn_test@localhost:5434/prizn_test?schema=public
+  REDIS_HOST: localhost
+  REDIS_PORT: '6381'
+  MINIO_ENDPOINT: localhost
+  MINIO_PORT: '9014'
+  MINIO_USE_SSL: 'false'
+  MINIO_BUCKET: prizn-test
+  MINIO_ACCESS_KEY: minio_test
+  MINIO_SECRET_KEY: minio_test_secret
+  MINIO_PUBLIC_URL: http://localhost:9014
+  JWT_ACCESS_SECRET: e2e-test-access-secret-minimum-32-chars
+  JWT_REFRESH_SECRET: e2e-test-refresh-secret-minimum-32-chars
+  FEATURE_AI: 'false'
+  FEATURE_SHOP: 'false'
+  SEED_ON_BOOT: 'false'
+
+jobs:
+  web:
+    name: Web tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: prizn/package-lock.json
+
+      - name: Install web dependencies
+        run: npm ci --prefix prizn
+
+      - name: Audit web dependencies
+        run: npm audit --omit=dev --prefix prizn
+
+      - name: Run Vitest with coverage
+        run: npm run test:cov --prefix prizn
+
+      - name: Upload web coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-coverage
+          path: prizn/coverage/
+          retention-days: 7
+
+  api:
+    name: API tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: api/package-lock.json
+
+      - name: Install API dependencies
+        run: npm ci --prefix api
+
+      - name: Audit API dependencies
+        run: npm audit --omit=dev --prefix api
+
+      - name: Generate Prisma client
+        run: npm run prisma:generate --prefix api
+
+      - name: Start test infrastructure
+        run: docker compose -f docker-compose.test.yml up -d --wait
+
+      - name: Run Jest unit + e2e with coverage
+        run: npm run test:cov:all --prefix api
+
+      - name: Upload API coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-coverage
+          path: api/coverage/
+          retention-days: 7
+
+      - name: Stop test infrastructure
+        if: always()
+        run: docker compose -f docker-compose.test.yml down -v

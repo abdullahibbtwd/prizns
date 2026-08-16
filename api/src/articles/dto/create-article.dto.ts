@@ -99,6 +99,10 @@ export class CreateArticleDto {
   sponsored?: boolean;
 
   @IsOptional()
+  @IsBoolean()
+  sourced?: boolean;
+
+  @IsOptional()
   @IsString()
   sponsorName?: string | null;
 

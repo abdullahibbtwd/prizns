@@ -17,6 +17,7 @@ import { JournalShell } from '@/components/concept-3/JournalShell'
 import { Logo } from '@/components/Logo'
 import { PageMeta } from '@/components/PageMeta'
 import { SponsoredBadge } from '@/components/concept-3/SponsoredBadge'
+import { SourcedBadge } from '@/components/concept-3/SourcedBadge'
 import { SupportThisStory } from '@/components/concept-3/SupportThisStory'
 import { RegionalContextExplainer } from '@/components/concept-3/RegionalContextExplainer'
 import { getAuthorForArticle } from '@/data/concept-3/authors'
@@ -24,6 +25,10 @@ import type { ArticleBlock, JournalArticle } from '@/data/concept-3/articleTypes
 import type { JournalLang } from '@/components/concept-3/JournalShell'
 import { useJournalLang } from '@/hooks/useJournalLang'
 import { LuxuryVideoPlayer } from '@/components/concept-3/LuxuryVideoPlayer'
+import {
+  ArticleHeroGallery,
+  articleHeroSlides,
+} from '@/components/concept-3/ArticleHeroGallery'
 import {
   getPublicArticle,
   listRelatedArticles,
@@ -90,6 +95,7 @@ function toJournalArticle(api: CmsArticle): JournalArticle {
     audioDuration: api.audioDuration,
     videoUrl: api.videoUrl,
     sponsored: Boolean(api.sponsored),
+    sourced: Boolean(api.sourced),
     sponsorName: api.sponsorName ?? null,
     behindStory: api.behindStory,
     behindStoryBg: api.behindStoryBg,
@@ -168,14 +174,17 @@ function ArticleBlockView({
   }
 
   if (block.type === 'pullquote') {
+    const cite = pick(lang, block.cite, block.citeBg).trim()
     return (
       <blockquote className="my-12 border-l-2 border-[#0C2686] bg-[#0C2686]/5 px-6 py-8 md:px-10 rounded-r-xl">
         <p className="mb-3 font-heading text-2xl md:text-3xl font-normal leading-snug italic text-[#1A1A1A]">
           “{pick(lang, block.text, block.textBg)}”
         </p>
-        <cite className="font-sans text-xs uppercase tracking-widest text-[#0C2686] not-italic">
-          — {pick(lang, block.cite, block.citeBg)}
-        </cite>
+        {cite ? (
+          <cite className="font-sans text-xs uppercase tracking-widest text-[#0C2686] not-italic">
+            — {cite}
+          </cite>
+        ) : null}
       </blockquote>
     )
   }
@@ -186,9 +195,11 @@ function ArticleBlockView({
         <span className="mb-2 block font-sans text-[11px] font-medium uppercase tracking-[0.22em] text-[#0C2686]">
           {pick(lang, block.label, block.labelBg)}
         </span>
-        <p className="font-sans text-sm md:text-base font-light leading-relaxed text-[#1A1A1A]/75">
-          {pick(lang, block.text, block.textBg)}
-        </p>
+        {pick(lang, block.text, block.textBg).trim() ? (
+          <p className="font-sans text-sm md:text-base font-light leading-relaxed text-[#1A1A1A]/75">
+            {pick(lang, block.text, block.textBg)}
+          </p>
+        ) : null}
       </aside>
     )
   }
@@ -469,13 +480,16 @@ function ArticleContent({
           </span>
         </div>
 
-        {article.sponsored ? (
-          <div className="mb-5 flex justify-center">
-            <SponsoredBadge
-              lang={lang}
-              sponsorName={article.sponsorName}
-              tone="onLight"
-            />
+        {article.sponsored || article.sourced ? (
+          <div className="mb-5 flex flex-wrap items-center justify-center gap-2">
+            {article.sourced ? <SourcedBadge lang={lang} tone="onLight" /> : null}
+            {article.sponsored ? (
+              <SponsoredBadge
+                lang={lang}
+                sponsorName={article.sponsorName}
+                tone="onLight"
+              />
+            ) : null}
           </div>
         ) : null}
 
@@ -563,18 +577,18 @@ function ArticleContent({
             )}
           </div>
         ) : (
-          article.image && (
-            <div className="relative mb-14 aspect-[16/10] w-full overflow-hidden rounded-[16px] shadow-[0_4px_24px_rgba(0,0,0,0.04)]">
-              <img
-                src={article.image}
-                alt={pick(lang, article.title, article.titleBg)}
-                className="h-full w-full object-cover"
-              />
-              <div className="absolute bottom-3 right-4 rounded bg-black/40 px-2.5 py-1 font-sans text-[10px] uppercase tracking-widest text-white/80 backdrop-blur-md">
-                {pick(lang, article.photoCredit, article.photoCreditBg)}
-              </div>
-            </div>
-          )
+          <ArticleHeroGallery
+            slides={articleHeroSlides({
+              image: article.image,
+              photoCreditBg: pick(
+                lang,
+                article.photoCredit,
+                article.photoCreditBg,
+              ),
+              gallery: article.gallery,
+            })}
+            title={pick(lang, article.title, article.titleBg)}
+          />
         )}
 
         {article.audioUrl && (
@@ -593,34 +607,6 @@ function ArticleContent({
         )}
 
         <ArticleBlocks article={article} lang={lang} />
-
-        {article.gallery && article.gallery.length > 1 ? (
-          <div className="mt-14 print-hidden" data-print-hide>
-            <p className="mb-4 font-sans text-[11px] uppercase tracking-[0.2em] text-[#0C2686]">
-              {lang === 'bg' ? 'Галерия' : 'Gallery'}
-            </p>
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4">
-              {article.gallery.map((item) => (
-                <figure
-                  key={item.id}
-                  className="overflow-hidden rounded-[12px] bg-[#1A1A1A]/5"
-                >
-                  <img
-                    src={item.url}
-                    alt=""
-                    className="aspect-[4/3] h-full w-full object-cover"
-                    loading="lazy"
-                  />
-                  {item.creditBg ? (
-                    <figcaption className="px-2 py-1.5 font-sans text-[10px] uppercase tracking-wider text-[#1A1A1A]/45">
-                      {item.creditBg}
-                    </figcaption>
-                  ) : null}
-                </figure>
-              ))}
-            </div>
-          </div>
-        ) : null}
 
         {(article.behindStoryBg || article.behindStory) ? (
           <aside className="mt-14 rounded-[16px] border border-[#EAE6DF] bg-white px-6 py-6 md:px-8 print-hidden" data-print-hide>

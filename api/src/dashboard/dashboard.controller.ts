@@ -25,11 +25,12 @@ export class DashboardController {
         authors: [],
         submissions: [],
         tags: [],
+        categories: [],
       };
     }
 
     const take = 8;
-    const [stories, authors, submissions, tags] = await Promise.all([
+    const [stories, authors, submissions, tags, categories] = await Promise.all([
       this.prisma.article.findMany({
         where: {
           OR: [
@@ -108,6 +109,24 @@ export class DashboardController {
         orderBy: { nameBg: 'asc' },
         take,
       }),
+      this.prisma.category.findMany({
+        where: {
+          OR: [
+            { nameBg: { contains: q, mode: 'insensitive' } },
+            { nameEn: { contains: q, mode: 'insensitive' } },
+            { slug: { contains: q, mode: 'insensitive' } },
+          ],
+        },
+        select: {
+          id: true,
+          nameBg: true,
+          nameEn: true,
+          slug: true,
+          parentId: true,
+        },
+        orderBy: { nameBg: 'asc' },
+        take,
+      }),
     ]);
 
     return {
@@ -143,6 +162,13 @@ export class DashboardController {
         nameBg: t.nameBg,
         nameEn: t.nameEn,
         slug: t.slug,
+      })),
+      categories: categories.map((c) => ({
+        id: c.id,
+        nameBg: c.nameBg,
+        nameEn: c.nameEn,
+        slug: c.slug,
+        parentId: c.parentId,
       })),
     };
   }

@@ -220,5 +220,86 @@ export function AnalyticsTracker() {
     }
   }, [consent, location.pathname, location.search])
 
+  useEffect(() => {
+    if (consent !== 'accepted') return
+
+    const onClick = (event: MouseEvent) => {
+      if (event.button !== 0) return
+      const payload = resolveClickPayload(event)
+      if (!payload) return
+      const visitorKey = ensureVisitorKey()
+      if (!visitorKey) return
+      void postBeacon({
+        visitorKey,
+        sessionId: getAnalyticsSessionId(),
+        event: 'click',
+        path: window.location.pathname + window.location.search,
+        articleId: metaRef.current.articleId || undefined,
+        title: metaRef.current.title || undefined,
+        readerId: readerIdRef.current || undefined,
+        href: payload.href,
+        label: payload.label,
+        kind: payload.kind,
+      })
+    }
+
+    document.addEventListener('click', onClick, true)
+    return () => document.removeEventListener('click', onClick, true)
+  }, [consent])
+
   return null
+}
+
+function resolveClickPayload(event: MouseEvent): {
+  href: string
+  label: string
+  kind: 'internal' | 'outbound' | 'cta'
+} | null {
+  const node = (event.target as HTMLElement | null)?.closest?.(
+    'a[href], [data-analytics]',
+  ) as HTMLElement | null
+  if (!node) return null
+  if (window.location.pathname.startsWith('/cms')) return null
+  if (node.closest('[data-analytics-ignore]')) return null
+
+  const cta = node.getAttribute('data-analytics')?.trim()
+  const hrefAttr =
+    (node instanceof HTMLAnchorElement
+      ? node.getAttribute('href')
+      : node.getAttribute('data-href')) || ''
+  const href = hrefAttr.trim()
+  if (!href && !cta) return null
+
+  const label = (
+    cta ||
+    node.getAttribute('aria-label') ||
+    node.textContent ||
+    href
+  )
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 120)
+
+  if (cta) {
+    return { href: href || `cta:${cta}`, label, kind: 'cta' }
+  }
+
+  try {
+    const url = new URL(href, window.location.origin)
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null
+    if (url.origin === window.location.origin) {
+      return {
+        href: `${url.pathname}${url.search}`,
+        label,
+        kind: 'internal',
+      }
+    }
+    return {
+      href: `${url.origin}${url.pathname}${url.search}`,
+      label,
+      kind: 'outbound',
+    }
+  } catch {
+    return null
+  }
 }

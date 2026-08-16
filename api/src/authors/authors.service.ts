@@ -181,6 +181,7 @@ export class AuthorsService {
         isActive: dto.isActive ?? true,
         translationStatus: TranslationStatus.PENDING,
         translationError: null,
+        userId: dto.userId || undefined,
       },
       select: authorSelect,
     });
@@ -246,6 +247,12 @@ export class AuthorsService {
       },
       select: authorSelect,
     });
+  }
+
+  async remove(id: string) {
+    await this.getById(id);
+    await this.prisma.author.delete({ where: { id } });
+    return { ok: true as const, id };
   }
 
   async ensureDefaultAuthor() {

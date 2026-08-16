@@ -13,7 +13,6 @@ import {
   Film,
   ImagePlus,
   MapPin,
-  Search,
   Settings,
   Sparkles,
   Copy,
@@ -274,19 +273,6 @@ export function CmsMediaPage() {
           ))}
         </div>
       )}
-    </div>
-  )
-}
-
-export function CmsSeoPage() {
-  return (
-    <div>
-      <CmsPageHeader title="SEO Health Center" description="Audit meta tags, canonical URLs, and OpenGraph social images." badge="SEO Score 94%" />
-      <ComingSoon
-        icon={Search}
-        title="Automated SEO Audit & Meta Generator"
-        blurb="Identifies missing meta descriptions and alt text across stories with one-click AI auto-fill."
-      />
     </div>
   )
 }

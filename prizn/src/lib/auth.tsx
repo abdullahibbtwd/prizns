@@ -6,9 +6,12 @@ export type { AuthUser }
 type AuthState = {
   user: AuthUser | null
   loading: boolean
-  login: (email: string, password: string) => Promise<void>
+  login: (email: string, password: string) => Promise<AuthUser>
   logout: () => Promise<void>
   refresh: () => Promise<boolean>
+  reload: () => Promise<void>
+  verifyEmail: (code: string) => Promise<void>
+  resendVerification: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthState | null>(null)
@@ -60,6 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       password,
     })
     setUser(result.user)
+    return result.user
   }
 
   const logout = async () => {
@@ -70,8 +74,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  const reload = async () => {
+    const me = await api.get<{ user: AuthUser }>('/auth/me')
+    setUser(me.user)
+  }
+
+  const verifyEmail = async (code: string) => {
+    const result = await api.post<{ user: AuthUser }>('/auth/verify-email', {
+      code,
+    })
+    setUser(result.user)
+  }
+
+  const resendVerification = async () => {
+    await api.post('/auth/resend-verification')
+  }
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, refresh }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        login,
+        logout,
+        refresh,
+        reload,
+        verifyEmail,
+        resendVerification,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   )

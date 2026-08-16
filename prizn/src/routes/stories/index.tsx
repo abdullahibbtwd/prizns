@@ -1,4 +1,4 @@
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import { ArrowRight, Clock, MapPin } from 'lucide-react'
@@ -7,7 +7,8 @@ import { PageMeta } from '@/components/PageMeta'
 import { ListingHeader } from '@/components/concept-3/ListingHeader'
 import { EpisodeBadge } from '@/components/concept-3/EpisodeBadge'
 import { SponsoredBadge } from '@/components/concept-3/SponsoredBadge'
-import { JournalSelect } from '@/components/ui/JournalSelect'
+import { RegionMap } from '@/components/concept-3/RegionMap'
+import { ListingFilters } from '@/components/concept-3/ListingFilters'
 import {
   articlePath,
   preferApi,
@@ -15,23 +16,21 @@ import {
   usePublicSeries,
   usePublicTags,
 } from '@/lib/public-content'
+import { useListingFilters } from '@/lib/listing-filters'
 import { toHumanStoryCard } from '@/lib/section-cards'
-import { cn } from '@/lib/utils'
 
 export default function StoriesPage() {
   const { t } = useTranslation()
-  const [searchParams, setSearchParams] = useSearchParams()
-  const selectedSeries = searchParams.get('series') || ''
-  const selectedTopic = searchParams.get('topic') || ''
-  const seriesMode =
-    searchParams.get('view') === 'series' || Boolean(selectedSeries)
+  const { location, topic, series, setFilters } = useListingFilters()
 
   const { data } = usePublicArticles('stories', {
-    series: selectedSeries || undefined,
-    topic: selectedTopic || undefined,
+    series: series || undefined,
+    topic: topic || undefined,
+    location: location || undefined,
   })
   const seriesQuery = usePublicSeries()
   const topicsQuery = usePublicTags('TOPIC')
+  const locationsQuery = usePublicTags('LOCATION')
 
   const stories = preferApi(
     data?.map((article) => ({
@@ -39,38 +38,6 @@ export default function StoriesPage() {
       path: articlePath(article),
     })),
   )
-
-  const seriesOptions = (seriesQuery.data ?? []).map((item) => ({
-    value: item.slug,
-    label: item.titleBg || item.title,
-  }))
-
-  const setModeAll = () => {
-    const next = new URLSearchParams()
-    if (selectedTopic) next.set('topic', selectedTopic)
-    setSearchParams(next)
-  }
-
-  const setModeSeries = () => {
-    const next = new URLSearchParams({ view: 'series' })
-    if (selectedSeries) next.set('series', selectedSeries)
-    if (selectedTopic) next.set('topic', selectedTopic)
-    setSearchParams(next)
-  }
-
-  const setSeriesFilter = (slug: string) => {
-    const next = new URLSearchParams({ view: 'series' })
-    if (slug) next.set('series', slug)
-    if (selectedTopic) next.set('topic', selectedTopic)
-    setSearchParams(next)
-  }
-
-  const setTopicFilter = (slug: string) => {
-    const next = new URLSearchParams(searchParams)
-    if (slug) next.set('topic', slug)
-    else next.delete('topic')
-    setSearchParams(next)
-  }
 
   return (
     <JournalShell>
@@ -94,111 +61,46 @@ export default function StoriesPage() {
             countLabel={t('storiesCount', { count: stories.length })}
           />
 
-          <div className="mx-auto max-w-7xl px-6 pt-10 md:px-12">
-            <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="mr-1 font-sans text-[11px] uppercase tracking-[0.2em] text-[#1A1A1A]/45">
-                  {lang === 'bg' ? 'Филтър' : 'Filter'}
-                </span>
-                <button
-                  type="button"
-                  onClick={setModeAll}
-                  className={cn(
-                    'rounded-full border px-3 py-1.5 font-sans text-[11px] uppercase tracking-[0.16em] transition-colors',
-                    !seriesMode
-                      ? 'border-[#0C2686] bg-[#0C2686] text-white'
-                      : 'border-[#EAE6DF] bg-white text-[#1A1A1A]/70 hover:border-[#0C2686]/40',
-                  )}
-                >
-                  {lang === 'bg' ? 'Всички' : 'All'}
-                </button>
-                <button
-                  type="button"
-                  onClick={setModeSeries}
-                  className={cn(
-                    'rounded-full border px-3 py-1.5 font-sans text-[11px] uppercase tracking-[0.16em] transition-colors',
-                    seriesMode
-                      ? 'border-[#0C2686] bg-[#0C2686] text-white'
-                      : 'border-[#EAE6DF] bg-white text-[#1A1A1A]/70 hover:border-[#0C2686]/40',
-                  )}
-                >
-                  {lang === 'bg' ? 'Поредица' : 'Series'}
-                </button>
-              </div>
+          <RegionMap
+            className="mx-auto max-w-7xl px-6 pt-10 md:px-12"
+            selectedSlug={location}
+            onSelect={(slug) => setFilters({ location: slug })}
+          />
 
-              {seriesMode ? (
-                <div className="w-full max-w-sm sm:min-w-[16rem]">
-                  <JournalSelect
-                    name="seriesFilter"
-                    label={
-                      lang === 'bg' ? 'Изберете поредица' : 'Choose a series'
-                    }
-                    placeholder={
-                      lang === 'bg' ? 'Изберете поредица…' : 'Select a series…'
-                    }
-                    options={
-                      lang === 'bg'
-                        ? seriesOptions
-                        : (seriesQuery.data ?? []).map((item) => ({
-                            value: item.slug,
-                            label: item.title || item.titleBg,
-                          }))
-                    }
-                    value={selectedSeries}
-                    onChange={setSeriesFilter}
-                  />
-                </div>
-              ) : null}
-            </div>
-
-            {(topicsQuery.data ?? []).length > 0 ? (
-              <div className="mt-4 flex flex-wrap items-center gap-2">
-                <span className="mr-1 font-sans text-[11px] uppercase tracking-[0.2em] text-[#1A1A1A]/45">
-                  {lang === 'bg' ? 'Тема' : 'Topic'}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setTopicFilter('')}
-                  className={cn(
-                    'rounded-full border px-3 py-1.5 font-sans text-[11px] uppercase tracking-[0.16em] transition-colors',
-                    !selectedTopic
-                      ? 'border-[#0C2686] bg-[#0C2686] text-white'
-                      : 'border-[#EAE6DF] bg-white text-[#1A1A1A]/70 hover:border-[#0C2686]/40',
-                  )}
-                >
-                  {lang === 'bg' ? 'Всички' : 'All'}
-                </button>
-                {(topicsQuery.data ?? []).map((tag) => (
-                  <button
-                    key={tag.id}
-                    type="button"
-                    onClick={() => setTopicFilter(tag.slug)}
-                    className={cn(
-                      'rounded-full border px-3 py-1.5 font-sans text-[11px] uppercase tracking-[0.16em] transition-colors',
-                      selectedTopic === tag.slug
-                        ? 'border-[#0C2686] bg-[#0C2686] text-white'
-                        : 'border-[#EAE6DF] bg-white text-[#1A1A1A]/70 hover:border-[#0C2686]/40',
-                    )}
-                  >
-                    {lang === 'bg' ? tag.nameBg : tag.name}
-                  </button>
-                ))}
-              </div>
-            ) : null}
-          </div>
+          <ListingFilters
+            lang={lang}
+            location={{
+              value: location,
+              options: (locationsQuery.data ?? []).map((tag) => ({
+                value: tag.slug,
+                label: lang === 'bg' ? tag.nameBg : tag.name,
+              })),
+              onChange: (value) => setFilters({ location: value }),
+            }}
+            topic={{
+              value: topic,
+              options: (topicsQuery.data ?? []).map((tag) => ({
+                value: tag.slug,
+                label: lang === 'bg' ? tag.nameBg : tag.name,
+              })),
+              onChange: (value) => setFilters({ topic: value }),
+            }}
+            series={{
+              value: series,
+              options: (seriesQuery.data ?? []).map((item) => ({
+                value: item.slug,
+                label: lang === 'bg' ? item.titleBg : item.title || item.titleBg,
+              })),
+              onChange: (value) => setFilters({ series: value }),
+            }}
+          />
 
           <div className="mx-auto max-w-7xl px-6 py-16 md:px-12 md:py-20">
-            {seriesMode && !selectedSeries ? (
+            {stories.length === 0 ? (
               <p className="text-center font-sans text-sm text-[#1A1A1A]/55">
                 {lang === 'bg'
-                  ? 'Изберете поредица, за да видите епизодите.'
-                  : 'Choose a series to see its episodes.'}
-              </p>
-            ) : stories.length === 0 ? (
-              <p className="text-center font-sans text-sm text-[#1A1A1A]/55">
-                {lang === 'bg'
-                  ? 'Няма истории в тази поредица.'
-                  : 'No stories in this series.'}
+                  ? 'Няма истории с тези филтри.'
+                  : 'No stories match these filters.'}
               </p>
             ) : (
               <div className="grid grid-cols-1 gap-10 md:grid-cols-2 lg:grid-cols-3">

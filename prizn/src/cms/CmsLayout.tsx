@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
-import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Link, Outlet, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Menu, Search, Bell, X, Sparkles, ChevronRight, CheckCircle2, AlertCircle, LogOut, Globe } from 'lucide-react'
+import { Menu, Search, Bell, X, Sparkles, ChevronRight, CheckCircle2, AlertCircle, Globe } from 'lucide-react'
 import { CmsSidebar, QuickSearchModal } from '@/cms/components/CmsUI'
 import { useAuth } from '@/lib/auth'
 import { useJournalLang } from '@/hooks/useJournalLang'
@@ -11,8 +11,7 @@ export function CmsLayout() {
   const [searchOpen, setSearchOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const location = useLocation()
-  const navigate = useNavigate()
-  const { user, logout } = useAuth()
+  const { user } = useAuth()
   const { t } = useTranslation()
   const { lang, setLang } = useJournalLang()
   const crumbSegment = location.pathname.replace(/^\/cms\/?/, '').split('/')[0] || 'dashboard'
@@ -88,15 +87,15 @@ export function CmsLayout() {
             >
               <Menu className="size-5" />
             </button>
-            <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs">
+            <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-2 text-xs">
               <Link
                 to="/cms"
-                className="font-heading font-semibold text-stone-500 hover:text-[#0C2686] transition-colors"
+                className="hidden font-heading font-semibold text-stone-500 transition-colors hover:text-[#0C2686] md:inline"
               >
                 {t('cms.editorialOs')}
               </Link>
-              <ChevronRight className="size-3 text-stone-400" />
-              <span className="capitalize font-semibold text-stone-900 bg-stone-100 px-2.5 py-1 rounded-md border border-stone-200/80">
+              <ChevronRight className="hidden size-3 text-stone-400 md:block" />
+              <span className="truncate rounded-md border border-stone-200/80 bg-stone-100 px-2.5 py-1 font-semibold capitalize text-stone-900">
                 {crumbLabel}
               </span>
             </nav>
@@ -182,23 +181,28 @@ export function CmsLayout() {
               )}
             </div>
 
-            <div className="hidden items-center gap-2 sm:flex">
-              <div className="text-right">
-                <p className="text-xs font-semibold text-stone-900">{user?.name ?? t('cms.editorRole')}</p>
-                <p className="text-[10px] text-stone-500">{user?.role}</p>
-              </div>
-              <button
-                type="button"
-                onClick={async () => {
-                  await logout()
-                  navigate('/cms/login', { replace: true })
-                }}
-                className="rounded-xl border border-[#E8E4DC] bg-stone-50 p-2.5 text-stone-600 transition-colors hover:bg-white hover:text-stone-900"
-                title={t('cms.signOut')}
-              >
-                <LogOut className="size-4.5" />
-              </button>
-            </div>
+            <Link
+              to="/cms/profile"
+              title={t('cms.nav.profile')}
+              className="relative flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[#0C2686]/20 bg-[#0C2686] text-[11px] font-bold tracking-wide text-white shadow-xs transition hover:ring-2 hover:ring-[#0C2686]/30"
+            >
+              {user?.imageUrl ? (
+                <img
+                  src={user.imageUrl}
+                  alt={user.name || user.email || t('cms.nav.profile')}
+                  className="size-full object-cover"
+                />
+              ) : (
+                <span aria-hidden>
+                  {(user?.name?.trim() || user?.email || 'P')
+                    .split(/\s+/)
+                    .filter(Boolean)
+                    .slice(0, 2)
+                    .map((part) => part[0]?.toUpperCase() ?? '')
+                    .join('') || 'P'}
+                </span>
+              )}
+            </Link>
           </div>
         </header>
 

@@ -36,12 +36,21 @@ export type CmsSearchTag = {
   slug: string
 }
 
+export type CmsSearchCategory = {
+  id: string
+  nameBg: string
+  nameEn: string | null
+  slug: string
+  parentId: string | null
+}
+
 export type CmsSearchResult = {
   q: string
   stories: CmsSearchStory[]
   authors: CmsSearchAuthor[]
   submissions: CmsSearchSubmission[]
   tags: CmsSearchTag[]
+  categories: CmsSearchCategory[]
 }
 
 export function cmsGlobalSearch(q: string) {

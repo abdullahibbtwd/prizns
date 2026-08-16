@@ -35,6 +35,7 @@ import ShopSuccessPage from '@/routes/shop/success'
 import AuthVerifyPage from '@/routes/auth/verify'
 import ReaderMePage from '@/routes/me'
 import StoryOfTheYearPage from '@/routes/story-of-the-year'
+import ArchivePage from '@/routes/archive'
 import CmsApp from '@/cms/CmsApp'
 
 export default function App() {
@@ -87,6 +88,7 @@ export default function App() {
             <Route path="/auth/verify" element={<AuthVerifyPage />} />
             <Route path="/me" element={<ReaderMePage />} />
             <Route path="/story-of-the-year" element={<StoryOfTheYearPage />} />
+            <Route path="/archive" element={<ArchivePage />} />
             <Route path="/cms/*" element={<CmsApp />} />
             <Route path="*" element={<HomePage />} />
           </Routes>

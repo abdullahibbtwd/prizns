@@ -4,7 +4,7 @@ set -e
 echo "[boot] Running prisma migrate deploy..."
 npx prisma migrate deploy
 
-# Idempotent upserts (admin + journal). Default on; set SEED_ON_BOOT=false to skip.
+# Idempotent upserts (admin + journal). Default on in dev; set SEED_ON_BOOT=false in production after first boot.
 if [ "${SEED_ON_BOOT:-true}" = "true" ]; then
   echo "[boot] Running database seed..."
   node prisma/run-seed.cjs

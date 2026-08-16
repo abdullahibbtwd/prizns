@@ -39,4 +39,8 @@ export class CreateAuthorDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @IsOptional()
+  @IsString()
+  userId?: string;
 }

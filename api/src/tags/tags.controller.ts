@@ -18,6 +18,11 @@ import { TagsService } from './tags.service';
 export class TagsController {
   constructor(private readonly tags: TagsService) {}
 
+  @Get('places/map')
+  listMap() {
+    return this.tags.listMapPins();
+  }
+
   @Get('tags')
   listPublic(@Query('kind') kind?: string) {
     return this.tags.listPublic(kind);
@@ -45,6 +50,12 @@ export class TagsController {
   @UseGuards(JwtAuthGuard)
   update(@Param('id') id: string, @Body() dto: UpdateTagDto) {
     return this.tags.update(id, dto);
+  }
+
+  @Post('cms/tags/:id/geocode')
+  @UseGuards(JwtAuthGuard)
+  geocode(@Param('id') id: string) {
+    return this.tags.geocodeTag(id);
   }
 
   @Delete('cms/tags/:id')

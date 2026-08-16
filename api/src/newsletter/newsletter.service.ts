@@ -1,9 +1,12 @@
 import {
   ConflictException,
+  HttpException,
+  HttpStatus,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { checkRateLimit } from '../common/rate-limit';
 import { PrismaService } from '../prisma/prisma.service';
 import { SubscribeNewsletterDto } from './dto/subscribe-newsletter.dto';
 
@@ -28,8 +31,19 @@ export class NewsletterService {
     };
   }
 
-  async subscribe(dto: SubscribeNewsletterDto) {
+  async subscribe(dto: SubscribeNewsletterDto, meta: { ip?: string } = {}) {
     const email = dto.email.trim().toLowerCase();
+    const ip = meta.ip || 'unknown';
+    if (
+      !checkRateLimit('newsletter', `ip:${ip}`, 15, 60 * 60 * 1000) ||
+      !checkRateLimit('newsletter', `email:${email}`, 3, 60 * 60 * 1000)
+    ) {
+      throw new HttpException(
+        'Too many subscription attempts. Try again later.',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
     const existing = await this.prisma.newsletterSubscriber.findUnique({
       where: { email },
     });

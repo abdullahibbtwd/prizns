@@ -99,6 +99,7 @@ export type CmsArticle = {
   bodyRaw?: BodyBlock[];
   featured: boolean;
   sponsored: boolean;
+  sourced: boolean;
   sponsorName?: string | null;
   behindStory?: string;
   behindStoryBg?: string;
@@ -241,6 +242,7 @@ export type ArticleFormValues = {
   readTimeUnit: "minutes" | "hours";
   locationBg: string;
   dateIso: string;
+  scheduledAt: string;
   photoCreditBg: string;
   endLabelBg: string;
   speakerBg: string;
@@ -252,6 +254,7 @@ export type ArticleFormValues = {
   videoMediaId: string;
   featured: boolean;
   sponsored: boolean;
+  sourced: boolean;
   sponsorName: string;
   behindStoryBg: string;
   seoTitleBg: string;

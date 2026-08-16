@@ -278,6 +278,48 @@ export default function CmsAnalyticsPage() {
           </div>
         </CmsCard>
       ) : null}
+
+      <CmsCard hover={false} className="mt-6 overflow-hidden p-0">
+        <div className="border-b border-[#E8E4DC] bg-[#FAF8F3] px-5 py-3.5">
+          <h2 className="font-heading text-sm font-bold uppercase tracking-wider text-stone-700">
+            {t('cms.analytics.topClicks')}
+          </h2>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[420px] text-left text-sm">
+            <thead className="border-b border-[#E8E4DC] bg-stone-50 text-xs uppercase tracking-wider text-stone-500">
+              <tr>
+                <th className="px-4 py-3">{t('cms.analytics.colLabel')}</th>
+                <th className="px-4 py-3">{t('cms.analytics.colHref')}</th>
+                <th className="px-4 py-3">{t('cms.analytics.colClicks')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(data?.topClicks ?? []).length === 0 && (
+                <tr>
+                  <td colSpan={3} className="px-4 py-8 text-stone-500">
+                    {t('cms.analytics.emptyClicks')}
+                  </td>
+                </tr>
+              )}
+              {(data?.topClicks ?? []).map((row) => (
+                <tr key={row.href} className="border-b border-[#E8E4DC]/70">
+                  <td className="px-4 py-3">
+                    <p className="font-medium text-stone-900">{row.label}</p>
+                    <p className="text-[11px] uppercase tracking-wider text-stone-500">
+                      {row.kind}
+                    </p>
+                  </td>
+                  <td className="px-4 py-3 font-mono text-xs text-stone-600">
+                    {row.href}
+                  </td>
+                  <td className="px-4 py-3 text-stone-700">{row.clicks}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </CmsCard>
     </div>
   )
 }

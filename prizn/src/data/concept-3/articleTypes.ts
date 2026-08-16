@@ -87,6 +87,7 @@ export interface JournalArticle {
   videoUrl?: string
 
   sponsored?: boolean
+  sourced?: boolean
   sponsorName?: string | null
 
   /** Editorial transparency block at end of article */

@@ -1,25 +1,31 @@
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ArrowUpRight } from 'lucide-react'
 import { JournalShell } from '@/components/concept-3/JournalShell'
 import { ListingHeader } from '@/components/concept-3/ListingHeader'
 import { SponsoredBadge } from '@/components/concept-3/SponsoredBadge'
+import { RegionMap } from '@/components/concept-3/RegionMap'
+import { ListingFilters } from '@/components/concept-3/ListingFilters'
 import {
   articlePath,
   preferApi,
   usePublicArticles,
+  usePublicSeries,
   usePublicTags,
 } from '@/lib/public-content'
+import { useListingFilters } from '@/lib/listing-filters'
 import { toPlaceCard } from '@/lib/section-cards'
-import { cn } from '@/lib/utils'
 
 export default function PlacesPage() {
-  const [searchParams, setSearchParams] = useSearchParams()
-  const selectedLocation = searchParams.get('location') || ''
+  const { location, topic, series, setFilters } = useListingFilters()
   const { data } = usePublicArticles('places', {
-    location: selectedLocation || undefined,
+    location: location || undefined,
+    topic: topic || undefined,
+    series: series || undefined,
   })
   const locationsQuery = usePublicTags('LOCATION')
+  const topicsQuery = usePublicTags('TOPIC')
+  const seriesQuery = usePublicSeries()
 
   return (
     <JournalShell>
@@ -47,42 +53,39 @@ export default function PlacesPage() {
               }
             />
 
-            {(locationsQuery.data ?? []).length > 0 ? (
-              <div className="mx-auto max-w-7xl px-6 pt-10 md:px-12">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="mr-1 font-sans text-[11px] uppercase tracking-[0.2em] text-[#1A1A1A]/45">
-                    {lang === 'bg' ? 'Място' : 'Location'}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setSearchParams({})}
-                    className={cn(
-                      'rounded-full border px-3 py-1.5 font-sans text-[11px] uppercase tracking-[0.16em] transition-colors',
-                      !selectedLocation
-                        ? 'border-[#0C2686] bg-[#0C2686] text-white'
-                        : 'border-[#EAE6DF] bg-white text-[#1A1A1A]/70 hover:border-[#0C2686]/40',
-                    )}
-                  >
-                    {lang === 'bg' ? 'Всички' : 'All'}
-                  </button>
-                  {(locationsQuery.data ?? []).map((tag) => (
-                    <button
-                      key={tag.id}
-                      type="button"
-                      onClick={() => setSearchParams({ location: tag.slug })}
-                      className={cn(
-                        'rounded-full border px-3 py-1.5 font-sans text-[11px] uppercase tracking-[0.16em] transition-colors',
-                        selectedLocation === tag.slug
-                          ? 'border-[#0C2686] bg-[#0C2686] text-white'
-                          : 'border-[#EAE6DF] bg-white text-[#1A1A1A]/70 hover:border-[#0C2686]/40',
-                      )}
-                    >
-                      {lang === 'bg' ? tag.nameBg : tag.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : null}
+            <RegionMap
+              className="mx-auto max-w-7xl px-6 pt-10 md:px-12"
+              selectedSlug={location}
+              onSelect={(slug) => setFilters({ location: slug })}
+            />
+
+            <ListingFilters
+              lang={lang}
+              location={{
+                value: location,
+                options: (locationsQuery.data ?? []).map((tag) => ({
+                  value: tag.slug,
+                  label: lang === 'bg' ? tag.nameBg : tag.name,
+                })),
+                onChange: (value) => setFilters({ location: value }),
+              }}
+              topic={{
+                value: topic,
+                options: (topicsQuery.data ?? []).map((tag) => ({
+                  value: tag.slug,
+                  label: lang === 'bg' ? tag.nameBg : tag.name,
+                })),
+                onChange: (value) => setFilters({ topic: value }),
+              }}
+              series={{
+                value: series,
+                options: (seriesQuery.data ?? []).map((item) => ({
+                  value: item.slug,
+                  label: lang === 'bg' ? item.titleBg : item.title || item.titleBg,
+                })),
+                onChange: (value) => setFilters({ series: value }),
+              }}
+            />
 
             <div className="mx-auto max-w-7xl px-6 py-16 md:px-12 md:py-20">
               <div className="grid grid-cols-1 gap-8 md:grid-cols-2">

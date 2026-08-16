@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common'
+import { Injectable, Logger, NotFoundException, HttpException, HttpStatus } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import {
   ContactInquiry,
@@ -7,6 +7,7 @@ import {
   Prisma,
 } from '@prisma/client'
 import { AiService } from '../ai/ai.service'
+import { checkRateLimit } from '../common/rate-limit'
 import { MailService } from '../mail/mail.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { CreateContactDto } from './dto/create-contact.dto'
@@ -56,7 +57,23 @@ export class ContactService {
     }
   }
 
-  async create(dto: CreateContactDto) {
+  async create(dto: CreateContactDto, meta: { ip?: string } = {}) {
+    const ip = meta.ip || 'unknown'
+    if (
+      !checkRateLimit('contact', `ip:${ip}`, 10, 60 * 60 * 1000) ||
+      !checkRateLimit(
+        'contact',
+        `email:${dto.email.trim().toLowerCase()}`,
+        5,
+        60 * 60 * 1000,
+      )
+    ) {
+      throw new HttpException(
+        'Too many contact requests. Try again later.',
+        HttpStatus.TOO_MANY_REQUESTS,
+      )
+    }
+
     if (dto.honeypot?.trim()) {
       this.logger.warn('Contact honeypot tripped — dropping submission')
       return { ok: true as const }

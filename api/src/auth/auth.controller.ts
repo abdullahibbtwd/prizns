@@ -12,7 +12,9 @@ import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { AUTH_COOKIES } from './auth.types';
 import { CurrentUser } from './decorators/current-user.decorator';
+import { AllowUnverifiedEmail } from './decorators/allow-unverified-email.decorator';
 import { LoginDto } from './dto/login.dto';
+import { VerifyEmailDto } from './dto/verify-email.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import type { AuthUserPayload } from './auth.types';
 
@@ -68,7 +70,36 @@ export class AuthController {
 
   @Get('me')
   @UseGuards(JwtAuthGuard)
+  @AllowUnverifiedEmail()
   me(@CurrentUser() user: AuthUserPayload) {
     return { user };
+  }
+
+  @Post('verify-email')
+  @HttpCode(200)
+  @UseGuards(JwtAuthGuard)
+  @AllowUnverifiedEmail()
+  async verifyEmail(
+    @CurrentUser() user: AuthUserPayload,
+    @Body() dto: VerifyEmailDto,
+  ) {
+    const verified = await this.auth.verifyEmail(user.id, dto.code);
+    return { user: { ...verified, sessionId: user.sessionId } };
+  }
+
+  @Post('resend-verification')
+  @HttpCode(200)
+  @UseGuards(JwtAuthGuard)
+  @AllowUnverifiedEmail()
+  async resendVerification(
+    @CurrentUser() user: AuthUserPayload,
+    @Req() req: Request,
+  ) {
+    await this.auth.sendEmailVerification(user.id, {
+      replaceExisting: true,
+      skipCooldown: false,
+      ip: req.ip,
+    });
+    return { ok: true };
   }
 }

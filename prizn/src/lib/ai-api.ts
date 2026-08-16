@@ -37,3 +37,19 @@ export function fetchRegionalContext(body: {
 }) {
   return api.post<RegionalContextResult>('/ai/regional-context', body)
 }
+
+export type ArchiveAskResult = {
+  refused: boolean
+  answer: string | null
+  lang: 'bg' | 'en'
+  citations: Array<{
+    path: string
+    title: string
+    titleBg: string
+    score: number
+  }>
+}
+
+export function askArchive(body: { question: string; lang?: 'bg' | 'en' }) {
+  return api.post<ArchiveAskResult>('/archive/ask', body)
+}

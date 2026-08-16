@@ -64,6 +64,18 @@ export class TranslationService {
     this.logger.log(`Queued series translation for ${seriesId}`)
   }
 
+  async enqueueCategory(categoryId: string): Promise<void> {
+    await this.prisma.category.update({
+      where: { id: categoryId },
+      data: {
+        translationStatus: TranslationStatus.PENDING,
+        translationError: null,
+      },
+    })
+    await this.addJob({ type: 'category', id: categoryId })
+    this.logger.log(`Queued category translation for ${categoryId}`)
+  }
+
   /**
    * Detect language of a single editor string and return bilingual pair.
    * Used for short entities (tags) that are not queued like articles.
@@ -96,7 +108,11 @@ export class TranslationService {
       await this.prisma.author.update({ where: { id }, data })
       return
     }
-    await this.prisma.series.update({ where: { id }, data })
+    if (type === 'series') {
+      await this.prisma.series.update({ where: { id }, data })
+      return
+    }
+    await this.prisma.category.update({ where: { id }, data })
   }
 
   async processArticle(articleId: string): Promise<void> {
@@ -331,6 +347,58 @@ export class TranslationService {
     })
     this.logger.log(
       `Translated series ${seriesId} (${sourceLang}→${targetLang})`,
+    )
+  }
+
+  async processCategory(categoryId: string): Promise<void> {
+    await this.prisma.category.update({
+      where: { id: categoryId },
+      data: {
+        translationStatus: TranslationStatus.RUNNING,
+        translationError: null,
+      },
+    })
+
+    const category = await this.prisma.category.findUniqueOrThrow({
+      where: { id: categoryId },
+    })
+
+    const sources = [category.nameBg, category.descriptionBg ?? '']
+    const sourceLang = this.detectSourceLang(sources)
+    const targetLang: Lang = sourceLang === 'bg' ? 'en' : 'bg'
+    this.logger.log(
+      `Category ${categoryId}: detected ${sourceLang} → translating to ${targetLang}`,
+    )
+
+    const map = await this.translateMany(sources, sourceLang, targetLang)
+    const name = this.pair(map, category.nameBg, sourceLang)
+    const description = category.descriptionBg?.trim()
+      ? this.pair(map, category.descriptionBg, sourceLang)
+      : null
+
+    const latest = await this.prisma.category.findUnique({
+      where: { id: categoryId },
+      select: { translationStatus: true },
+    })
+    if (latest?.translationStatus !== TranslationStatus.RUNNING) {
+      this.logger.warn(`Skip stale category translation write for ${categoryId}`)
+      return
+    }
+
+    await this.prisma.category.update({
+      where: { id: categoryId },
+      data: {
+        translationStatus: TranslationStatus.READY,
+        translationError: null,
+        sourceLang,
+        nameBg: name.bg,
+        nameEn: name.en || null,
+        descriptionBg: description?.bg ?? category.descriptionBg,
+        descriptionEn: description?.en || null,
+      },
+    })
+    this.logger.log(
+      `Translated category ${categoryId} (${sourceLang}→${targetLang})`,
     )
   }
 

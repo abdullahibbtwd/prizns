@@ -75,8 +75,8 @@ export function PhotographyGallery({ lang }: PhotographyGalleryProps) {
           <div className="flex flex-col items-start gap-3 md:items-end">
             <p className="max-w-sm font-sans text-xs uppercase tracking-[0.2em] text-[#1A1A1A]/50 md:text-right">
               {lang === 'bg'
-                ? 'Северозападът в кадри — от медия библиотеката.'
-                : 'The northwest in frames — from the media library.'}
+                ? 'Северозападът в кадри.'
+                : 'The northwest in frames.'}
             </p>
             <ViewAllLink to="/gallery" lang={lang} />
           </div>

@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
+import { Role } from '@prisma/client';
 import { ROLES_KEY } from '../decorators/roles.decorator';
 import type { AuthUserPayload } from '../auth.types';
 
@@ -14,7 +15,7 @@ export class RolesGuard implements CanActivate {
   constructor(private readonly reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {
-    const roles = this.reflector.getAllAndOverride<Array<'ADMIN' | 'EDITOR'>>(
+    const roles = this.reflector.getAllAndOverride<Role[]>(
       ROLES_KEY,
       [context.getHandler(), context.getClass()],
     );

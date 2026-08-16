@@ -11,6 +11,14 @@
     "docker:logs": "docker compose logs -f",
     "prisma:migrate": "npm run prisma:migrate --prefix api",
     "prisma:generate": "npm run prisma:generate --prefix api",
-    "prisma:seed": "npm run prisma:seed --prefix api"
+    "prisma:seed": "npm run prisma:seed --prefix api",
+    "import:wordpress": "npm run import:wordpress --prefix api",
+    "import:wordpress:batch": "npm run import:wordpress:batch --prefix api",
+    "test:web": "npm test --prefix prizn",
+    "test:web:cov": "npm run test:cov --prefix prizn",
+    "test:api": "npm test --prefix api",
+    "test:api:cov": "npm run test:cov:all --prefix api",
+    "test:all": "npm run test:api && npm run test:web",
+    "test:ci": "npm run test:api:cov && npm run test:web:cov"
   }
 }

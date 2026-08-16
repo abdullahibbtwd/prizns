@@ -1,8 +1,9 @@
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ArrowUpRight } from 'lucide-react'
 import { ViewAllLink } from '@/components/concept-3/ViewAllLink'
 import { SponsoredBadge } from '@/components/concept-3/SponsoredBadge'
+import { RegionMap } from '@/components/concept-3/RegionMap'
 import {
   articlePath,
   preferApi,
@@ -15,6 +16,7 @@ interface OurPlacesSectionProps {
 }
 
 export function OurPlacesSection({ lang }: OurPlacesSectionProps) {
+  const navigate = useNavigate()
   const { data } = usePublicArticles('places')
   const places = preferApi(
     data?.map((article) => ({
@@ -37,6 +39,18 @@ export function OurPlacesSection({ lang }: OurPlacesSectionProps) {
           </div>
           <ViewAllLink to="/places" lang={lang} />
         </div>
+
+        <p className="mb-6 text-center font-sans text-sm font-light text-[#1A1A1A]/55">
+          {lang === 'bg'
+            ? 'Изберете град или село, за да видите историите оттам. Същата карта има и при Места и Традиции.'
+            : 'Click a town or village to see stories from that place. The same map is on Places and Traditions.'}
+        </p>
+        <RegionMap
+          className="mb-12"
+          onSelect={(slug) =>
+            navigate(`/stories?location=${encodeURIComponent(slug)}`)
+          }
+        />
 
         <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
           {places.map((place, index) => {

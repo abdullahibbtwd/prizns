@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import {
   CmsCard,
   CmsPageHeader,
@@ -8,6 +9,7 @@ import {
   PrimaryButton,
   StatusPill,
 } from '@/cms/components/CmsUI'
+import { useCmsConfirm } from '@/cms/components/CmsConfirmDialog'
 import {
   convertCmsSubmission,
   deleteCmsSubmission,
@@ -34,6 +36,8 @@ import {
 } from 'lucide-react'
 
 export default function CmsSubmissionDetailPage() {
+  const { t } = useTranslation()
+  const { confirm, dialog } = useCmsConfirm()
   const { id = '' } = useParams()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -351,17 +355,21 @@ export default function CmsSubmissionDetailPage() {
             <GhostButton
               className="text-rose-700 hover:border-rose-200 hover:bg-rose-50"
               disabled={deleteMutation.isPending}
-              onClick={() => {
-                if (window.confirm('Delete this submission permanently?')) {
-                  deleteMutation.mutate(selected.id)
-                }
+              onClick={async () => {
+                const ok = await confirm({
+                  title: t('cms.submissions.delete'),
+                  description: t('cms.submissions.deleteConfirm'),
+                })
+                if (ok) deleteMutation.mutate(selected.id)
               }}
             >
-              <Trash2 className="size-4 text-rose-600" /> Delete
+              <Trash2 className="size-4 text-rose-600" />{' '}
+              {t('cms.submissions.delete')}
             </GhostButton>
           </div>
         </CmsCard>
       )}
+      {dialog}
     </div>
   )
 }

@@ -21,6 +21,7 @@ import {
 } from '@/cms/components/CmsUI'
 import { JournalSelect } from '@/components/ui/JournalSelect'
 import { Alert } from '@/components/ui/Alert'
+import { useCmsConfirm } from '@/cms/components/CmsConfirmDialog'
 import {
   deleteCmsNewsletterSubscriber,
   listCmsNewsletterSubscribers,
@@ -38,6 +39,7 @@ const PAGE_SIZE_OPTIONS = [5, 10, 20, 50, 100] as const
 export default function CmsNewsletterPage() {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
+  const { confirm, dialog } = useCmsConfirm()
   const [query, setQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
   const [page, setPage] = useState(1)
@@ -207,17 +209,17 @@ export default function CmsNewsletterPage() {
                   subscriberCount < 1 ||
                   previewQuery.data?.mailConfigured === false
                 }
-                onClick={() => {
-                  if (
-                    window.confirm(
-                      t('cms.newsletter.sendConfirm', {
-                        title: nextEpisode.titleBg,
-                        count: subscriberCount,
-                      }),
-                    )
-                  ) {
-                    sendMutation.mutate()
-                  }
+                onClick={async () => {
+                  const ok = await confirm({
+                    title: t('cms.newsletter.sendNow'),
+                    description: t('cms.newsletter.sendConfirm', {
+                      title: nextEpisode.titleBg,
+                      count: subscriberCount,
+                    }),
+                    confirmLabel: t('cms.newsletter.sendNow'),
+                    variant: 'default',
+                  })
+                  if (ok) sendMutation.mutate()
                 }}
               >
                 <Send className="size-3.5" />
@@ -348,16 +350,14 @@ export default function CmsNewsletterPage() {
                       <button
                         type="button"
                         disabled={deleteMutation.isPending}
-                        onClick={() => {
-                          if (
-                            window.confirm(
-                              t('cms.newsletter.removeConfirm', {
-                                email: item.email,
-                              }),
-                            )
-                          ) {
-                            deleteMutation.mutate(item.id)
-                          }
+                        onClick={async () => {
+                          const ok = await confirm({
+                            title: t('cms.newsletter.remove'),
+                            description: t('cms.newsletter.removeConfirm', {
+                              email: item.email,
+                            }),
+                          })
+                          if (ok) deleteMutation.mutate(item.id)
                         }}
                         className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-50 disabled:opacity-50"
                       >
@@ -450,6 +450,7 @@ export default function CmsNewsletterPage() {
         message={toast.message}
         onClose={() => setToast((prev) => ({ ...prev, open: false }))}
       />
+      {dialog}
     </div>
   )
 }

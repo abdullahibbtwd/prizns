@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ButtonHTMLAttributes } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useFieldArray, useForm } from 'react-hook-form'
 import { z } from 'zod'
@@ -9,6 +9,7 @@ import {
   ArrowLeft,
   ChevronLeft,
   ChevronRight,
+  Clock,
   Eye,
   Film,
   Headphones,
@@ -65,6 +66,16 @@ import { pickLang } from '@/lib/pick-lang'
 import { cn, randomId } from '@/lib/utils'
 import { getSectionProfile } from '@/cms/section-profiles'
 import {
+  defaultScheduleLocal,
+  editorActionDisabled,
+  isScheduleDueNow,
+  joinDatetimeLocal,
+  publishedAtPayload,
+  splitDatetimeLocal,
+  toDatetimeLocalValue,
+  type EditorSaveAction,
+} from '@/cms/pages/story-editor-actions'
+import {
   captureVideoPosterBlob,
   formatWatchDuration,
   getRemotePosterUrl,
@@ -79,12 +90,12 @@ const blockSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('pullquote'),
     textBg: z.string().min(1),
-    citeBg: z.string().min(1),
+    citeBg: z.string(),
   }),
   z.object({
     type: z.literal('note'),
     labelBg: z.string().min(1),
-    textBg: z.string().min(1),
+    textBg: z.string(),
   }),
   z.object({
     type: z.literal('caption'),
@@ -102,6 +113,7 @@ const schema = z.object({
     'voices',
     'sports',
     'events',
+    'news',
     'video',
     'campaigns',
     'gallery',
@@ -125,6 +137,7 @@ const schema = z.object({
   videoMediaId: z.string(),
   featured: z.boolean(),
   sponsored: z.boolean(),
+  sourced: z.boolean(),
   sponsorName: z.string(),
   behindStoryBg: z.string(),
   seoTitleBg: z.string(),
@@ -133,6 +146,16 @@ const schema = z.object({
   body: z.array(blockSchema).min(1),
   seriesMode: z.enum(['standalone', 'series']),
   seriesId: z.string(),
+  scheduledAt: z.string(),
+}).superRefine((values, ctx) => {
+  if (values.status !== 'SCHEDULED') return
+  if (!values.scheduledAt.trim()) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['scheduledAt'],
+      message: 'required',
+    })
+  }
 })
 
 const emptyDefaults: ArticleFormValues = {
@@ -145,6 +168,7 @@ const emptyDefaults: ArticleFormValues = {
   readTimeUnit: 'minutes',
   locationBg: '',
   dateIso: '',
+  scheduledAt: '',
   photoCreditBg: '',
   endLabelBg: 'Край',
   speakerBg: '',
@@ -156,6 +180,7 @@ const emptyDefaults: ArticleFormValues = {
   videoMediaId: '',
   featured: false,
   sponsored: false,
+  sourced: false,
   sponsorName: '',
   behindStoryBg: '',
   seoTitleBg: '',
@@ -225,6 +250,14 @@ function preloadImageUrl(url: string) {
     img.onerror = () => resolve()
     img.src = url
   })
+}
+
+function EditorActionButton({
+  primary,
+  ...props
+}: ButtonHTMLAttributes<HTMLButtonElement> & { primary: boolean }) {
+  const Button = primary ? PrimaryButton : GhostButton
+  return <Button {...props} />
 }
 
 export default function CmsStoryEditorPage() {
@@ -332,6 +365,10 @@ export default function CmsStoryEditorPage() {
         article.section === 'video' ? 'minutes' : readTime.unit,
       locationBg: article.locationBg,
       dateIso: article.publishedAt?.slice(0, 10) || '',
+      scheduledAt:
+        article.status === 'SCHEDULED'
+          ? toDatetimeLocalValue(article.publishedAt)
+          : '',
       photoCreditBg: article.photoCreditBg,
       endLabelBg: article.endLabelBg,
       speakerBg: article.speakerBg ?? '',
@@ -343,6 +380,7 @@ export default function CmsStoryEditorPage() {
       videoMediaId: article.videoMediaId ?? '',
       featured: article.featured,
       sponsored: article.sponsored,
+      sourced: Boolean(article.sourced),
       sponsorName: article.sponsorName ?? '',
       behindStoryBg: article.behindStoryBg ?? '',
       seoTitleBg: article.seoTitleBg ?? '',
@@ -374,6 +412,8 @@ export default function CmsStoryEditorPage() {
   const videoUrlValue = form.watch('videoUrl')
   const videoMediaIdValue = form.watch('videoMediaId')
   const status = form.watch('status')
+  const scheduledAt = form.watch('scheduledAt')
+  const { isDirty, errors } = form.formState
   const profile = getSectionProfile(section)
 
   useEffect(() => {
@@ -385,8 +425,18 @@ export default function CmsStoryEditorPage() {
   }, [gallery, form])
 
   // Editing a published story returns it to draft until Publish is clicked again.
+  const allowPublishDemote = useRef(false)
+  useEffect(() => {
+    allowPublishDemote.current = false
+    const timer = window.setTimeout(() => {
+      allowPublishDemote.current = true
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [articleQuery.data?.id])
+
   useEffect(() => {
     const sub = form.watch((_values, info) => {
+      if (!allowPublishDemote.current) return
       if (info.type !== 'change') return
       if (!info.name || info.name === 'status') return
       // Synced from local gallery state — demotion happens via noteGalleryEdit.
@@ -472,10 +522,10 @@ export default function CmsStoryEditorPage() {
           subtitleBg: values.subtitleBg,
           readTimeBg: formatReadTimeBg(minutes, values.readTimeUnit),
           locationBg: values.locationBg,
-          dateBg: formatDateBg(values.dateIso),
-          publishedAt: values.dateIso
-            ? new Date(`${values.dateIso}T12:00:00`).toISOString()
-            : undefined,
+          dateBg: formatDateBg(
+            values.dateIso || values.scheduledAt.slice(0, 10),
+          ),
+          publishedAt: publishedAtPayload(values.status, values.scheduledAt),
           photoCreditBg: values.photoCreditBg,
           endLabelBg: values.endLabelBg,
           speakerBg: values.speakerBg || undefined,
@@ -490,6 +540,7 @@ export default function CmsStoryEditorPage() {
           videoMediaId,
           featured: values.featured,
           sponsored: values.sponsored,
+          sourced: values.sourced,
           sponsorName: values.sponsored
             ? values.sponsorName.trim() || null
             : null,
@@ -539,6 +590,10 @@ export default function CmsStoryEditorPage() {
         await queryClient.invalidateQueries({
           queryKey: ['cms-series-item', article.series.id],
         })
+      }
+      if (article.status === 'PUBLISHED') {
+        navigate(basePath)
+        return
       }
       if (isNew) navigate(`${basePath}/${article.id}`, { replace: true })
       else await queryClient.invalidateQueries({ queryKey: ['cms-article', id] })
@@ -806,6 +861,21 @@ export default function CmsStoryEditorPage() {
     await saveMutation.mutateAsync(values)
   })
 
+  const submitStatus = (next: EditorSaveAction) => {
+    let statusToSave: EditorSaveAction = next
+    if (next === 'SCHEDULED') {
+      let at = form.getValues('scheduledAt')
+      if (!at.trim()) {
+        at = defaultScheduleLocal()
+        form.setValue('scheduledAt', at, { shouldDirty: true })
+      }
+      if (isScheduleDueNow(at)) statusToSave = 'PUBLISHED'
+    }
+    void form.handleSubmit((values) =>
+      saveMutation.mutateAsync({ ...values, status: statusToSave }),
+    )()
+  }
+
   if (!isNew && articleQuery.isLoading) {
     return (
       <p className="text-sm text-stone-500">{t('cms.editor.loading')}</p>
@@ -844,6 +914,20 @@ export default function CmsStoryEditorPage() {
   }))
 
   const mediaBusy = mediaSaving || mediaPreparing || posterBusy
+  const editorDirty = isDirty || Boolean(pendingAudioFile || pendingVideoFile)
+  const editorBusy = saveMutation.isPending || mediaBusy
+  const savedStatus = articleQuery.data?.status
+  const thirdAction: EditorSaveAction =
+    status === 'SCHEDULED' || status === 'ARCHIVED' ? status : 'PUBLISHED'
+  const actionDisabled = (action: EditorSaveAction) =>
+    editorActionDisabled({
+      action,
+      savedStatus,
+      selectedStatus: status,
+      dirty: editorDirty,
+      busy: editorBusy,
+      isNew,
+    })
 
   const MediaPrepOverlay = ({ label }: { label?: string }) =>
     mediaPreparing || posterBusy ? (
@@ -876,26 +960,38 @@ export default function CmsStoryEditorPage() {
           {articleQuery.data?.translationStatus && (
             <StatusPill status={articleQuery.data.translationStatus} />
           )}
-          <GhostButton
+          <EditorActionButton
             type="button"
-            onClick={() => {
-              form.setValue('status', 'DRAFT')
-              void onSubmit()
-            }}
-            disabled={saveMutation.isPending || mediaBusy}
+            primary={status === 'REVIEW'}
+            onClick={() => submitStatus('REVIEW')}
+            disabled={actionDisabled('REVIEW')}
+          >
+            {t('cms.editor.review')}
+          </EditorActionButton>
+          <EditorActionButton
+            type="button"
+            primary={status === 'DRAFT'}
+            onClick={() => submitStatus('DRAFT')}
+            disabled={actionDisabled('DRAFT')}
           >
             <Save className="size-4" /> {t('cms.editor.saveDraft')}
-          </GhostButton>
-          <PrimaryButton
+          </EditorActionButton>
+          <EditorActionButton
             type="button"
-            onClick={() => {
-              form.setValue('status', 'PUBLISHED')
-              void onSubmit()
-            }}
-            disabled={saveMutation.isPending || mediaBusy}
+            primary={status === thirdAction}
+            onClick={() => submitStatus(thirdAction)}
+            disabled={actionDisabled(thirdAction)}
           >
-            {t('cms.editor.publish')}
-          </PrimaryButton>
+            {thirdAction === 'SCHEDULED' ? (
+              <>
+                <Clock className="size-4" /> {t('cms.editor.schedule')}
+              </>
+            ) : thirdAction === 'ARCHIVED' ? (
+              t('cms.editor.archive')
+            ) : (
+              t('cms.editor.publish')
+            )}
+          </EditorActionButton>
         </div>
       </div>
 
@@ -1906,13 +2002,71 @@ export default function CmsStoryEditorPage() {
                 placeholder={t('cms.editor.status')}
                 options={statusOptions}
                 value={form.watch('status')}
-                onChange={(value) =>
-                  form.setValue('status', value as ArticleFormValues['status'], {
-                    shouldDirty: true,
-                  })
-                }
+                onChange={(value) => {
+                  const next = value as ArticleFormValues['status']
+                  form.setValue('status', next, { shouldDirty: true })
+                  if (next === 'SCHEDULED' && !form.getValues('scheduledAt')) {
+                    form.setValue('scheduledAt', defaultScheduleLocal(), {
+                      shouldDirty: true,
+                    })
+                  }
+                }}
               />
             </div>
+            {status === 'SCHEDULED' ? (
+              <div className="space-y-2 rounded-xl border border-[#E8E4DC] bg-[#FAF8F3] p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-stone-500">
+                  {t('cms.editor.scheduleAt')}
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="block space-y-1 text-xs">
+                    {t('cms.editor.scheduleDate')}
+                    <input
+                      type="date"
+                      lang="bg-BG"
+                      className="w-full border border-[#E8E4DC] bg-white px-2 py-2"
+                      value={splitDatetimeLocal(scheduledAt).date}
+                      onChange={(event) =>
+                        form.setValue(
+                          'scheduledAt',
+                          joinDatetimeLocal(
+                            event.target.value,
+                            splitDatetimeLocal(scheduledAt).time,
+                          ),
+                          { shouldDirty: true },
+                        )
+                      }
+                    />
+                  </label>
+                  <label className="block space-y-1 text-xs">
+                    {t('cms.editor.scheduleTime')}
+                    <input
+                      type="time"
+                      className="w-full border border-[#E8E4DC] bg-white px-2 py-2"
+                      value={splitDatetimeLocal(scheduledAt).time}
+                      onChange={(event) =>
+                        form.setValue(
+                          'scheduledAt',
+                          joinDatetimeLocal(
+                            splitDatetimeLocal(scheduledAt).date,
+                            event.target.value,
+                          ),
+                          { shouldDirty: true },
+                        )
+                      }
+                    />
+                  </label>
+                </div>
+                <p className="text-[11px] text-stone-500">
+                  {t('cms.editor.scheduleHint')}
+                </p>
+                {errors.scheduledAt ? (
+                  <p className="text-[11px] text-rose-700">
+                    {t('cms.editor.scheduleRequired')}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
             <CmsCheckbox
               checked={form.watch('featured')}
               onChange={() =>
@@ -1939,6 +2093,15 @@ export default function CmsStoryEditorPage() {
                 />
               </CmsField>
             ) : null}
+            <CmsCheckbox
+              checked={form.watch('sourced')}
+              onChange={() =>
+                form.setValue('sourced', !form.getValues('sourced'), {
+                  shouldDirty: true,
+                })
+              }
+              label={t('cms.editor.sourced')}
+            />
 
             <CmsField label={t('cms.editor.behindStory')}>
               <CmsTextarea rows={4} {...form.register('behindStoryBg')} />
@@ -2152,6 +2315,11 @@ export default function CmsStoryEditorPage() {
           </CmsCard>
           )}
 
+          {form.formState.isSubmitted && Object.keys(errors).length > 0 ? (
+            <p className="text-sm text-rose-700">
+              {t('cms.editor.validationFailed')}
+            </p>
+          ) : null}
           {saveMutation.isError && (
             <p className="text-sm text-rose-700">
               {(saveMutation.error as ApiError)?.message ||

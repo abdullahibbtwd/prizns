@@ -31,6 +31,7 @@ import { StorageModule } from './storage/storage.module';
 import { StoryYearModule } from './story-year/story-year.module';
 import { SubmissionsModule } from './submissions/submissions.module';
 import { TagsModule } from './tags/tags.module';
+import { CategoriesModule } from './categories/categories.module';
 import { TodosModule } from './todos/todos.module';
 import { TranslationModule } from './translation/translation.module';
 import { TtsModule } from './tts/tts.module';
@@ -59,6 +60,7 @@ import { UsersModule } from './users/users.module';
     ArticlesModule,
     SeriesModule,
     TagsModule,
+    CategoriesModule,
     SubmissionsModule,
     PartnershipsModule,
     ContactModule,

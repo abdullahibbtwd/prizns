@@ -1,12 +1,13 @@
-import {
-  Injectable,
-  Logger,
-  OnModuleInit,
-  ServiceUnavailableException,
-} from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, OnModuleInit, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
 import * as Minio from 'minio';
+import {
+  assertAllowedUploadMime,
+  assertSafeObjectKey,
+  sanitizeStorageFolder,
+  type UploadProfile,
+} from '../common/upload-validation';
 import { PrismaService } from '../prisma/prisma.service';
 
 export type UploadedFile = {
@@ -145,6 +146,7 @@ export class StorageService implements OnModuleInit {
   async upload(
     file: Express.Multer.File,
     folder = 'uploads',
+    profile: UploadProfile = 'cms',
   ): Promise<UploadedFile> {
     if (!file) {
       throw new ServiceUnavailableException('No file provided');
@@ -155,6 +157,7 @@ export class StorageService implements OnModuleInit {
       mimeType: file.mimetype,
       originalName: file.originalname,
       folder,
+      profile,
     });
   }
 
@@ -163,8 +166,11 @@ export class StorageService implements OnModuleInit {
     mimeType: string;
     originalName: string;
     folder?: string;
+    profile?: UploadProfile;
   }): Promise<UploadedFile> {
-    const folder = input.folder ?? 'uploads';
+    const profile = input.profile ?? 'cms';
+    assertAllowedUploadMime(input.mimeType, profile);
+    const folder = sanitizeStorageFolder(input.folder, 'uploads');
     const ext = input.originalName.includes('.')
       ? input.originalName.slice(input.originalName.lastIndexOf('.'))
       : '';
@@ -200,11 +206,25 @@ export class StorageService implements OnModuleInit {
   }
 
   async getPresignedUrl(key: string, expirySeconds = 3600): Promise<string> {
-    return this.client.presignedGetObject(this.bucket, key, expirySeconds);
+    const safeKey = assertSafeObjectKey(key);
+    await this.assertRegisteredKey(safeKey);
+    return this.client.presignedGetObject(this.bucket, safeKey, expirySeconds);
   }
 
   async remove(key: string): Promise<void> {
-    await this.client.removeObject(this.bucket, key);
-    await this.prisma.fileObject.deleteMany({ where: { key } });
+    const safeKey = assertSafeObjectKey(key);
+    await this.assertRegisteredKey(safeKey);
+    await this.client.removeObject(this.bucket, safeKey);
+    await this.prisma.fileObject.deleteMany({ where: { key: safeKey } });
+  }
+
+  private async assertRegisteredKey(key: string) {
+    const record = await this.prisma.fileObject.findFirst({
+      where: { key, bucket: this.bucket },
+      select: { id: true },
+    });
+    if (!record) {
+      throw new NotFoundException('File not found');
+    }
   }
 }

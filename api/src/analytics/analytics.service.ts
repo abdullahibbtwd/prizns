@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { AnalyticsClickKind, Prisma } from '@prisma/client';
+import { checkRateLimit } from '../common/rate-limit';
 import { PrismaService } from '../prisma/prisma.service';
 import { AnalyticsBeaconDto } from './dto/beacon.dto';
 
@@ -102,6 +103,10 @@ export class AnalyticsService {
       });
     }
 
+    if (dto.event === 'click') {
+      return this.recordClick(dto, sessionId, path);
+    }
+
     if (dto.event === 'pageview') {
       const view = await this.prisma.pageView.create({
         data: {
@@ -145,6 +150,76 @@ export class AnalyticsService {
     });
 
     return { sessionId, pageViewId: updated.id };
+  }
+
+  private async recordClick(
+    dto: AnalyticsBeaconDto,
+    sessionId: string,
+    path: string,
+  ) {
+    const visitorKey = dto.visitorKey.trim().slice(0, 80);
+    if (!checkRateLimit('analytics-click', visitorKey, 40, 60_000)) {
+      return { sessionId, ignored: true as const };
+    }
+
+    const href = this.normalizeHref(dto.href);
+    if (!href) {
+      return { sessionId, ignored: true as const };
+    }
+
+    const kind = this.clickKind(dto.kind, href);
+    const label = (dto.label ?? '').trim().slice(0, 120);
+
+    await this.prisma.analyticsClick.create({
+      data: {
+        sessionId,
+        visitorKey,
+        readerId: dto.readerId?.trim() || null,
+        path: path.slice(0, 500),
+        href: href.slice(0, 500),
+        label,
+        kind,
+        articleId: dto.articleId?.trim() || null,
+      },
+    });
+    return { sessionId };
+  }
+
+  private normalizeHref(raw?: string): string | null {
+    const value = raw?.trim();
+    if (!value) return null;
+    const lower = value.toLowerCase();
+    if (
+      lower.startsWith('javascript:') ||
+      lower.startsWith('data:') ||
+      lower.startsWith('vbscript:') ||
+      lower.startsWith('mailto:') ||
+      lower.startsWith('tel:')
+    ) {
+      return null;
+    }
+    if (value.startsWith('#')) return null;
+    try {
+      if (value.startsWith('/') && !value.startsWith('//')) {
+        return value.split('#')[0].slice(0, 500);
+      }
+      const url = new URL(value);
+      if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+      return `${url.origin}${url.pathname}${url.search}`.slice(0, 500);
+    } catch {
+      return value.split('#')[0].slice(0, 500) || null;
+    }
+  }
+
+  private clickKind(
+    kind: AnalyticsBeaconDto['kind'],
+    href: string,
+  ): AnalyticsClickKind {
+    if (kind === 'cta') return AnalyticsClickKind.cta;
+    if (kind === 'outbound') return AnalyticsClickKind.outbound;
+    if (kind === 'internal') return AnalyticsClickKind.internal;
+    if (href.startsWith('/')) return AnalyticsClickKind.internal;
+    return AnalyticsClickKind.outbound;
   }
 
   private async periodStats(start: Date, end: Date) {
@@ -195,7 +270,7 @@ export class AnalyticsService {
 
   async summary(range: AnalyticsRange = 'today') {
     const { start, end, prevStart, prevEnd } = rangeWindow(range);
-    const [current, previous, topPagesRaw, topStoriesRaw, dailyRaw, sourceRows] =
+    const [current, previous, topPagesRaw, topStoriesRaw, dailyRaw, sourceRows, topClicksRaw] =
       await Promise.all([
         this.periodStats(start, end),
         this.periodStats(prevStart, prevEnd),
@@ -228,6 +303,13 @@ export class AnalyticsService {
         this.prisma.pageView.findMany({
           where: { startedAt: { gte: start, lt: end } },
           select: { utmSource: true, referrer: true },
+        }),
+        this.prisma.analyticsClick.groupBy({
+          by: ['href'],
+          where: { createdAt: { gte: start, lt: end } },
+          _count: { _all: true },
+          orderBy: { _count: { href: 'desc' } },
+          take: 10,
         }),
       ]);
 
@@ -267,6 +349,24 @@ export class AnalyticsService {
       .sort((a, b) => b.views - a.views)
       .slice(0, 10);
 
+    const clickHrefs = topClicksRaw.map((row) => row.href);
+    const clickSamples = clickHrefs.length
+      ? await this.prisma.analyticsClick.findMany({
+          where: {
+            href: { in: clickHrefs },
+            createdAt: { gte: start, lt: end },
+          },
+          select: { href: true, label: true, kind: true },
+          orderBy: { createdAt: 'desc' },
+        })
+      : [];
+    const clickMeta = new Map<string, { label: string; kind: string }>();
+    for (const row of clickSamples) {
+      if (!clickMeta.has(row.href)) {
+        clickMeta.set(row.href, { label: row.label, kind: row.kind });
+      }
+    }
+
     return {
       range,
       visitors: current.visitors,
@@ -305,6 +405,15 @@ export class AnalyticsService {
         };
       }),
       trafficSources,
+      topClicks: topClicksRaw.map((row) => {
+        const meta = clickMeta.get(row.href);
+        return {
+          href: row.href,
+          clicks: row._count._all,
+          label: meta?.label?.trim() || row.href,
+          kind: meta?.kind || 'internal',
+        };
+      }),
       daily: dailyRaw.map((row) => ({
         day: row.day.toISOString().slice(0, 10),
         views: Number(row.views),

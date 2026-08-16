@@ -31,8 +31,10 @@ import {
   GhostButton,
 } from '@/cms/components/CmsUI'
 import { uploadCmsMedia } from '@/lib/articles-api'
+import { useCmsConfirm } from '@/cms/components/CmsConfirmDialog'
 import {
   createCmsSeries,
+  deleteCmsSeries,
   getCmsSeries,
   setCmsSeriesEpisodes,
   updateCmsSeries,
@@ -131,6 +133,7 @@ export default function CmsSeriesEditorPage() {
   const queryClient = useQueryClient()
   const { t } = useTranslation()
   const { lang } = useJournalLang()
+  const { confirm, dialog } = useCmsConfirm()
   const isNew = !id || id === 'new'
   const [coverUrl, setCoverUrl] = useState('')
   const [episodeIds, setEpisodeIds] = useState<string[]>([])
@@ -220,6 +223,28 @@ export default function CmsSeriesEditorPage() {
     },
   })
 
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteCmsSeries(id!),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['cms-series'] })
+      await queryClient.invalidateQueries({ queryKey: ['cms-series-count'] })
+      navigate('/cms/series')
+    },
+  })
+
+  const confirmDelete = async () => {
+    const title =
+      form.getValues('titleBg') ||
+      seriesQuery.data?.titleBg ||
+      t('cms.editor.untitled')
+    const ok = await confirm({
+      title: t('cms.series.delete'),
+      description: t('cms.series.deleteConfirm', { title }),
+    })
+    if (!ok) return
+    deleteMutation.mutate()
+  }
+
   const onDragEnd = (event: DragEndEvent) => {
     const { active, over } = event
     if (!over || active.id === over.id) return
@@ -290,15 +315,30 @@ export default function CmsSeriesEditorPage() {
         }
         description={t('cms.series.editorHint')}
         actions={
-          <PrimaryButton
-            type="button"
-            disabled={saveMutation.isPending}
-            onClick={form.handleSubmit((values) => saveMutation.mutate(values))}
-          >
-            {saveMutation.isPending
-              ? t('cms.series.saving')
-              : t('cms.series.save')}
-          </PrimaryButton>
+          <div className="flex flex-wrap items-center gap-2">
+            {!isNew ? (
+              <GhostButton
+                type="button"
+                className="text-rose-700 hover:border-rose-200 hover:bg-rose-50"
+                disabled={deleteMutation.isPending || saveMutation.isPending}
+                onClick={() => void confirmDelete()}
+              >
+                <Trash2 className="size-4" />
+                {deleteMutation.isPending
+                  ? t('cms.series.deleting')
+                  : t('cms.series.delete')}
+              </GhostButton>
+            ) : null}
+            <PrimaryButton
+              type="button"
+              disabled={saveMutation.isPending || deleteMutation.isPending}
+              onClick={form.handleSubmit((values) => saveMutation.mutate(values))}
+            >
+              {saveMutation.isPending
+                ? t('cms.series.saving')
+                : t('cms.series.save')}
+            </PrimaryButton>
+          </div>
         }
       />
 
@@ -479,6 +519,7 @@ export default function CmsSeriesEditorPage() {
           </CmsCard>
         </div>
       </div>
+      {dialog}
     </div>
   )
 }

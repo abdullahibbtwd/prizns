@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { Tags, Trash2 } from 'lucide-react'
@@ -15,10 +15,14 @@ import {
 } from '@/cms/components/CmsFields'
 import { JournalSelect } from '@/components/ui/JournalSelect'
 import { Alert } from '@/components/ui/Alert'
+import { useCmsConfirm } from '@/cms/components/CmsConfirmDialog'
 import {
   createCmsTag,
   deleteCmsTag,
+  geocodeCmsTag,
   listCmsTags,
+  updateCmsTag,
+  type CmsTag,
   type TagKind,
 } from '@/lib/tags-api'
 
@@ -27,6 +31,7 @@ const KIND_VALUES: TagKind[] = ['LOCATION', 'TOPIC', 'CATEGORY']
 export default function CmsTagsPage() {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
+  const { confirm, dialog } = useCmsConfirm()
   const [kind, setKind] = useState<TagKind>('LOCATION')
   const [nameBg, setNameBg] = useState('')
   const [filterKind, setFilterKind] = useState<TagKind | ''>('')
@@ -109,6 +114,48 @@ export default function CmsTagsPage() {
         open: true,
         variant: 'error',
         message: err.message || t('cms.tags.deleteFailed'),
+      })
+    },
+  })
+
+  const coordsMutation = useMutation({
+    mutationFn: (input: { id: string; lat: number; lng: number }) =>
+      updateCmsTag(input.id, { lat: input.lat, lng: input.lng }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['cms-tags'] })
+      setToast({
+        open: true,
+        variant: 'success',
+        message: t('cms.tags.coordsSaved'),
+      })
+    },
+    onError: (err: Error) => {
+      setToast({
+        open: true,
+        variant: 'error',
+        message: err.message || t('cms.tags.createFailed'),
+      })
+    },
+  })
+
+  const geocodeMutation = useMutation({
+    mutationFn: (id: string) => geocodeCmsTag(id),
+    onSuccess: async (tag) => {
+      await queryClient.invalidateQueries({ queryKey: ['cms-tags'] })
+      setToast({
+        open: true,
+        variant: tag.geocodeStatus === 'ok' ? 'success' : 'error',
+        message:
+          tag.geocodeStatus === 'ok'
+            ? t('cms.tags.geocodeOk')
+            : t('cms.tags.geocodeFailed'),
+      })
+    },
+    onError: (err: Error) => {
+      setToast({
+        open: true,
+        variant: 'error',
+        message: err.message || t('cms.tags.geocodeFailed'),
       })
     },
   })
@@ -211,31 +258,51 @@ export default function CmsTagsPage() {
                   {items.map((tag) => (
                     <li
                       key={tag.id}
-                      className="flex items-center justify-between gap-3 px-4 py-3"
+                      className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-start sm:justify-between"
                     >
-                      <div>
+                      <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium text-stone-900">
                           {tag.nameBg}
                         </p>
                         <p className="text-xs text-stone-500">
                           {tag.nameEn || '—'} · /{tag.slug}
+                          {groupKind === 'LOCATION' ? (
+                            <>
+                              {' '}
+                              ·{' '}
+                              {tag.lat != null && tag.lng != null
+                                ? t('cms.tags.mapped')
+                                : t('cms.tags.unmapped')}
+                            </>
+                          ) : null}
                         </p>
+                        {groupKind === 'LOCATION' ? (
+                          <LocationCoords
+                            tag={tag}
+                            disabled={
+                              coordsMutation.isPending ||
+                              geocodeMutation.isPending
+                            }
+                            onSave={(lat, lng) =>
+                              coordsMutation.mutate({ id: tag.id, lat, lng })
+                            }
+                            onGeocode={() => geocodeMutation.mutate(tag.id)}
+                          />
+                        ) : null}
                       </div>
                       <button
                         type="button"
                         className="rounded-lg border border-[#E8E4DC] p-2 text-stone-500 transition-colors hover:border-rose-200 hover:text-rose-600"
-                        onClick={() => {
-                          if (
-                            window.confirm(
-                              t('cms.tags.deleteConfirm', { name: tag.nameBg }),
-                            )
-                          ) {
-                            deleteMutation.mutate(tag.id)
-                          }
+                        onClick={async () => {
+                          const ok = await confirm({
+                            title: t('cms.common.delete'),
+                            description: t('cms.tags.deleteConfirm', {
+                              name: tag.nameBg,
+                            }),
+                          })
+                          if (ok) deleteMutation.mutate(tag.id)
                         }}
-                        aria-label={t('cms.tags.deleteConfirm', {
-                          name: tag.nameBg,
-                        })}
+                        aria-label={`${t('cms.common.delete')}: ${tag.nameBg}`}
                       >
                         <Trash2 className="size-4" />
                       </button>
@@ -247,6 +314,102 @@ export default function CmsTagsPage() {
           })}
         </div>
       )}
+      {dialog}
+    </div>
+  )
+}
+
+function LocationCoords({
+  tag,
+  disabled,
+  onSave,
+  onGeocode,
+}: {
+  tag: CmsTag
+  disabled: boolean
+  onSave: (lat: number, lng: number) => void
+  onGeocode: () => void
+}) {
+  const { t } = useTranslation()
+  const hasCoords = tag.lat != null && tag.lng != null
+  const [editing, setEditing] = useState(!hasCoords)
+  const [lat, setLat] = useState(tag.lat != null ? String(tag.lat) : '')
+  const [lng, setLng] = useState(tag.lng != null ? String(tag.lng) : '')
+
+  useEffect(() => {
+    setLat(tag.lat != null ? String(tag.lat) : '')
+    setLng(tag.lng != null ? String(tag.lng) : '')
+    setEditing(tag.lat == null || tag.lng == null)
+  }, [tag.lat, tag.lng])
+
+  const latNum = Number(lat)
+  const lngNum = Number(lng)
+  const canSave = Number.isFinite(latNum) && Number.isFinite(lngNum)
+
+  if (!editing) {
+    return (
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <p className="text-xs text-stone-500">
+          {tag.lat}, {tag.lng}
+        </p>
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => setEditing(true)}
+          className="rounded-lg border border-[#E8E4DC] px-3 py-1.5 text-xs font-semibold text-stone-700 hover:border-[#0C2686]/30 disabled:opacity-50"
+        >
+          {t('cms.tags.editCoords')}
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="mt-3 flex flex-wrap items-end gap-2">
+      <label className="space-y-1 text-[11px] text-stone-500">
+        {t('cms.tags.lat')}
+        <input
+          value={lat}
+          onChange={(e) => setLat(e.target.value)}
+          inputMode="decimal"
+          className="block w-28 rounded-lg border border-[#E8E4DC] px-2 py-1.5 text-sm text-stone-800"
+        />
+      </label>
+      <label className="space-y-1 text-[11px] text-stone-500">
+        {t('cms.tags.lng')}
+        <input
+          value={lng}
+          onChange={(e) => setLng(e.target.value)}
+          inputMode="decimal"
+          className="block w-28 rounded-lg border border-[#E8E4DC] px-2 py-1.5 text-sm text-stone-800"
+        />
+      </label>
+      <button
+        type="button"
+        disabled={disabled || !canSave}
+        onClick={() => onSave(latNum, lngNum)}
+        className="rounded-lg border border-[#E8E4DC] px-3 py-1.5 text-xs font-semibold text-stone-700 hover:border-[#0C2686]/30 disabled:opacity-50"
+      >
+        {t('cms.tags.saveCoords')}
+      </button>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={onGeocode}
+        className="rounded-lg border border-[#E8E4DC] px-3 py-1.5 text-xs font-semibold text-[#0C2686] hover:border-[#0C2686]/30 disabled:opacity-50"
+      >
+        {t('cms.tags.geocode')}
+      </button>
+      {hasCoords ? (
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => setEditing(false)}
+          className="rounded-lg px-3 py-1.5 text-xs font-semibold text-stone-500 hover:text-stone-700 disabled:opacity-50"
+        >
+          {t('cms.tags.cancelCoords')}
+        </button>
+      ) : null}
     </div>
   )
 }

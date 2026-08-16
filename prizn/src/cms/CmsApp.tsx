@@ -3,6 +3,7 @@ import { AuthProvider } from '@/lib/auth'
 import { RequireAuth } from '@/cms/RequireAuth'
 import { CmsLayout } from '@/cms/CmsLayout'
 import CmsLoginPage from '@/cms/pages/LoginPage'
+import CmsVerifyEmailPage from '@/cms/pages/VerifyEmailPage'
 import CmsDashboard from '@/cms/pages/Dashboard'
 import CmsStoriesPage from '@/cms/pages/StoriesPage'
 import CmsStoryEditorPage from '@/cms/pages/StoryEditorPage'
@@ -18,16 +19,18 @@ import CmsContactPage from '@/cms/pages/ContactPage'
 import CmsContactDetailPage from '@/cms/pages/ContactDetailPage'
 import CmsNewsletterPage from '@/cms/pages/NewsletterPage'
 import CmsTagsPage from '@/cms/pages/TagsPage'
+import CmsCategoriesPage from '@/cms/pages/CategoriesPage'
 import CmsUsersPage from '@/cms/pages/UsersPage'
+import CmsProfilePage from '@/cms/pages/ProfilePage'
 import CmsAnalyticsPage from '@/cms/pages/AnalyticsPage'
 import CmsSocialPage from '@/cms/pages/SocialPage'
 import {
   CmsAiPage,
   CmsMediaPage,
-  CmsSeoPage,
   CmsSettingsPage,
   CmsShopPage,
 } from '@/cms/pages/ContentPages'
+import CmsSeoPage from '@/cms/pages/SeoPage'
 import CmsProductsPage from '@/cms/pages/ProductsPage'
 import CmsOrdersPage from '@/cms/pages/OrdersPage'
 import CmsBadgesPage from '@/cms/pages/BadgesPage'
@@ -38,6 +41,7 @@ export default function CmsApp() {
     <AuthProvider>
       <Routes>
         <Route path="login" element={<CmsLoginPage />} />
+        <Route path="verify-email" element={<CmsVerifyEmailPage />} />
 
         <Route element={<RequireAuth />}>
           <Route element={<CmsLayout />}>
@@ -47,6 +51,7 @@ export default function CmsApp() {
             <Route path="series" element={<CmsSeriesPage />} />
             <Route path="series/:id" element={<CmsSeriesEditorPage />} />
             <Route path="tags" element={<CmsTagsPage />} />
+            <Route path="categories" element={<CmsCategoriesPage />} />
             <Route path="authors" element={<CmsAuthorsPage />} />
             <Route path="authors/:id" element={<CmsAuthorEditorPage />} />
             <Route path="media" element={<CmsMediaPage />} />
@@ -66,6 +71,7 @@ export default function CmsApp() {
             <Route path="orders" element={<CmsOrdersPage />} />
             <Route path="products" element={<CmsProductsPage />} />
             <Route path="users" element={<CmsUsersPage />} />
+            <Route path="profile" element={<CmsProfilePage />} />
             <Route path="roles" element={<Navigate to="/cms/users" replace />} />
             <Route path="settings" element={<CmsSettingsPage />} />
             <Route path="ai" element={<CmsAiPage />} />

@@ -12,5 +12,10 @@
     "declaration": false,
     "sourceMap": false
   },
-  "include": ["prisma/seed.ts", "prisma/seed-journal.ts", "prisma/seed-path.ts"]
+  "include": [
+    "prisma/seed.ts",
+    "prisma/seed-journal.ts",
+    "prisma/seed-path.ts",
+    "prisma/seed-categories.ts"
+  ]
 }

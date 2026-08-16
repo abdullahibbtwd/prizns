@@ -1,14 +1,15 @@
 import { Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { Layers, Plus } from 'lucide-react'
+import { Layers, Plus, Trash2 } from 'lucide-react'
 import {
   CmsCard,
   CmsPageHeader,
   PrimaryButton,
   StatusPill,
 } from '@/cms/components/CmsUI'
-import { listCmsSeries } from '@/lib/cms-content-api'
+import { useCmsConfirm } from '@/cms/components/CmsConfirmDialog'
+import { deleteCmsSeries, listCmsSeries } from '@/lib/cms-content-api'
 import { useJournalLang } from '@/hooks/useJournalLang'
 import { pickLang } from '@/lib/pick-lang'
 import type { CmsSeries } from '@/lib/cms-types'
@@ -40,10 +41,30 @@ function statsLine(
 export default function CmsSeriesPage() {
   const { t } = useTranslation()
   const { lang } = useJournalLang()
+  const queryClient = useQueryClient()
+  const { confirm, dialog } = useCmsConfirm()
   const seriesQuery = useQuery({
     queryKey: ['cms-series'],
     queryFn: listCmsSeries,
   })
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => deleteCmsSeries(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['cms-series'] })
+      await queryClient.invalidateQueries({ queryKey: ['cms-series-count'] })
+    },
+  })
+
+  const confirmDelete = async (item: CmsSeries) => {
+    const title = pickLang(lang, item.titleEn, item.titleBg) || item.titleBg
+    const ok = await confirm({
+      title: t('cms.series.delete'),
+      description: t('cms.series.deleteConfirm', { title }),
+    })
+    if (!ok) return
+    deleteMutation.mutate(item.id)
+  }
 
   const series = seriesQuery.data ?? []
 
@@ -101,14 +122,28 @@ export default function CmsSeriesPage() {
                 </p>
               </div>
             </div>
-            <Link to={`/cms/series/${item.id}`} className="shrink-0">
-              <PrimaryButton className="py-2 text-xs">
-                {t('cms.series.manage')}
-              </PrimaryButton>
-            </Link>
+            <div className="flex shrink-0 items-center gap-3">
+              <button
+                type="button"
+                onClick={() => void confirmDelete(item)}
+                disabled={deleteMutation.isPending}
+                className="inline-flex items-center gap-1 text-xs font-semibold text-rose-700 disabled:opacity-50"
+              >
+                <Trash2 className="size-3.5" />
+                {deleteMutation.isPending
+                  ? t('cms.series.deleting')
+                  : t('cms.series.delete')}
+              </button>
+              <Link to={`/cms/series/${item.id}`} className="shrink-0">
+                <PrimaryButton className="py-2 text-xs">
+                  {t('cms.series.manage')}
+                </PrimaryButton>
+              </Link>
+            </div>
           </CmsCard>
         ))}
       </div>
+      {dialog}
     </div>
   )
 }

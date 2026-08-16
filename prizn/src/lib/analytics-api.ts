@@ -36,13 +36,19 @@ export type AnalyticsSummary = {
   }>
   daily: Array<{ day: string; views: number }>
   trafficSources?: Array<{ source: string; views: number }>
+  topClicks?: Array<{
+    href: string
+    clicks: number
+    label: string
+    kind: string
+  }>
 }
 
 export type BeaconPayload = {
   visitorKey: string
   sessionId?: string
   pageViewId?: string
-  event: 'pageview' | 'heartbeat' | 'leave'
+  event: 'pageview' | 'heartbeat' | 'leave' | 'click'
   path: string
   articleId?: string
   title?: string
@@ -52,6 +58,9 @@ export type BeaconPayload = {
   utmCampaign?: string
   readerId?: string
   dwellMs?: number
+  href?: string
+  label?: string
+  kind?: 'internal' | 'outbound' | 'cta'
 }
 
 export type BeaconResponse = {

@@ -6,6 +6,7 @@ import {
   IsString,
   Min,
   MinLength,
+  ValidateIf,
 } from 'class-validator';
 
 export class AnalyticsBeaconDto {
@@ -21,8 +22,8 @@ export class AnalyticsBeaconDto {
   @IsString()
   pageViewId?: string;
 
-  @IsIn(['pageview', 'heartbeat', 'leave'])
-  event!: 'pageview' | 'heartbeat' | 'leave';
+  @IsIn(['pageview', 'heartbeat', 'leave', 'click'])
+  event!: 'pageview' | 'heartbeat' | 'leave' | 'click';
 
   @IsString()
   @MinLength(1)
@@ -56,6 +57,19 @@ export class AnalyticsBeaconDto {
   @IsString()
   @MinLength(1)
   readerId?: string;
+
+  @ValidateIf((dto: AnalyticsBeaconDto) => dto.event === 'click')
+  @IsString()
+  @MinLength(1)
+  href?: string;
+
+  @IsOptional()
+  @IsString()
+  label?: string;
+
+  @IsOptional()
+  @IsIn(['internal', 'outbound', 'cta'])
+  kind?: 'internal' | 'outbound' | 'cta';
 
   @IsOptional()
   @Transform(({ value }) =>

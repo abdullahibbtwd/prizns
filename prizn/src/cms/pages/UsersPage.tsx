@@ -1,24 +1,40 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { ChevronLeft, ChevronRight, Search, Shield, Users } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Pencil, Plus, Search } from 'lucide-react'
 import {
   CmsCard,
   CmsPageHeader,
+  GhostButton,
+  PrimaryButton,
   StatusPill,
 } from '@/cms/components/CmsUI'
+import { CmsField, CmsInput } from '@/cms/components/CmsFields'
+import { CmsModal } from '@/cms/components/CmsModal'
+import { CmsPasswordInput } from '@/cms/components/CmsPasswordInput'
 import { Alert } from '@/components/ui/Alert'
 import { JournalSelect } from '@/components/ui/JournalSelect'
 import { useAuth } from '@/lib/auth'
 import {
+  createCmsUser,
   listCmsUsers,
   updateCmsUser,
   type CmsUserRole,
 } from '@/lib/users-api'
+import { CMS_USER_ROLES, cmsRoleI18nKey } from '@/lib/cms-roles'
 import { cn } from '@/lib/utils'
 
 const PAGE_SIZE_OPTIONS = [5, 10, 20, 50] as const
-const ROLE_FILTERS: Array<'all' | CmsUserRole> = ['all', 'ADMIN', 'EDITOR']
+const ROLE_FILTERS: Array<'all' | CmsUserRole> = ['all', ...CMS_USER_ROLES]
+
+const EMPTY_FORM = {
+  name: '',
+  email: '',
+  password: '',
+  confirmPassword: '',
+  role: 'EDITOR' as CmsUserRole,
+}
 
 export default function CmsUsersPage() {
   const { t } = useTranslation()
@@ -31,11 +47,29 @@ export default function CmsUsersPage() {
   const [roleFilter, setRoleFilter] = useState<(typeof ROLE_FILTERS)[number]>('all')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>(10)
+  const [createOpen, setCreateOpen] = useState(false)
+  const [editing, setEditing] = useState<{
+    id: string
+    name: string
+    email: string
+  } | null>(null)
+  const [form, setForm] = useState(EMPTY_FORM)
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [toast, setToast] = useState<{
     open: boolean
     variant: 'success' | 'error'
     message: string
   }>({ open: false, variant: 'success', message: '' })
+
+  const roleOptions = useMemo(
+    () =>
+      CMS_USER_ROLES.map((role) => ({
+        value: role,
+        label: t(cmsRoleI18nKey(role)),
+      })),
+    [t],
+  )
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 300)
@@ -81,18 +115,33 @@ export default function CmsUsersPage() {
     return Array.from({ length: end - start + 1 }, (_, i) => start + i)
   }, [page, totalPages])
 
+  const closeCreate = () => {
+    setCreateOpen(false)
+    setForm(EMPTY_FORM)
+    setShowPassword(false)
+    setShowConfirmPassword(false)
+  }
+
   const updateMutation = useMutation({
     mutationFn: ({
       id,
       role,
       isActive,
+      name,
+      email,
     }: {
       id: string
       role?: CmsUserRole
       isActive?: boolean
-    }) => updateCmsUser(id, { role, isActive }),
+      name?: string
+      email?: string
+    }) => updateCmsUser(id, { role, isActive, name, email }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['cms-users'] })
+      await queryClient.invalidateQueries({ queryKey: ['cms-authors-desk'] })
+      await queryClient.invalidateQueries({ queryKey: ['cms-authors'] })
+      await queryClient.invalidateQueries({ queryKey: ['cms-authors-count'] })
+      setEditing(null)
       setToast({ open: true, variant: 'success', message: t('cms.users.updated') })
     },
     onError: (err: Error) => {
@@ -104,40 +153,55 @@ export default function CmsUsersPage() {
     },
   })
 
+  const createMutation = useMutation({
+    mutationFn: () =>
+      createCmsUser({
+        name: form.name.trim(),
+        email: form.email.trim(),
+        password: form.password,
+        role: form.role,
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['cms-users'] })
+      await queryClient.invalidateQueries({ queryKey: ['cms-authors-desk'] })
+      await queryClient.invalidateQueries({ queryKey: ['cms-authors'] })
+      await queryClient.invalidateQueries({ queryKey: ['cms-authors-count'] })
+      closeCreate()
+      setToast({ open: true, variant: 'success', message: t('cms.users.created') })
+    },
+    onError: (err: Error) => {
+      setToast({
+        open: true,
+        variant: 'error',
+        message: err.message || t('cms.users.createFailed'),
+      })
+    },
+  })
+
+  const passwordsMatch =
+    form.password.length > 0 && form.password === form.confirmPassword
+  const canSubmitCreate =
+    form.name.trim().length > 0 &&
+    form.email.trim().includes('@') &&
+    form.password.length >= 8 &&
+    passwordsMatch &&
+    !createMutation.isPending
+
   return (
     <div>
       <CmsPageHeader
         title={t('cms.users.title')}
         description={t('cms.users.description')}
         badge={t('cms.users.badge', { count: total })}
+        actions={
+          isAdmin ? (
+            <PrimaryButton onClick={() => setCreateOpen(true)}>
+              <Plus className="size-4" />
+              {t('cms.users.newUser')}
+            </PrimaryButton>
+          ) : undefined
+        }
       />
-
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <CmsCard hover={false} className="flex items-center gap-4 p-5">
-          <div className="flex size-11 items-center justify-center rounded-xl bg-[#0C2686]/10 text-[#0C2686]">
-            <Users className="size-5" />
-          </div>
-          <div>
-            <p className="font-heading text-xs font-bold uppercase tracking-wider text-stone-500">
-              {t('cms.users.teamMembers')}
-            </p>
-            <p className="mt-1 font-heading text-2xl font-bold text-stone-900">{total}</p>
-          </div>
-        </CmsCard>
-        <CmsCard hover={false} className="flex items-center gap-4 p-5">
-          <div className="flex size-11 items-center justify-center rounded-xl bg-amber-50 text-amber-800">
-            <Shield className="size-5" />
-          </div>
-          <div>
-            <p className="font-heading text-xs font-bold uppercase tracking-wider text-stone-500">
-              {t('cms.users.roles')}
-            </p>
-            <p className="mt-1 text-sm font-semibold text-stone-800">
-              {t('cms.roles.admin')} · {t('cms.roles.editor')}
-            </p>
-          </div>
-        </CmsCard>
-      </div>
 
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="relative w-full sm:max-w-sm">
@@ -150,26 +214,20 @@ export default function CmsUsersPage() {
           />
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          {ROLE_FILTERS.map((item) => (
-            <button
-              key={item}
-              type="button"
-              onClick={() => setRoleFilter(item)}
-              className={cn(
-                'rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors',
-                roleFilter === item
-                  ? 'border-[#0C2686] bg-[#0C2686] text-white'
-                  : 'border-[#E8E4DC] bg-white text-stone-600 hover:border-[#0C2686]/40',
-              )}
-            >
-              {item === 'all'
-                ? t('cms.users.allRoles')
-                : item === 'ADMIN'
-                  ? t('cms.roles.admin')
-                  : t('cms.roles.editor')}
-            </button>
-          ))}
+        <div className="w-full sm:max-w-[240px]">
+          <JournalSelect
+            name="usersRoleFilter"
+            variant="boxed"
+            label={t('cms.users.colRole')}
+            value={roleFilter}
+            onChange={(value) =>
+              setRoleFilter(value as (typeof ROLE_FILTERS)[number])
+            }
+            options={[
+              { value: 'all', label: t('cms.users.allRoles') },
+              ...roleOptions,
+            ]}
+          />
         </div>
       </div>
 
@@ -194,13 +252,15 @@ export default function CmsUsersPage() {
       {items.length > 0 && (
         <CmsCard hover={false} className="overflow-hidden p-0">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] text-left text-sm">
+            <table className="w-full min-w-[880px] text-left text-sm">
               <thead className="border-b border-[#E8E4DC] bg-stone-50 text-xs uppercase tracking-wider text-stone-500">
                 <tr>
                   <th className="px-4 py-3">{t('cms.users.colUser')}</th>
                   <th className="px-4 py-3">{t('cms.users.colRole')}</th>
                   <th className="px-4 py-3">{t('cms.users.colStatus')}</th>
+                  <th className="px-4 py-3">{t('cms.users.colVerified')}</th>
                   <th className="px-4 py-3">{t('cms.users.colJoined')}</th>
+                  {isAdmin && <th className="px-4 py-3" />}
                 </tr>
               </thead>
               <tbody>
@@ -219,12 +279,21 @@ export default function CmsUsersPage() {
                         )}
                       </p>
                       <p className="text-xs text-stone-500">{item.email}</p>
+                      {item.authorId && (
+                        <Link
+                          to={`/cms/authors/${item.authorId}`}
+                          className="mt-1 inline-flex text-[11px] font-semibold text-[#0C2686] hover:underline"
+                        >
+                          {t('cms.users.openAuthor')}
+                        </Link>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       {isAdmin ? (
-                        <div className="min-w-[140px] max-w-[180px]">
+                        <div className="min-w-[180px] max-w-[240px]">
                           <JournalSelect
                             name={`role-${item.id}`}
+                            variant="boxed"
                             value={item.role}
                             onChange={(value) => {
                               if (value === item.role) return
@@ -233,10 +302,7 @@ export default function CmsUsersPage() {
                                 role: value as CmsUserRole,
                               })
                             }}
-                            options={[
-                              { value: 'ADMIN', label: t('cms.roles.admin') },
-                              { value: 'EDITOR', label: t('cms.roles.editor') },
-                            ]}
+                            options={roleOptions}
                           />
                         </div>
                       ) : (
@@ -271,7 +337,39 @@ export default function CmsUsersPage() {
                         <StatusPill status={item.isActive ? 'active' : 'archived'} />
                       )}
                     </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={cn(
+                          'rounded-full border px-2.5 py-1 text-xs font-semibold',
+                          item.emailVerified
+                            ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                            : 'border-amber-200 bg-amber-50 text-amber-800',
+                        )}
+                      >
+                        {item.emailVerified
+                          ? t('cms.users.verified')
+                          : t('cms.users.unverified')}
+                      </span>
+                    </td>
                     <td className="px-4 py-3 text-stone-500">{item.joinedAt}</td>
+                    {isAdmin && (
+                      <td className="px-4 py-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setEditing({
+                              id: item.id,
+                              name: item.name ?? '',
+                              email: item.email,
+                            })
+                          }
+                          className="inline-flex items-center gap-1 rounded-xl border border-[#E8E4DC] bg-stone-50 px-2.5 py-1.5 text-xs font-semibold text-stone-700 transition hover:bg-white"
+                        >
+                          <Pencil className="size-3.5" />
+                          {t('cms.users.edit')}
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -293,6 +391,7 @@ export default function CmsUsersPage() {
               </span>
               <JournalSelect
                 name="usersPageSize"
+                variant="boxed"
                 value={String(pageSize)}
                 onChange={(value) =>
                   setPageSize(Number(value) as (typeof PAGE_SIZE_OPTIONS)[number])
@@ -356,6 +455,168 @@ export default function CmsUsersPage() {
           {t('cms.users.adminOnly')}
         </p>
       )}
+
+      <CmsModal
+        open={createOpen}
+        onClose={closeCreate}
+        title={t('cms.users.createTitle')}
+        description={t('cms.users.createDescription')}
+      >
+        <form
+          className="space-y-4"
+          onSubmit={(event) => {
+            event.preventDefault()
+            if (!canSubmitCreate) return
+            createMutation.mutate()
+          }}
+        >
+          <CmsField label={t('cms.users.name')} htmlFor="cms-user-name">
+            <CmsInput
+              id="cms-user-name"
+              value={form.name}
+              onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
+              autoComplete="name"
+              required
+            />
+          </CmsField>
+          <CmsField label={t('cms.users.email')} htmlFor="cms-user-email">
+            <CmsInput
+              id="cms-user-email"
+              type="email"
+              value={form.email}
+              onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
+              autoComplete="off"
+              required
+            />
+          </CmsField>
+          <CmsField label={t('cms.users.password')} htmlFor="cms-user-password">
+            <CmsPasswordInput
+              id="cms-user-password"
+              value={form.password}
+              onChange={(password) => setForm((prev) => ({ ...prev, password }))}
+              visible={showPassword}
+              onToggleVisible={() => setShowPassword((prev) => !prev)}
+              showLabel={t('cms.users.showPassword')}
+              hideLabel={t('cms.users.hidePassword')}
+              required
+              minLength={8}
+            />
+            <p className="text-xs text-stone-500">{t('cms.users.passwordHint')}</p>
+          </CmsField>
+          <CmsField
+            label={t('cms.users.confirmPassword')}
+            htmlFor="cms-user-confirm-password"
+          >
+            <CmsPasswordInput
+              id="cms-user-confirm-password"
+              value={form.confirmPassword}
+              onChange={(confirmPassword) =>
+                setForm((prev) => ({ ...prev, confirmPassword }))
+              }
+              visible={showConfirmPassword}
+              onToggleVisible={() => setShowConfirmPassword((prev) => !prev)}
+              showLabel={t('cms.users.showPassword')}
+              hideLabel={t('cms.users.hidePassword')}
+              required
+              minLength={8}
+            />
+            {form.confirmPassword.length > 0 && !passwordsMatch && (
+              <p className="text-xs text-rose-700">{t('cms.users.passwordMismatch')}</p>
+            )}
+          </CmsField>
+          <CmsField label={t('cms.users.colRole')}>
+            <JournalSelect
+              name="cms-user-role"
+              variant="boxed"
+              value={form.role}
+              onChange={(value) =>
+                setForm((prev) => ({ ...prev, role: value as CmsUserRole }))
+              }
+              options={roleOptions}
+            />
+            {form.role === 'AUTHOR' && (
+              <p className="text-xs text-stone-500">{t('cms.users.authorHint')}</p>
+            )}
+          </CmsField>
+          <div className="flex justify-end gap-2 pt-2">
+            <GhostButton type="button" onClick={closeCreate}>
+              {t('cms.users.cancel')}
+            </GhostButton>
+            <PrimaryButton type="submit" disabled={!canSubmitCreate}>
+              {createMutation.isPending
+                ? t('cms.common.saving')
+                : t('cms.common.create')}
+            </PrimaryButton>
+          </div>
+        </form>
+      </CmsModal>
+
+      <CmsModal
+        open={Boolean(editing)}
+        onClose={() => setEditing(null)}
+        title={t('cms.users.editTitle')}
+        description={t('cms.users.editDescription')}
+      >
+        {editing && (
+          <form
+            className="space-y-4"
+            onSubmit={(event) => {
+              event.preventDefault()
+              if (!editing.name.trim() || !editing.email.includes('@')) return
+              updateMutation.mutate({
+                id: editing.id,
+                name: editing.name.trim(),
+                email: editing.email.trim(),
+              })
+            }}
+          >
+            <CmsField label={t('cms.users.name')} htmlFor="cms-user-edit-name">
+              <CmsInput
+                id="cms-user-edit-name"
+                value={editing.name}
+                onChange={(e) =>
+                  setEditing((prev) =>
+                    prev ? { ...prev, name: e.target.value } : prev,
+                  )
+                }
+                autoComplete="name"
+                required
+              />
+            </CmsField>
+            <CmsField label={t('cms.users.email')} htmlFor="cms-user-edit-email">
+              <CmsInput
+                id="cms-user-edit-email"
+                type="email"
+                value={editing.email}
+                onChange={(e) =>
+                  setEditing((prev) =>
+                    prev ? { ...prev, email: e.target.value } : prev,
+                  )
+                }
+                autoComplete="off"
+                required
+              />
+            </CmsField>
+            <div className="flex justify-end gap-2 pt-2">
+              <GhostButton type="button" onClick={() => setEditing(null)}>
+                {t('cms.users.cancel')}
+              </GhostButton>
+              <PrimaryButton
+                type="submit"
+                disabled={
+                  updateMutation.isPending ||
+                  !editing.name.trim() ||
+                  !editing.email.includes('@')
+                }
+              >
+                {updateMutation.isPending
+                  ? t('cms.common.saving')
+                  : t('cms.common.save')}
+              </PrimaryButton>
+            </div>
+          </form>
+        )}
+      </CmsModal>
 
       <Alert
         open={toast.open}

@@ -79,3 +79,11 @@ export function updateCmsSeries(id: string, body: Partial<SeriesFormValues>) {
 export function setCmsSeriesEpisodes(id: string, articleIds: string[]) {
   return api.put<CmsSeries>(`/cms/series/${id}/episodes`, { articleIds })
 }
+
+export function deleteCmsAuthor(id: string) {
+  return api.delete<{ ok: boolean; id: string }>(`/cms/authors/${id}`)
+}
+
+export function deleteCmsSeries(id: string) {
+  return api.delete<{ ok: boolean; id: string }>(`/cms/series/${id}`)
+}

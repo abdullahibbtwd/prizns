@@ -1,26 +1,47 @@
 import { Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { Edit, MapPin, Plus, UserRound } from 'lucide-react'
+import { Edit, MapPin, Plus, Trash2, UserRound } from 'lucide-react'
 import {
   CmsCard,
   CmsPageHeader,
   PrimaryButton,
   StatusPill,
 } from '@/cms/components/CmsUI'
-import { listCmsAuthors } from '@/lib/cms-content-api'
+import { useCmsConfirm } from '@/cms/components/CmsConfirmDialog'
+import { deleteCmsAuthor, listCmsAuthors } from '@/lib/cms-content-api'
 import { useJournalLang } from '@/hooks/useJournalLang'
 import { pickLang } from '@/lib/pick-lang'
 
 export default function CmsAuthorsPage() {
   const { t } = useTranslation()
   const { lang } = useJournalLang()
+  const queryClient = useQueryClient()
+  const { confirm, dialog } = useCmsConfirm()
   const authorsQuery = useQuery({
     queryKey: ['cms-authors-desk'],
     queryFn: () => listCmsAuthors(true),
   })
-
   const authors = authorsQuery.data ?? []
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => deleteCmsAuthor(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['cms-authors-desk'] })
+      await queryClient.invalidateQueries({ queryKey: ['cms-authors'] })
+      await queryClient.invalidateQueries({ queryKey: ['cms-authors-count'] })
+    },
+  })
+
+  const confirmDelete = async (author: (typeof authors)[number]) => {
+    const name = pickLang(lang, author.nameEn, author.nameBg) || author.nameBg
+    const ok = await confirm({
+      title: t('cms.authors.delete'),
+      description: t('cms.authors.deleteConfirm', { name }),
+    })
+    if (!ok) return
+    deleteMutation.mutate(author.id)
+  }
 
   return (
     <div>
@@ -108,17 +129,31 @@ export default function CmsAuthorsPage() {
                     </span>
                   </div>
                 </div>
-                <Link
-                  to={`/cms/authors/${author.id}`}
-                  className="inline-flex items-center gap-1 font-semibold text-[#0C2686]"
-                >
-                  <Edit className="size-3.5" /> {t('cms.authors.edit')}
-                </Link>
+                <div className="flex items-center justify-between gap-3">
+                  <Link
+                    to={`/cms/authors/${author.id}`}
+                    className="inline-flex items-center gap-1 font-semibold text-[#0C2686]"
+                  >
+                    <Edit className="size-3.5" /> {t('cms.authors.edit')}
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => void confirmDelete(author)}
+                    disabled={deleteMutation.isPending}
+                    className="inline-flex items-center gap-1 font-semibold text-rose-700 disabled:opacity-50"
+                  >
+                    <Trash2 className="size-3.5" />
+                    {deleteMutation.isPending
+                      ? t('cms.authors.deleting')
+                      : t('cms.authors.delete')}
+                  </button>
+                </div>
               </div>
             </CmsCard>
           ))}
         </div>
       )}
+      {dialog}
     </div>
   )
 }

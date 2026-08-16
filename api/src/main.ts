@@ -2,6 +2,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import cookieParser from 'cookie-parser';
+import helmet from 'helmet';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -10,6 +11,7 @@ async function bootstrap() {
 
   const prefix = config.get<string>('API_PREFIX', 'api');
   app.setGlobalPrefix(prefix);
+  app.use(helmet());
   app.use(cookieParser());
 
   app.useGlobalPipes(

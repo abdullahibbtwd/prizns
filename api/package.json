@@ -13,17 +13,22 @@
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main.js",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:cov": "jest --coverage",
-    "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "test": "jest --selectProjects unit",
+    "test:watch": "jest --selectProjects unit --watch",
+    "test:cov": "jest --coverage --selectProjects unit",
+    "test:cov:all": "jest --coverage --runInBand",
+    "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand --selectProjects unit",
+    "test:e2e": "jest --selectProjects e2e --runInBand",
+    "test:e2e:docker": "docker compose -f ../docker-compose.test.yml up -d --wait && npm run test:e2e",
+    "test:e2e:docker:down": "docker compose -f ../docker-compose.test.yml down -v",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
     "prisma:studio": "prisma studio",
     "prisma:seed": "prisma db seed",
-    "prisma:seed:build": "tsc -p tsconfig.seed.json"
+    "prisma:seed:build": "tsc -p tsconfig.seed.json",
+    "import:wordpress": "ts-node --transpile-only src/wordpress-import/import-wordpress.ts",
+    "import:wordpress:batch": "ts-node --transpile-only src/wordpress-import/import-wordpress.ts --users --limit=20"
   },
   "prisma": {
     "seed": "node prisma/run-seed.cjs"
@@ -50,6 +55,7 @@
     "cookie-parser": "^1.4.7",
     "dotenv": "^17.4.2",
     "google-translate-api-x": "^10.7.3",
+    "helmet": "^8.3.0",
     "ioredis": "^5.11.1",
     "minio": "^8.0.7",
     "passport": "^0.7.0",
@@ -90,22 +96,5 @@
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.20.0"
-  },
-  "jest": {
-    "moduleFileExtensions": [
-      "js",
-      "json",
-      "ts"
-    ],
-    "rootDir": "src",
-    "testRegex": ".*\\.spec\\.ts$",
-    "transform": {
-      "^.+\\.(t|j)s$": "ts-jest"
-    },
-    "collectCoverageFrom": [
-      "**/*.(t|j)s"
-    ],
-    "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
   }
 }

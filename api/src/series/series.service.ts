@@ -322,4 +322,10 @@ export class SeriesService {
 
     return this.getById(id);
   }
+
+  async remove(id: string) {
+    await this.getById(id);
+    await this.prisma.series.delete({ where: { id } });
+    return { ok: true as const, id };
+  }
 }

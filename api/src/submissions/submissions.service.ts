@@ -1,5 +1,7 @@
 import {
   BadRequestException,
+  HttpException,
+  HttpStatus,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -11,6 +13,8 @@ import {
   SubmissionStatus,
 } from '@prisma/client';
 import { ArticlesService } from '../articles/articles.service';
+import { checkRateLimit } from '../common/rate-limit';
+import type { UploadProfile } from '../common/upload-validation';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { CreateSubmissionDto } from './dto/create-submission.dto';
@@ -85,11 +89,12 @@ export class SubmissionsService {
   private async uploadMany(
     files: Express.Multer.File[] | undefined,
     folder: string,
+    profile: UploadProfile,
   ): Promise<Attachment[]> {
     if (!files?.length) return [];
     const uploaded: Attachment[] = [];
     for (const file of files) {
-      const result = await this.storage.upload(file, folder);
+      const result = await this.storage.upload(file, folder, profile);
       uploaded.push({
         key: result.key,
         url: result.url,
@@ -171,15 +176,33 @@ export class SubmissionsService {
       photos?: Express.Multer.File[];
       documents?: Express.Multer.File[];
     },
+    meta: { ip?: string } = {},
   ) {
+    const ip = meta.ip || 'unknown';
+    const email = dto.email.trim().toLowerCase();
+    if (
+      !checkRateLimit('submissions', `ip:${ip}`, 5, 60 * 60 * 1000) ||
+      !checkRateLimit('submissions', `email:${email}`, 3, 24 * 60 * 60 * 1000)
+    ) {
+      throw new HttpException(
+        'Too many submissions. Try again later.',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
     if (!dto.ownWork) {
       throw new BadRequestException('You must confirm this is your own work');
     }
 
-    const photoUrls = await this.uploadMany(files?.photos, 'submissions/photos');
+    const photoUrls = await this.uploadMany(
+      files?.photos,
+      'submissions/photos',
+      'submission-photo',
+    );
     const documentUrls = await this.uploadMany(
       files?.documents,
       'submissions/documents',
+      'submission-document',
     );
 
     const row = await this.prisma.submission.create({

@@ -8,6 +8,7 @@ import {
   BookOpen,
   ChartColumn,
   FolderKanban,
+  FolderTree,
   Handshake,
   HeartHandshake,
   LayoutDashboard,
@@ -15,10 +16,10 @@ import {
   Package,
   PenLine,
   Search,
-  Settings,
   Share2,
   ShoppingBag,
   Sparkles,
+  CircleUser,
   Users,
   Library,
   Layers,
@@ -35,12 +36,14 @@ import {
   X,
   Award,
   Trophy,
+  LogOut,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { cmsGlobalSearch } from '@/lib/cms-search-api'
 import { listCmsArticles } from '@/lib/articles-api'
 import { listCmsAuthors, listCmsSeries } from '@/lib/cms-content-api'
 import { useAuth } from '@/lib/auth'
+import { cmsRoleI18nKey, isCmsUserRole } from '@/lib/cms-roles'
 import { pickLang } from '@/lib/pick-lang'
 
 export interface CmsNavItem {
@@ -68,6 +71,7 @@ export const cmsNavGroups: CmsNavGroup[] = [
       { labelKey: 'cms.nav.series', to: '/cms/series', icon: Layers },
       { labelKey: 'cms.nav.social', to: '/cms/social', icon: Share2 },
       { labelKey: 'cms.nav.tags', to: '/cms/tags', icon: Tags },
+      { labelKey: 'cms.nav.categories', to: '/cms/categories', icon: FolderTree },
       { labelKey: 'cms.nav.authors', to: '/cms/authors', icon: Users },
       { labelKey: 'cms.nav.media', to: '/cms/media', icon: Library },
     ],
@@ -102,8 +106,9 @@ export const cmsNavGroups: CmsNavGroup[] = [
   {
     labelKey: 'cms.nav.system',
     items: [
+      { labelKey: 'cms.nav.profile', to: '/cms/profile', icon: CircleUser },
       { labelKey: 'cms.nav.users', to: '/cms/users', icon: Users },
-      { labelKey: 'cms.nav.settings', to: '/cms/settings', icon: Settings },
+      // { labelKey: 'cms.nav.settings', to: '/cms/settings', icon: Settings },
       { labelKey: 'cms.nav.ai', to: '/cms/ai', icon: Bot },
     ],
   },
@@ -116,14 +121,12 @@ interface CmsSidebarProps {
 
 export function CmsSidebar({ onNavigate }: CmsSidebarProps) {
   const { t } = useTranslation()
-  const { user } = useAuth()
+  const { user, logout } = useAuth()
+  const navigate = useNavigate()
   const displayName = user?.name?.trim() || user?.email || t('cms.editorRole')
-  const displayRole =
-    user?.role === 'ADMIN'
-      ? t('cms.roles.admin')
-      : user?.role === 'EDITOR'
-        ? t('cms.roles.editor')
-        : t('cms.editorRole')
+  const displayRole = user?.role
+    ? t(cmsRoleI18nKey(user.role))
+    : t('cms.editorRole')
   const initials = displayName
     .split(/\s+/)
     .filter(Boolean)
@@ -264,14 +267,26 @@ export function CmsSidebar({ onNavigate }: CmsSidebarProps) {
 
       {/* Editor Profile & Journal Link Footer */}
       <div className="border-t border-[#E8E4DC] p-3.5 bg-white/50 backdrop-blur-xs space-y-2">
-        <div className="flex items-center gap-3 rounded-xl border border-[#E8E4DC] bg-white p-2.5 shadow-xs">
+        <Link
+          to="/cms/profile"
+          onClick={onNavigate}
+          className="flex items-center gap-3 rounded-xl border border-[#E8E4DC] bg-white p-2.5 shadow-xs transition hover:border-[#0C2686]/30"
+        >
           <div className="relative">
-            <div
-              aria-hidden
-              className="flex size-9 items-center justify-center rounded-full border border-[#0C2686]/20 bg-[#0C2686] text-[11px] font-bold tracking-wide text-white shadow-xs"
-            >
-              {initials}
-            </div>
+            {user?.imageUrl ? (
+              <img
+                src={user.imageUrl}
+                alt=""
+                className="size-9 rounded-full border border-[#0C2686]/20 object-cover shadow-xs"
+              />
+            ) : (
+              <div
+                aria-hidden
+                className="flex size-9 items-center justify-center rounded-full border border-[#0C2686]/20 bg-[#0C2686] text-[11px] font-bold tracking-wide text-white shadow-xs"
+              >
+                {initials}
+              </div>
+            )}
             <span className="absolute bottom-0 right-0 size-2.5 rounded-full bg-emerald-500 ring-2 ring-white" />
           </div>
           <div className="min-w-0 flex-1">
@@ -280,7 +295,20 @@ export function CmsSidebar({ onNavigate }: CmsSidebarProps) {
               {displayRole}
             </p>
           </div>
-        </div>
+        </Link>
+
+        <button
+          type="button"
+          onClick={async () => {
+            await logout()
+            onNavigate?.()
+            navigate('/cms/login', { replace: true })
+          }}
+          className="flex w-full items-center gap-2 rounded-xl border border-[#E8E4DC] bg-stone-50 px-3 py-2 text-xs font-semibold text-stone-700 transition-all hover:border-rose-200 hover:bg-rose-50 hover:text-rose-800"
+        >
+          <LogOut className="size-3.5" />
+          {t('cms.signOut')}
+        </button>
 
         <a
           href="/"
@@ -376,6 +404,11 @@ export function StatusPill({ status }: { status: string }) {
     rejected: { style: 'bg-rose-50 text-rose-800 border-rose-200/80', dot: 'bg-rose-500' },
     admin: { style: 'bg-violet-50 text-violet-800 border-violet-200/80', dot: 'bg-violet-500' },
     editor: { style: 'bg-sky-50 text-sky-800 border-sky-200/80', dot: 'bg-sky-500' },
+    author: { style: 'bg-teal-50 text-teal-800 border-teal-200/80', dot: 'bg-teal-500' },
+    contributor: { style: 'bg-orange-50 text-orange-800 border-orange-200/80', dot: 'bg-orange-500' },
+    subscriber: { style: 'bg-stone-100 text-stone-700 border-stone-200/80', dot: 'bg-stone-400' },
+    seo_editor: { style: 'bg-indigo-50 text-indigo-800 border-indigo-200/80', dot: 'bg-indigo-500' },
+    seo_manager: { style: 'bg-fuchsia-50 text-fuchsia-800 border-fuchsia-200/80', dot: 'bg-fuchsia-500' },
     completed: { style: 'bg-emerald-50 text-emerald-800 border-emerald-200/80', dot: 'bg-emerald-500' },
     contacted: { style: 'bg-sky-50 text-sky-800 border-sky-200/80', dot: 'bg-sky-500' },
     negotiating: { style: 'bg-amber-50 text-amber-800 border-amber-200/80', dot: 'bg-amber-500' },
@@ -393,7 +426,12 @@ export function StatusPill({ status }: { status: string }) {
   }
 
   const statusKey = `cms.status.${key}`
-  const label = i18n.exists(statusKey) ? t(statusKey) : status
+  const roleKey = status.replace(/-/g, '_').toUpperCase()
+  const label = isCmsUserRole(roleKey)
+    ? t(cmsRoleI18nKey(roleKey))
+    : i18n.exists(statusKey)
+      ? t(statusKey)
+      : status
 
   return (
     <span
@@ -616,7 +654,8 @@ export function QuickSearchModal({
     (data?.stories.length ?? 0) +
       (data?.authors.length ?? 0) +
       (data?.submissions.length ?? 0) +
-      (data?.tags.length ?? 0) >
+      (data?.tags.length ?? 0) +
+      (data?.categories.length ?? 0) >
     0
 
   return (
@@ -806,6 +845,38 @@ export function QuickSearchModal({
                             </p>
                             <p className="truncate text-xs text-stone-600">
                               {tag.kind} · /{tag.slug}
+                            </p>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {(data?.categories.length ?? 0) > 0 && (
+                <div>
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-stone-600">
+                    {t('cms.quickSearch.categories', {
+                      count: data!.categories.length,
+                    })}
+                  </p>
+                  <div className="space-y-1">
+                    {data!.categories.map((category) => (
+                      <button
+                        key={category.id}
+                        type="button"
+                        onClick={() => handleSelect('/cms/categories')}
+                        className="flex w-full items-center justify-between rounded-xl p-2.5 text-left transition-colors hover:bg-stone-100"
+                      >
+                        <div className="flex min-w-0 items-center gap-3">
+                          <FolderTree className="size-4 shrink-0 text-[#0C2686]" />
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold text-stone-900">
+                              {pickLang(lang, category.nameEn, category.nameBg)}
+                            </p>
+                            <p className="truncate text-xs text-stone-600">
+                              /{category.slug}
                             </p>
                           </div>
                         </div>

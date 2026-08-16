@@ -1,8 +1,14 @@
+import type { CmsUserRole } from '@/lib/cms-roles'
+
+export type { CmsUserRole }
+
 export type AuthUser = {
   id: string
   email: string
   name: string | null
-  role: 'ADMIN' | 'EDITOR'
+  role: CmsUserRole
+  imageUrl?: string | null
+  emailVerified?: boolean
 }
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3003/api'

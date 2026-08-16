@@ -115,6 +115,51 @@ export class ArticlesService {
     return trimmed || null;
   }
 
+  /**
+   * PUBLISHED goes live now unless this is a republish of a past date.
+   * SCHEDULED stores the chosen datetime. undefined on update = leave unchanged.
+   */
+  private resolvePublishedAt(
+    dto: { status?: ArticleStatus; publishedAt?: string },
+    existing?: { status: ArticleStatus; publishedAt: Date | null } | null,
+  ): Date | null | undefined {
+    if (dto.status === undefined && dto.publishedAt === undefined) {
+      return existing ? undefined : null;
+    }
+
+    if (dto.status === ArticleStatus.SCHEDULED) {
+      if (dto.publishedAt) return new Date(dto.publishedAt);
+      return existing ? undefined : null;
+    }
+
+    if (dto.status === ArticleStatus.PUBLISHED) {
+      if (!existing) return new Date();
+      if (existing.status === ArticleStatus.PUBLISHED) {
+        return dto.publishedAt !== undefined
+          ? dto.publishedAt
+            ? new Date(dto.publishedAt)
+            : null
+          : undefined;
+      }
+      if (
+        existing.publishedAt &&
+        existing.publishedAt.getTime() <= Date.now()
+      ) {
+        return undefined;
+      }
+      return new Date();
+    }
+
+    if (!existing) {
+      return dto.publishedAt ? new Date(dto.publishedAt) : null;
+    }
+    return dto.publishedAt !== undefined
+      ? dto.publishedAt
+        ? new Date(dto.publishedAt)
+        : null
+      : undefined;
+  }
+
   private include = {
     author: true,
     heroMedia: true,
@@ -413,6 +458,7 @@ export class ArticlesService {
       translationStatus: article.translationStatus,
       featured: article.featured,
       sponsored: article.sponsored,
+      sourced: article.sourced,
       sponsorName: this.optionalText(article.sponsorName),
       behindStory: article.behindStoryEn ?? article.behindStoryBg,
       behindStoryBg: article.behindStoryBg,
@@ -852,12 +898,7 @@ export class ArticlesService {
         slug,
         path,
         status: dto.status ?? ArticleStatus.DRAFT,
-        publishedAt:
-          dto.status === ArticleStatus.PUBLISHED
-            ? new Date()
-            : dto.publishedAt
-              ? new Date(dto.publishedAt)
-              : null,
+        publishedAt: this.resolvePublishedAt(dto, null) ?? null,
         categoryBg: dto.categoryBg,
         titleBg: dto.titleBg,
         subtitleBg: dto.subtitleBg ?? '',
@@ -872,6 +913,7 @@ export class ArticlesService {
         body: (dto.body ?? []) as unknown as Prisma.InputJsonValue,
         featured: dto.featured ?? false,
         sponsored: dto.sponsored ?? false,
+        sourced: dto.sourced ?? false,
         sponsorName: this.optionalText(dto.sponsorName),
         behindStoryBg: dto.behindStoryBg?.trim() ?? '',
         seoTitleBg: this.optionalText(dto.seoTitleBg),
@@ -996,14 +1038,7 @@ export class ArticlesService {
         slug: nextSlug,
         path,
         status: dto.status,
-        publishedAt:
-          dto.status === ArticleStatus.PUBLISHED && !existing.publishedAt
-            ? new Date()
-            : dto.publishedAt !== undefined
-              ? dto.publishedAt
-                ? new Date(dto.publishedAt)
-                : null
-              : undefined,
+        publishedAt: this.resolvePublishedAt(dto, existing),
         categoryBg: dto.categoryBg,
         titleBg: dto.titleBg,
         subtitleBg: dto.subtitleBg,
@@ -1032,6 +1067,7 @@ export class ArticlesService {
             : undefined,
         featured: dto.featured,
         sponsored: dto.sponsored,
+        sourced: dto.sourced,
         ...(dto.sponsorName !== undefined
           ? { sponsorName: this.optionalText(dto.sponsorName) }
           : {}),
@@ -1086,6 +1122,21 @@ export class ArticlesService {
     await this.prisma.article.findUniqueOrThrow({ where: { id } });
     await this.prisma.article.delete({ where: { id } });
     return { ok: true as const, id };
+  }
+
+  /** Promote due SCHEDULED stories to PUBLISHED. */
+  async publishDueScheduled(now = new Date()) {
+    const due = await this.prisma.article.findMany({
+      where: {
+        status: ArticleStatus.SCHEDULED,
+        publishedAt: { lte: now },
+      },
+      select: { id: true },
+    });
+    for (const row of due) {
+      await this.update(row.id, { status: ArticleStatus.PUBLISHED });
+    }
+    return { published: due.length };
   }
 
   async markTranslation(

@@ -48,8 +48,8 @@ export default function GalleryPage() {
               title={getSectionPublicLabel('gallery', lang)}
               description={
                 lang === 'bg'
-                  ? 'Северозападът в кадри — от медия библиотеката.'
-                  : 'The northwest in frames — from the media library.'
+                  ? 'Северозападът в кадри.'
+                  : 'The northwest in frames.'
               }
               countLabel={
                 lang === 'bg'

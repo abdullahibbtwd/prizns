@@ -34,6 +34,10 @@ export function getFooterSecondaryLinks(lang: JournalLang): JournalNavLink[] {
       label: lang === 'bg' ? 'История на годината' : 'Story of the Year',
       to: '/story-of-the-year',
     },
+    {
+      label: lang === 'bg' ? 'Архивът' : 'Ask the Archive',
+      to: '/archive',
+    },
   ]
 }
 

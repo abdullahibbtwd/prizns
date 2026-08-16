@@ -31,6 +31,7 @@ import { useJournalLang } from '@/hooks/useJournalLang'
 import { pickLang } from '@/lib/pick-lang'
 import { getSectionLabel } from '@/lib/section-i18n'
 import { cn } from '@/lib/utils'
+import { useCmsConfirm } from '@/cms/components/CmsConfirmDialog'
 import {
   approveCmsSocialPost,
   deleteCmsSocialPost,
@@ -75,6 +76,7 @@ function summarizePacks(posts: SocialPost[]) {
 export default function CmsSocialPage() {
   const { t } = useTranslation()
   const { lang } = useJournalLang()
+  const { confirm, dialog } = useCmsConfirm()
   const queryClient = useQueryClient()
 
   const [query, setQuery] = useState('')
@@ -765,10 +767,12 @@ export default function CmsSocialPage() {
                           type="button"
                           className="!px-3 !py-1.5 text-xs text-rose-700"
                           disabled={deleteMutation.isPending}
-                          onClick={() => {
-                            if (window.confirm(t('cms.social.deleteConfirm'))) {
-                              deleteMutation.mutate(post.id)
-                            }
+                          onClick={async () => {
+                            const ok = await confirm({
+                              title: t('cms.social.delete'),
+                              description: t('cms.social.deleteConfirm'),
+                            })
+                            if (ok) deleteMutation.mutate(post.id)
                           }}
                         >
                           <Trash2 className="size-3.5" />
@@ -956,6 +960,7 @@ export default function CmsSocialPage() {
           {toast}
         </div>
       ) : null}
+      {dialog}
     </div>
   )
 }

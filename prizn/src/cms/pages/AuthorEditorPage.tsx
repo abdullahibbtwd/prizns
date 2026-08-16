@@ -5,15 +5,18 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Trash2 } from 'lucide-react'
 import {
   CmsCard,
   CmsPageHeader,
+  GhostButton,
   PrimaryButton,
   StatusPill,
 } from '@/cms/components/CmsUI'
+import { useCmsConfirm } from '@/cms/components/CmsConfirmDialog'
 import {
   createCmsAuthor,
+  deleteCmsAuthor,
   getCmsAuthor,
   updateCmsAuthor,
 } from '@/lib/cms-content-api'
@@ -65,6 +68,7 @@ export default function CmsAuthorEditorPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { t } = useTranslation()
+  const { confirm, dialog } = useCmsConfirm()
   const isNew = !id || id === 'new'
   const [uploading, setUploading] = useState(false)
 
@@ -113,6 +117,26 @@ export default function CmsAuthorEditorPage() {
     },
   })
 
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteCmsAuthor(id!),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['cms-authors-desk'] })
+      await queryClient.invalidateQueries({ queryKey: ['cms-authors'] })
+      await queryClient.invalidateQueries({ queryKey: ['cms-authors-count'] })
+      navigate('/cms/authors')
+    },
+  })
+
+  const confirmDelete = async () => {
+    const name = form.getValues('nameBg') || t('cms.editor.untitled')
+    const ok = await confirm({
+      title: t('cms.authors.delete'),
+      description: t('cms.authors.deleteConfirm', { name }),
+    })
+    if (!ok) return
+    deleteMutation.mutate()
+  }
+
   const uploadPortrait = async (files: FileList | null) => {
     if (!files?.[0]) return
     setUploading(true)
@@ -156,15 +180,30 @@ export default function CmsAuthorEditorPage() {
         }
         description={t('cms.authors.editorHint')}
         actions={
-          <PrimaryButton
-            type="button"
-            disabled={saveMutation.isPending}
-            onClick={form.handleSubmit((values) => saveMutation.mutate(values))}
-          >
-            {saveMutation.isPending
-              ? t('cms.authors.saving')
-              : t('cms.authors.save')}
-          </PrimaryButton>
+          <div className="flex flex-wrap items-center gap-2">
+            {!isNew ? (
+              <GhostButton
+                type="button"
+                className="text-rose-700 hover:border-rose-200 hover:bg-rose-50"
+                disabled={deleteMutation.isPending || saveMutation.isPending}
+                onClick={() => void confirmDelete()}
+              >
+                <Trash2 className="size-4" />
+                {deleteMutation.isPending
+                  ? t('cms.authors.deleting')
+                  : t('cms.authors.delete')}
+              </GhostButton>
+            ) : null}
+            <PrimaryButton
+              type="button"
+              disabled={saveMutation.isPending || deleteMutation.isPending}
+              onClick={form.handleSubmit((values) => saveMutation.mutate(values))}
+            >
+              {saveMutation.isPending
+                ? t('cms.authors.saving')
+                : t('cms.authors.save')}
+            </PrimaryButton>
+          </div>
         }
       />
 
@@ -263,6 +302,7 @@ export default function CmsAuthorEditorPage() {
           </CmsCard>
         </div>
       </form>
+      {dialog}
     </div>
   )
 }

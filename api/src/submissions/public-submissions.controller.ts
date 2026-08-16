@@ -2,9 +2,11 @@ import {
   Body,
   Controller,
   Post,
+  Req,
   UploadedFiles,
   UseInterceptors,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { CreateSubmissionDto } from './dto/create-submission.dto';
@@ -34,7 +36,8 @@ export class PublicSubmissionsController {
       photos?: Express.Multer.File[];
       documents?: Express.Multer.File[];
     },
+    @Req() req?: Request,
   ) {
-    return this.submissions.create(dto, files);
+    return this.submissions.create(dto, files, { ip: req?.ip });
   }
 }

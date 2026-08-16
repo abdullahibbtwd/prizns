@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   Patch,
+  Post,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -11,17 +12,25 @@ import { Role } from '@prisma/client';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import type { AuthUserPayload } from '../auth/auth.types';
+import { AuthService } from '../auth/auth.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { TranslationService } from '../translation/translation.service';
+import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UsersService } from './users.service';
 
 @Controller('cms/users')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class UsersController {
-  constructor(private readonly users: UsersService) {}
+  constructor(
+    private readonly users: UsersService,
+    private readonly translation: TranslationService,
+    private readonly auth: AuthService,
+  ) {}
 
   @Get()
+  @Roles('ADMIN')
   list(
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
@@ -42,13 +51,32 @@ export class UsersController {
     });
   }
 
+  @Post()
+  @Roles('ADMIN')
+  async create(@Body() dto: CreateUserDto) {
+    const { user, authorCreated } = await this.users.create(dto);
+    if (authorCreated && user.authorId) {
+      await this.translation.enqueueAuthor(user.authorId);
+    }
+    await this.auth.sendAccountCreatedEmail(user.id);
+    return user;
+  }
+
   @Patch(':id')
   @Roles('ADMIN')
-  update(
+  async update(
     @Param('id') id: string,
     @Body() dto: UpdateUserDto,
     @CurrentUser() actor: AuthUserPayload,
   ) {
-    return this.users.update(id, dto, actor.id);
+    const { user, authorCreated } = await this.users.update(
+      id,
+      dto,
+      actor.id,
+    );
+    if (authorCreated && user.authorId) {
+      await this.translation.enqueueAuthor(user.authorId);
+    }
+    return user;
   }
 }

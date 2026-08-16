@@ -36,6 +36,75 @@ export class SeoService {
     return raw.replace(/\/+$/, '');
   }
 
+  private filled(value?: string | null): boolean {
+    return Boolean(value?.trim());
+  }
+
+  /** CMS desk: technical SEO is live; unique title/description is the editorial gap. */
+  async cmsOverview() {
+    const base = this.siteUrl();
+    const published = await this.prisma.article.findMany({
+      where: { status: ArticleStatus.PUBLISHED },
+      select: {
+        id: true,
+        path: true,
+        section: true,
+        titleBg: true,
+        titleEn: true,
+        seoTitleBg: true,
+        seoTitleEn: true,
+        seoDescriptionBg: true,
+        seoDescriptionEn: true,
+      },
+      orderBy: { updatedAt: 'desc' },
+    });
+
+    const rows = published.map((article) => {
+      const hasTitle =
+        this.filled(article.seoTitleBg) || this.filled(article.seoTitleEn);
+      const hasDescription =
+        this.filled(article.seoDescriptionBg) ||
+        this.filled(article.seoDescriptionEn);
+      return {
+        id: article.id,
+        path: article.path.startsWith('/') ? article.path : `/${article.path}`,
+        section: article.section,
+        titleBg: article.titleBg,
+        titleEn: article.titleEn,
+        hasTitle,
+        hasDescription,
+      };
+    });
+
+    const missingTitle = rows.filter((row) => !row.hasTitle).length;
+    const missingDescription = rows.filter((row) => !row.hasDescription).length;
+    const withUniqueMeta = rows.filter(
+      (row) => row.hasTitle && row.hasDescription,
+    ).length;
+    const coveragePct =
+      rows.length === 0 ? 100 : Math.round((withUniqueMeta / rows.length) * 100);
+
+    return {
+      siteUrl: base,
+      sitemapUrl: `${base}/sitemap.xml`,
+      robotsUrl: `${base}/robots.txt`,
+      feedUrl: `${base}/feed.xml`,
+      published: rows.length,
+      withUniqueMeta,
+      missingTitle,
+      missingDescription,
+      coveragePct,
+      evergreen: {
+        traditions: published.filter((article) => article.section === 'traditions')
+          .length,
+        places: published.filter((article) => article.section === 'places').length,
+      },
+      gaps: rows
+        .filter((row) => !row.hasTitle || !row.hasDescription)
+        .slice(0, 50),
+    };
+  }
+
   private escapeXml(value: string): string {
     return value
       .replace(/&/g, '&amp;')

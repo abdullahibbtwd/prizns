@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import {
@@ -20,6 +20,7 @@ import {
   StatusPill,
 } from '@/cms/components/CmsUI'
 import { JournalSelect } from '@/components/ui/JournalSelect'
+import { useCmsConfirm } from '@/cms/components/CmsConfirmDialog'
 import { deleteCmsArticle, listCmsArticles, listCmsAuthors } from '@/lib/articles-api'
 import type { ArticleSection, ArticleStatus, CmsArticle } from '@/lib/cms-types'
 import { ARTICLE_SECTIONS } from '@/lib/cms-types'
@@ -46,8 +47,15 @@ const ALL_AUTHORS = ''
 export default function CmsStoriesPage() {
   const { t } = useTranslation()
   const { lang } = useJournalLang()
+  const { confirm, dialog } = useCmsConfirm()
   const queryClient = useQueryClient()
-  const [filter, setFilter] = useState<(typeof filters)[number]>('all')
+  const [searchParams] = useSearchParams()
+  const statusParam = searchParams.get('status')
+  const [filter, setFilter] = useState<(typeof filters)[number]>(() =>
+    statusParam && filters.includes(statusParam as (typeof filters)[number])
+      ? (statusParam as (typeof filters)[number])
+      : 'all',
+  )
   const [section, setSection] = useState(ALL_SECTIONS)
   const [authorId, setAuthorId] = useState(ALL_AUTHORS)
   const [query, setQuery] = useState('')
@@ -172,11 +180,12 @@ export default function CmsStoriesPage() {
     },
   })
 
-  const confirmDelete = (story: CmsArticle) => {
+  const confirmDelete = async (story: CmsArticle) => {
     const title = pickLang(lang, story.title, story.titleBg) || story.titleBg
-    const ok = window.confirm(
-      t('cms.stories.deleteConfirm', { title }),
-    )
+    const ok = await confirm({
+      title: t('cms.stories.delete'),
+      description: t('cms.stories.deleteConfirm', { title }),
+    })
     if (!ok) return
     deleteMutation.mutate(story.id)
   }
@@ -519,6 +528,7 @@ export default function CmsStoriesPage() {
           </div>
         </div>
       )}
+      {dialog}
     </div>
   )
 }
