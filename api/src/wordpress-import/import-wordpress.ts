@@ -11,6 +11,7 @@
  *   node dist/wordpress-import/import-wordpress.js --slug=...
  */
 import { createHash } from 'crypto';
+import { setDefaultResultOrder } from 'dns';
 import { config } from 'dotenv';
 import { readFile } from 'fs/promises';
 import { resolve } from 'path';
@@ -30,6 +31,9 @@ import {
 config({ path: resolve(__dirname, '../../../.env') });
 config({ path: resolve(process.cwd(), '../.env') });
 config({ path: resolve(process.cwd(), '.env') });
+
+// Docker/Alpine often gets an IPv6 AAAA that blackholes; undici then times out on :443.
+setDefaultResultOrder('ipv4first');
 
 const UA = 'PriznsWordpressImport/1.0';
 
@@ -85,7 +89,12 @@ async function fetchJson(
     headers.Authorization = `Basic ${token}`;
   }
 
-  const response = await fetch(url, { headers });
+  let response: Response;
+  try {
+    response = await fetch(url, { headers });
+  } catch (error) {
+    throw new Error(formatNetworkError(url, error));
+  }
 
   if (!response.ok) {
     throw new Error(`${response.status} ${response.statusText} for ${url}`);
@@ -519,10 +528,31 @@ async function saveArticle(
   return { id: row.id, action: existing ? ('updated' as const) : ('created' as const) };
 }
 
+function formatNetworkError(url: string, error: unknown): string {
+  const cause =
+    error instanceof Error && error.cause instanceof Error ? error.cause : error;
+  const code =
+    cause && typeof cause === 'object' && 'code' in cause
+      ? String((cause as { code?: string }).code)
+      : undefined;
+  const detail =
+    cause instanceof Error
+      ? [cause.message, code].filter(Boolean).join(' ')
+      : String(cause);
+  return [
+    `Could not reach WordPress at ${url} (${detail}).`,
+    'WORDPRESS_URL must be the live WordPress site (wp-json), not this Coolify app.',
+    'From the API container: node -e "fetch(process.env.WORDPRESS_URL).then(r=>console.log(r.status)).catch(e=>console.error(e.cause||e))"',
+  ].join(' ');
+}
+
 async function main() {
   const flags = parseFlags(process.argv.slice(2));
   const origin = wpOrigin(
     flags.from || process.env.WORDPRESS_URL || 'https://prizni.bg',
+  );
+  console.log(
+    `WordPress origin: ${origin}${process.env.WORDPRESS_URL ? '' : ' (default; set WORDPRESS_URL in Coolify)'}`,
   );
   const skipTranslate = !flags.translate;
   const importUsers = Boolean(flags.users);
@@ -627,5 +657,8 @@ async function main() {
 
 main().catch((error) => {
   console.error(error instanceof Error ? error.message : error);
+  if (error instanceof Error && error.cause) {
+    console.error(error.cause);
+  }
   process.exit(1);
 });
