@@ -1,11 +1,14 @@
 /**
  * Import WordPress REST users + posts into the current journal (Prisma + MinIO).
  *
- * Import all WP users, then 20 published posts (no auto-translate):
- *   npm run import:wordpress --prefix api -- --users --limit=20
+ * Production / Coolify API container (already in /app, no ts-node):
+ *   node dist/wordpress-import/import-wordpress.js --users --limit=20
+ *
+ * Local (after api build, from repo root):
+ *   npm run import:wordpress:batch
  *
  * Single post:
- *   npx ts-node --transpile-only src/wordpress-import/import-wordpress.ts --slug=...
+ *   node dist/wordpress-import/import-wordpress.js --slug=...
  */
 import { createHash } from 'crypto';
 import { config } from 'dotenv';
