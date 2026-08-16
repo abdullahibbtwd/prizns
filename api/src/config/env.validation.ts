@@ -237,13 +237,29 @@ function assertProductionSecurity(env: EnvironmentVariables) {
       'JWT_REFRESH_SECRET must be at least 32 characters in production.',
     );
   }
-  if (env.COOKIE_SECURE !== 'true') {
-    throw new Error('COOKIE_SECURE must be true in production.');
-  }
   if (!env.CORS_ORIGIN?.trim()) {
     throw new Error('CORS_ORIGIN must be set in production.');
+  }
+  if (usesHttpsOrigins(env)) {
+    if (env.COOKIE_SECURE !== 'true') {
+      throw new Error(
+        'COOKIE_SECURE must be true in production when CORS_ORIGIN or PUBLIC_SITE_URL uses HTTPS.',
+      );
+    }
+  } else if (env.COOKIE_SECURE !== 'false') {
+    throw new Error(
+      'COOKIE_SECURE must be false when serving over HTTP (browsers will not send Secure cookies to http:// IP or hostname). Use HTTPS, or set COOKIE_SECURE=false with an http:// CORS_ORIGIN.',
+    );
   }
   if (env.ADMIN_PASSWORD && env.ADMIN_PASSWORD.length < 16) {
     throw new Error('ADMIN_PASSWORD must be at least 16 characters in production.');
   }
+}
+
+function usesHttpsOrigins(env: EnvironmentVariables): boolean {
+  return [env.CORS_ORIGIN, env.PUBLIC_SITE_URL]
+    .filter((value): value is string => Boolean(value?.trim()))
+    .flatMap((value) => value.split(',').map((part) => part.trim()))
+    .filter(Boolean)
+    .some((origin) => /^https:\/\//i.test(origin));
 }

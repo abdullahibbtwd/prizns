@@ -49,4 +49,42 @@ describe('validateEnv', () => {
       }),
     ).toThrow('JWT_ACCESS_SECRET must be at least 32 characters');
   });
+
+  it('allows COOKIE_SECURE=false in production for HTTP origins', () => {
+    const result = validateEnv({
+      ...validConfig,
+      NODE_ENV: 'production',
+      JWT_ACCESS_SECRET: 'a'.repeat(32),
+      JWT_REFRESH_SECRET: 'b'.repeat(32),
+      COOKIE_SECURE: 'false',
+      CORS_ORIGIN: 'http://192.168.1.10:5175',
+    });
+    expect(result.COOKIE_SECURE).toBe('false');
+  });
+
+  it('rejects COOKIE_SECURE=false in production for HTTPS origins', () => {
+    expect(() =>
+      validateEnv({
+        ...validConfig,
+        NODE_ENV: 'production',
+        JWT_ACCESS_SECRET: 'a'.repeat(32),
+        JWT_REFRESH_SECRET: 'b'.repeat(32),
+        COOKIE_SECURE: 'false',
+        CORS_ORIGIN: 'https://prizni.bg',
+      }),
+    ).toThrow('COOKIE_SECURE must be true in production when CORS_ORIGIN');
+  });
+
+  it('rejects COOKIE_SECURE=true in production for HTTP origins', () => {
+    expect(() =>
+      validateEnv({
+        ...validConfig,
+        NODE_ENV: 'production',
+        JWT_ACCESS_SECRET: 'a'.repeat(32),
+        JWT_REFRESH_SECRET: 'b'.repeat(32),
+        COOKIE_SECURE: 'true',
+        CORS_ORIGIN: 'http://192.168.1.10:5175',
+      }),
+    ).toThrow('COOKIE_SECURE must be false when serving over HTTP');
+  });
 });

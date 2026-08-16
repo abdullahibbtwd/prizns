@@ -357,7 +357,7 @@ Article statuses: `DRAFT`, `REVIEW`, `SCHEDULED`, `PUBLISHED`, `ARCHIVED`.
 - Access TTL default 15 minutes; refresh 7 days
 - Redis-backed sessions; logout can revoke the current session or all others
 - Email verification required after login (except endpoints marked `@AllowUnverifiedEmail`)
-- Production requires 32+ character JWT secrets and `COOKIE_SECURE=true`
+- Production requires 32+ character JWT secrets. `COOKIE_SECURE=true` over HTTPS; `COOKIE_SECURE=false` when `CORS_ORIGIN` is `http://` (IP deploys)
 
 **Roles** (`Role` enum):
 
@@ -542,7 +542,7 @@ Coolify / compose notes:
 
 - Do not bake `localhost` into the web build; use `/api` and `/media`
 - `MINIO_PORT` inside the network is `9000`; host publish is `MINIO_HOST_PORT` (9010)
-- Set `COOKIE_SECURE=false` only if you serve HTTP; production validation requires `true` when `NODE_ENV=production`
+- Set `COOKIE_SECURE=false` and an `http://` `CORS_ORIGIN` if you serve HTTP (IP). Over HTTPS, both `CORS_ORIGIN` and `COOKIE_SECURE` must use HTTPS / `true`
 
 Health check: `GET /api/health`.
 
