@@ -63,6 +63,25 @@ describe('AuthorsService', () => {
   it('lists active authors', async () => {
     const rows = await service.listActive();
     expect(rows).toHaveLength(1);
+    expect(prisma.author.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ isActive: true }),
+      }),
+    );
+  });
+
+  it('lists cms authors that belong to AUTHOR-role users', async () => {
+    await service.listCms();
+    expect(prisma.author.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          OR: [
+            { user: { is: { role: 'AUTHOR' } } },
+            { userId: null },
+          ],
+        },
+      }),
+    );
   });
 
   it('lists public authors with badges', async () => {

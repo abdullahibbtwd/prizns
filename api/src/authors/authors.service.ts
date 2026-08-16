@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { ArticleStatus, TranslationStatus } from '@prisma/client';
+import { ArticleStatus, Prisma, Role, TranslationStatus } from '@prisma/client';
 import { BadgesService } from '../badges/badges.service';
 import { ensureUniqueSlug } from '../common/slug.util';
 import { PrismaService } from '../prisma/prisma.service';
@@ -52,6 +52,11 @@ const publicAuthorSelect = {
   },
 } as const;
 
+/** Bylines on the Authors desk: CMS users with role AUTHOR, plus unlinked profiles. */
+const authorRoleFilter: Prisma.AuthorWhereInput = {
+  OR: [{ user: { is: { role: Role.AUTHOR } } }, { userId: null }],
+};
+
 @Injectable()
 export class AuthorsService {
   constructor(
@@ -61,7 +66,7 @@ export class AuthorsService {
 
   listActive() {
     return this.prisma.author.findMany({
-      where: { isActive: true },
+      where: { isActive: true, AND: [authorRoleFilter] },
       orderBy: { nameBg: 'asc' },
       select: {
         id: true,
@@ -77,7 +82,7 @@ export class AuthorsService {
 
   async listPublic() {
     const rows = await this.prisma.author.findMany({
-      where: { isActive: true },
+      where: { isActive: true, AND: [authorRoleFilter] },
       orderBy: { nameBg: 'asc' },
       select: publicAuthorSelect,
     });
@@ -86,7 +91,7 @@ export class AuthorsService {
 
   async getPublicBySlug(slug: string) {
     const row = await this.prisma.author.findFirst({
-      where: { slug, isActive: true },
+      where: { slug, isActive: true, AND: [authorRoleFilter] },
       select: publicAuthorSelect,
     });
     return row ? this.toPublicDto(row) : null;
@@ -135,6 +140,7 @@ export class AuthorsService {
 
   listCms() {
     return this.prisma.author.findMany({
+      where: authorRoleFilter,
       orderBy: { nameBg: 'asc' },
       select: authorSelect,
     });
