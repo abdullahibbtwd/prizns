@@ -85,7 +85,9 @@ describe('TtsService', () => {
   });
 
   it('queues narration when credentials path resolves', async () => {
-    jest.spyOn(service as never as { resolveCredentialsPath: () => string }, 'resolveCredentialsPath').mockReturnValue('/secrets/key.json');
+    jest.spyOn(service, 'resolveGoogleAuth').mockReturnValue({
+      keyFilename: '/secrets/key.json',
+    });
     await service.enqueue('art-1');
     expect(prisma.article.update).toHaveBeenCalledWith(
       expect.objectContaining({

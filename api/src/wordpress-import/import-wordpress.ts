@@ -200,17 +200,18 @@ async function resolvePackagedImage(
   dirs: MediaDirs,
 ): Promise<string> {
   const name = file.replace(/^images[/\\]/, '');
-  const candidates = [
-    resolve(dirs.packageDir, file),
-    resolve(dirs.imagesDir, name),
-    resolve(dirs.imagesDir, file),
-  ];
+  const roots = [dirs.packageDir, dirs.imagesDir, join(dirs.packageDir, 'wordpress-export')];
+  const candidates = roots.flatMap((root) => [
+    resolve(root, file),
+    resolve(root, name),
+    resolve(root, 'images', name),
+  ]);
+  const allowed = [dirs.packageDir, dirs.imagesDir, join(dirs.packageDir, 'wordpress-export')];
   for (const abs of candidates) {
-    const relPackage = relative(dirs.packageDir, abs);
-    const relImages = relative(dirs.imagesDir, abs);
-    const inside =
-      (!relPackage.startsWith('..') && !relPackage.startsWith(sep)) ||
-      (!relImages.startsWith('..') && !relImages.startsWith(sep));
+    const inside = allowed.some((root) => {
+      const rel = relative(root, abs);
+      return rel !== '' && !rel.startsWith(`..${sep}`) && rel !== '..' && !rel.startsWith(sep);
+    });
     if (!inside) continue;
     if (await pathExists(abs)) return abs;
   }
@@ -325,11 +326,8 @@ async function importImage(
         });
       }
     } catch (error) {
-      if (image.file && opts.mediaDirs) {
-        throw error;
-      }
       console.warn(
-        `  media kept remote (${image.src}): ${
+        `  media skipped (${image.file || image.src}): ${
           error instanceof Error ? error.message : String(error)
         }`,
       );
@@ -793,7 +791,15 @@ async function loadExportPackage(flags: Flags): Promise<{
       JSON.parse(await readFile(categoriesPath, 'utf8')) as unknown,
     );
   }
-  const imagesDir = resolve(flags.images || join(packageDir, 'images'));
+  const nestedImages = join(packageDir, 'wordpress-export', 'images');
+  const imagesDir = resolve(
+    flags.images ||
+      ((await pathExists(join(packageDir, 'images')))
+        ? join(packageDir, 'images')
+        : (await pathExists(nestedImages))
+          ? nestedImages
+          : join(packageDir, 'images')),
+  );
   return {
     packageDir,
     imagesDir,

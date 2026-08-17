@@ -126,6 +126,11 @@ class EnvironmentVariables {
   @IsString()
   GOOGLE_APPLICATION_CREDENTIALS?: string;
 
+  /** Full service-account JSON (or base64). Prefer this on Coolify instead of a mounted file. */
+  @IsOptional()
+  @IsString()
+  GOOGLE_SERVICE_ACCOUNT_JSON?: string;
+
   /** Public site origin for sitemap, canonicals, Stripe redirects. */
   @IsOptional()
   @IsString()

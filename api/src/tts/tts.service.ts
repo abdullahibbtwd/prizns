@@ -10,8 +10,7 @@ import { ConfigService } from '@nestjs/config'
 import { MediaKind, NarrationStatus } from '@prisma/client'
 import { Queue } from 'bullmq'
 import { TextToSpeechClient } from '@google-cloud/text-to-speech'
-import { existsSync } from 'fs'
-import { isAbsolute, resolve } from 'path'
+import { resolveGoogleClientAuth, type GoogleClientAuth } from '../config/google-credentials'
 import { QUEUE_TTS } from '../jobs/queue.constants'
 import { PrismaService } from '../prisma/prisma.service'
 import { StorageService } from '../storage/storage.service'
@@ -48,10 +47,10 @@ export class TtsService {
     if (!this.enabled) {
       throw new ServiceUnavailableException('TTS narration is disabled')
     }
-    const credentialsPath = this.resolveCredentialsPath()
-    if (!credentialsPath) {
+    const credentials = this.resolveGoogleAuth()
+    if (!credentials) {
       throw new ServiceUnavailableException(
-        'Google Cloud TTS credentials file not found. For local dev set GOOGLE_APPLICATION_CREDENTIALS to ../secrets/google-service-account.json. Docker uses /app/secrets/....',
+        'Google Cloud TTS credentials missing. Set GOOGLE_SERVICE_ACCOUNT_JSON to the service-account JSON, or GOOGLE_APPLICATION_CREDENTIALS to a file path.',
       )
     }
 
@@ -117,15 +116,15 @@ export class TtsService {
         throw new Error('No text available for narration')
       }
 
-      const credentialsPath = this.resolveCredentialsPath()
-      if (!credentialsPath) {
+      const auth = this.resolveGoogleAuth()
+      if (!auth) {
         throw new Error(
-          'Google credentials file not found for TTS (check GOOGLE_APPLICATION_CREDENTIALS)',
+          'Google credentials missing for TTS (set GOOGLE_SERVICE_ACCOUNT_JSON or GOOGLE_APPLICATION_CREDENTIALS)',
         )
       }
 
       const clipped = script.slice(0, MAX_CHARS)
-      const client = new TextToSpeechClient({ keyFilename: credentialsPath })
+      const client = this.createTtsClient(auth)
       const [response] = await client.synthesizeSpeech({
         input: { text: clipped },
         voice: {
@@ -220,39 +219,31 @@ export class TtsService {
   }
 
   /**
-   * Resolve a readable service-account JSON.
-   * Supports Docker (`/app/secrets/...`) and local host paths.
+   * Inline JSON (`GOOGLE_SERVICE_ACCOUNT_JSON`) or a credentials file path.
    */
+  resolveGoogleAuth(): GoogleClientAuth | null {
+    return resolveGoogleClientAuth((key) => this.config.get<string>(key)?.trim())
+  }
+
+  /** @deprecated use resolveGoogleAuth */
   resolveCredentialsPath(): string | null {
-    const configured =
-      this.config.get<string>('GOOGLE_APPLICATION_CREDENTIALS')?.trim() || ''
+    const auth = this.resolveGoogleAuth()
+    return auth && 'keyFilename' in auth ? auth.keyFilename : null
+  }
 
-    const candidates: string[] = []
-    if (configured) {
-      candidates.push(
-        isAbsolute(configured)
-          ? configured
-          : resolve(process.cwd(), configured),
-      )
-      // Coolify/Docker path when API runs on the host
-      if (configured.startsWith('/app/')) {
-        candidates.push(resolve(process.cwd(), '..', configured.slice(5)))
-        candidates.push(resolve(process.cwd(), configured.slice(5)))
-      }
+  private createTtsClient(auth: GoogleClientAuth): TextToSpeechClient {
+    if ('credentials' in auth) {
+      this.logger.log('Using Google credentials from GOOGLE_SERVICE_ACCOUNT_JSON')
+      return new TextToSpeechClient({
+        credentials: auth.credentials,
+        projectId: auth.projectId,
+      })
     }
-
-    candidates.push(
-      resolve(process.cwd(), '../secrets/google-service-account.json'),
-      resolve(process.cwd(), 'secrets/google-service-account.json'),
-    )
-
-    for (const candidate of candidates) {
-      if (candidate && existsSync(candidate)) {
-        this.logger.log(`Using Google credentials at ${candidate}`)
-        return candidate
-      }
-    }
-    return null
+    this.logger.log(`Using Google credentials at ${auth.keyFilename}`)
+    return new TextToSpeechClient({
+      keyFilename: auth.keyFilename,
+      projectId: auth.projectId,
+    })
   }
 
   private buildScript(titleBg: string, bodyRaw: unknown): string {
