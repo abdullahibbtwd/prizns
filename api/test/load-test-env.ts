@@ -13,7 +13,11 @@ export function loadTestEnv() {
   for (const key of INTEGRATION_KEYS) {
     delete process.env[key];
   }
-  config({ path: resolve(__dirname, '.env.test'), override: false });
+  config({
+    path: resolve(__dirname, '.env.test'),
+    override: false,
+    quiet: true,
+  });
   for (const key of INTEGRATION_KEYS) {
     if (process.env[key] === '') delete process.env[key];
   }

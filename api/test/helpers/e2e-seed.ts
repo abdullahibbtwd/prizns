@@ -1,10 +1,12 @@
 import request from 'supertest';
+import { resetRateLimits } from '../../src/common/rate-limit';
 import { E2E_ADMIN_EMAIL, E2E_ADMIN_PASSWORD } from '../load-test-env';
 import { getTestPrisma } from './e2e-db';
 
 export async function loginAdminAgent(
   server: Parameters<typeof request>[0],
 ): Promise<ReturnType<typeof request.agent>> {
+  resetRateLimits('auth-login');
   const agent = request.agent(server);
   await agent
     .post('/api/auth/login')
