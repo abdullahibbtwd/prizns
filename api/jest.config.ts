@@ -38,6 +38,7 @@ const config: Config = {
       testEnvironment: 'node',
       globalSetup: '<rootDir>/global-setup.ts',
       globalTeardown: '<rootDir>/global-teardown.ts',
+      setupFiles: ['<rootDir>/setup-env.ts'],
       setupFilesAfterEnv: ['<rootDir>/setup-e2e.ts'],
       testTimeout: 60000,
       maxWorkers: 1,

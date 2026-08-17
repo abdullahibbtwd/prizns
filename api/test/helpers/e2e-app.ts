@@ -184,7 +184,8 @@ export async function createE2eApp(
   return { app, moduleFixture };
 }
 
-export async function closeE2eApp(ctx: E2eContext) {
+export async function closeE2eApp(ctx: E2eContext | undefined) {
+  if (!ctx?.moduleFixture) return;
   await closeBullQueues(ctx.moduleFixture);
   try {
     await ctx.app.close();

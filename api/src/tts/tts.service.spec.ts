@@ -45,6 +45,9 @@ describe('TtsService', () => {
     }).compile();
 
     service = module.get(TtsService);
+    jest.spyOn(service, 'resolveGoogleAuth').mockReturnValue({
+      keyFilename: '/secrets/key.json',
+    });
   });
 
   it('throws when tts disabled', async () => {

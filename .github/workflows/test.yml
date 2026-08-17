@@ -11,6 +11,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
+  API_PORT: '3003'
   DATABASE_URL: postgresql://prizn_test:prizn_test@localhost:5434/prizn_test?schema=public
   REDIS_HOST: localhost
   REDIS_PORT: '6381'

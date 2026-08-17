@@ -17,6 +17,11 @@ export function loadTestEnv() {
   for (const key of INTEGRATION_KEYS) {
     if (process.env[key] === '') delete process.env[key];
   }
+  // Required by AppModule env validation; .env is gitignored so CI/local
+  // e2e cannot rely on it being present.
+  if (!process.env.API_PORT) {
+    process.env.API_PORT = '3003';
+  }
 }
 
 export const E2E_ADMIN_EMAIL =
