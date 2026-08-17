@@ -13,12 +13,14 @@ type NarrationPanelProps = {
   articleId: string
   article: CmsArticle
   audioUrl?: string
+  onQueued?: () => void
 }
 
 export function NarrationPanel({
   articleId,
   article,
   audioUrl,
+  onQueued,
 }: NarrationPanelProps) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
@@ -72,7 +74,10 @@ export function NarrationPanel({
         type="button"
         className="w-full"
         disabled={busy || narrateMutation.isPending}
-        onClick={() => narrateMutation.mutate()}
+        onClick={() => {
+          onQueued?.()
+          narrateMutation.mutate()
+        }}
       >
         <Headphones className="size-3.5" />
         {busy || narrateMutation.isPending
@@ -87,7 +92,10 @@ export function NarrationPanel({
           type="button"
           className="w-full text-xs"
           disabled={clearMutation.isPending}
-          onClick={() => clearMutation.mutate()}
+          onClick={() => {
+            onQueued?.()
+            clearMutation.mutate()
+          }}
         >
           <Trash2 className="size-3.5" />
           {t('cms.editor.narrationDelete')}

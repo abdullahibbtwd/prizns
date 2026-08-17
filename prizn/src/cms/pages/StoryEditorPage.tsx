@@ -399,6 +399,7 @@ export default function CmsStoryEditorPage() {
     resolver: zodResolver(schema) as never,
     values: defaults,
     defaultValues: emptyDefaults,
+    resetOptions: { keepDirtyValues: true },
   })
 
   const { fields, append, remove, replace } = useFieldArray({
@@ -638,6 +639,12 @@ export default function CmsStoryEditorPage() {
         form.getValues('galleryMediaIds'),
         { shouldDirty: true },
       )
+    }
+  }
+
+  const noteUnpublishedEdit = () => {
+    if (form.getValues('status') === 'PUBLISHED') {
+      form.setValue('status', 'DRAFT', { shouldDirty: true })
     }
   }
 
@@ -1988,6 +1995,7 @@ export default function CmsStoryEditorPage() {
               articleId={id!}
               article={articleQuery.data}
               audioUrl={audioUrl || articleQuery.data.audioUrl || undefined}
+              onQueued={noteUnpublishedEdit}
             />
           ) : null}
 

@@ -12,6 +12,7 @@ const listCmsSeries = vi.fn()
 const listCmsTags = vi.fn()
 const createCmsArticle = vi.fn()
 const updateCmsArticle = vi.fn()
+const queueArticleNarration = vi.fn()
 
 vi.mock('@/hooks/useJournalLang', () => ({
   useJournalLang: () => ({ lang: 'en', setLang: vi.fn() }),
@@ -25,7 +26,7 @@ vi.mock('@/lib/articles-api', () => ({
   createCmsAuthor: vi.fn(),
   queueArticleTranslation: vi.fn(),
   uploadCmsMedia: vi.fn(),
-  queueArticleNarration: vi.fn(),
+  queueArticleNarration: (...args: unknown[]) => queueArticleNarration(...args),
   clearArticleNarration: vi.fn(),
 }))
 
@@ -58,6 +59,8 @@ describe('CmsStoryEditorPage publishing actions', () => {
     createCmsArticle.mockReset()
     updateCmsArticle.mockReset()
     getCmsArticle.mockReset()
+    queueArticleNarration.mockReset()
+    queueArticleNarration.mockResolvedValue({ ok: true, queued: true })
   })
 
   it('shows Review, Save draft, and Publish for a new story', async () => {
@@ -164,5 +167,32 @@ describe('CmsStoryEditorPage publishing actions', () => {
         expect.objectContaining({ status: 'PUBLISHED' }),
       )
     })
+  })
+
+  it('enables Publish after generating narration on a published story', async () => {
+    const user = userEvent.setup()
+    getCmsArticle.mockResolvedValue(
+      buildCmsArticle({
+        status: 'PUBLISHED',
+        bodyRaw: [{ type: 'paragraph', textBg: 'Lead paragraph.' }],
+      }),
+    )
+    renderEditor('/cms/stories/art-1')
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: 'cms.editor.publish' }),
+      ).toBeDisabled()
+    })
+
+    await user.click(
+      screen.getByRole('button', { name: /cms.editor.narrationGenerate/ }),
+    )
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: 'cms.editor.publish' }),
+      ).toBeEnabled()
+    })
+    expect(screen.getByText('cms.editor.unpublishedEdits')).toBeInTheDocument()
   })
 })
