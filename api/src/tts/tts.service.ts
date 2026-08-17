@@ -11,12 +11,11 @@ import { MediaKind, NarrationStatus } from '@prisma/client'
 import { Queue } from 'bullmq'
 import { TextToSpeechClient } from '@google-cloud/text-to-speech'
 import { resolveGoogleClientAuth, type GoogleClientAuth } from '../config/google-credentials'
+import { chunkTextForTts } from './tts-chunk'
 import { QUEUE_TTS } from '../jobs/queue.constants'
 import { PrismaService } from '../prisma/prisma.service'
 import { StorageService } from '../storage/storage.service'
 import type { StoredArticleBlock } from '../articles/article.types'
-
-const MAX_CHARS = 4500
 
 export type TtsJobData = {
   articleId: string
@@ -123,26 +122,29 @@ export class TtsService {
         )
       }
 
-      const clipped = script.slice(0, MAX_CHARS)
+      const chunks = chunkTextForTts(script)
       const client = this.createTtsClient(auth)
-      const [response] = await client.synthesizeSpeech({
-        input: { text: clipped },
-        voice: {
-          languageCode: this.languageCode,
-          name: this.voiceName,
-        },
-        audioConfig: {
-          audioEncoding: 'MP3',
-          speakingRate: 0.95,
-        },
-      })
-
-      const audioContent = response.audioContent
-      if (!audioContent) {
-        throw new Error('TTS returned empty audio')
+      const parts: Buffer[] = []
+      for (const [index, chunk] of chunks.entries()) {
+        const [response] = await client.synthesizeSpeech({
+          input: { text: chunk },
+          voice: {
+            languageCode: this.languageCode,
+            name: this.voiceName,
+          },
+          audioConfig: {
+            audioEncoding: 'MP3',
+            speakingRate: 0.95,
+          },
+        })
+        const audioContent = response.audioContent
+        if (!audioContent) {
+          throw new Error(`TTS returned empty audio for chunk ${index + 1}/${chunks.length}`)
+        }
+        parts.push(Buffer.from(audioContent as Uint8Array))
       }
 
-      const buffer = Buffer.from(audioContent as Uint8Array)
+      const buffer = Buffer.concat(parts)
       const uploaded = await this.storage.uploadBuffer({
         buffer,
         mimeType: 'audio/mpeg',
@@ -181,7 +183,7 @@ export class TtsService {
       }
 
       this.logger.log(
-        `TTS narration ready for ${articleId} → media ${media.id}`,
+        `TTS narration ready for ${articleId} → media ${media.id} (${chunks.length} chunk${chunks.length === 1 ? '' : 's'})`,
       )
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error)
