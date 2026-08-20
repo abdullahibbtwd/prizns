@@ -132,7 +132,7 @@ function ArticleBlocks({
   lang: JournalLang
 }) {
   return (
-    <div className="space-y-8 font-sans text-base md:text-lg text-[#1A1A1A]/80 font-light leading-relaxed">
+    <div className="article-body space-y-8 font-sans text-base md:text-lg text-[#1A1A1A]/80 font-light leading-relaxed">
       {article.body.map((block, index) => (
         <ArticleBlockView
           key={`${block.type}-${index}`}
@@ -197,12 +197,12 @@ function ArticleBlockView({
   if (block.type === 'pullquote') {
     const cite = pick(lang, block.cite, block.citeBg).trim()
     return (
-      <blockquote className="my-12 border-l-2 border-[#0C2686] bg-[#0C2686]/5 px-6 py-8 md:px-10 rounded-r-xl">
-        <p className="mb-3 font-heading text-2xl md:text-3xl font-normal leading-snug italic text-[#1A1A1A]">
+      <blockquote className="my-10 border-l-2 border-[#0C2686] bg-[#0C2686]/5 px-6 py-6 md:px-8 rounded-r-xl">
+        <p className="font-sans text-base md:text-lg font-light italic leading-relaxed text-[#1A1A1A]/80">
           “{pick(lang, block.text, block.textBg)}”
         </p>
         {cite ? (
-          <cite className="font-sans text-xs uppercase tracking-widest text-[#0C2686] not-italic">
+          <cite className="mt-3 block font-sans text-xs uppercase tracking-widest text-[#0C2686] not-italic">
             — {cite}
           </cite>
         ) : null}

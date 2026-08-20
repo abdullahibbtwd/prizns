@@ -94,6 +94,9 @@ describe('ArticlePage', () => {
       expect(screen.getByRole('heading', { name: 'Village life' })).toBeInTheDocument()
     })
     expect(screen.getByText('First paragraph of the story.')).toBeInTheDocument()
+    expect(screen.getByText('First paragraph of the story.').className).not.toMatch(
+      /font-heading/,
+    )
   })
 
   it('shows the sourced pill when the article is marked sourced', async () => {
@@ -180,6 +183,37 @@ describe('ArticlePage', () => {
       'https://cdn.example/two.jpg',
     )
     expect(screen.getByText('Archive photo')).toBeInTheDocument()
+  })
+
+  it('renders quotes in body type without a drop-cap heading', async () => {
+    getPublicArticle.mockResolvedValue(
+      buildCmsArticle({
+        section: 'stories',
+        slug: 'village-life',
+        path: '/stories/village-life',
+        title: 'Village life',
+        titleBg: 'Селски живот',
+        body: [
+          {
+            type: 'paragraph',
+            text: 'First paragraph of the story.',
+            textBg: 'Първи параграф.',
+          },
+          {
+            type: 'pullquote',
+            text: 'we stayed for the harvest.',
+            textBg: 'останахме за реколтата.',
+            cite: 'Ivan',
+            citeBg: 'Иван',
+          },
+        ],
+      }),
+    )
+
+    renderArticle()
+    const quote = await screen.findByText('“we stayed for the harvest.”')
+    expect(quote.className).toMatch(/font-sans/)
+    expect(quote.className).not.toMatch(/font-heading/)
   })
 
   it('keeps the hero photo when a story also has a video', async () => {
