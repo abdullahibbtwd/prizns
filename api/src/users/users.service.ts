@@ -7,6 +7,7 @@ import {
 import { Prisma, Role } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { AuthorsService } from '../authors/authors.service';
+import { hasAdminRole, normalizeRoles, primaryRole } from '../auth/role-access';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
@@ -17,11 +18,12 @@ const userSelect = {
   email: true,
   name: true,
   role: true,
+  roles: true,
   isActive: true,
   emailVerifiedAt: true,
   createdAt: true,
   updatedAt: true,
-  author: { select: { id: true } },
+  author: { select: { id: true, showOnAuthors: true } },
 } as const;
 
 type UserRow = {
@@ -29,11 +31,12 @@ type UserRow = {
   email: string;
   name: string | null;
   role: Role;
+  roles: Role[];
   isActive: boolean;
   emailVerifiedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
-  author?: { id: string } | null;
+  author?: { id: string; showOnAuthors?: boolean } | null;
 };
 
 @Injectable()
@@ -44,37 +47,92 @@ export class UsersService {
   ) {}
 
   private toDto(row: UserRow, authorId?: string | null) {
+    const roles = normalizeRoles(row.role, row.roles);
     return {
       id: row.id,
       email: row.email,
       name: row.name,
       role: row.role,
+      roles,
       isActive: row.isActive,
       emailVerified: Boolean(row.emailVerifiedAt),
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
       joinedAt: row.createdAt.toISOString().slice(0, 10),
       authorId: authorId ?? row.author?.id ?? null,
+      showOnAuthors: Boolean(row.author?.showOnAuthors),
     };
   }
 
-  private async ensureAuthorProfile(user: {
-    id: string;
-    email: string;
-    name: string | null;
-  }) {
+  private resolveRoles(dto: { role?: Role; roles?: Role[] }): Role[] {
+    const roles = normalizeRoles(dto.role, dto.roles);
+    if (!roles.length) {
+      throw new BadRequestException('At least one role is required');
+    }
+    return roles;
+  }
+
+  private async ensureAuthorProfile(
+    user: {
+      id: string;
+      email: string;
+      name: string | null;
+    },
+    showOnAuthors?: boolean,
+  ) {
     const existing = await this.prisma.author.findUnique({
       where: { userId: user.id },
-      select: { id: true },
+      select: { id: true, showOnAuthors: true },
     });
-    if (existing) return { id: existing.id, created: false };
+    if (existing) {
+      if (
+        showOnAuthors !== undefined &&
+        showOnAuthors !== existing.showOnAuthors
+      ) {
+        await this.prisma.author.update({
+          where: { id: existing.id },
+          data: { showOnAuthors },
+        });
+      }
+      return { id: existing.id, created: false };
+    }
 
     const author = await this.authors.create({
       nameBg: user.name?.trim() || user.email,
       roleBg: 'Автор',
       userId: user.id,
+      showOnAuthors: showOnAuthors ?? true,
     });
     return { id: author.id, created: true };
+  }
+
+  private async syncAuthorListing(
+    user: {
+      id: string;
+      email: string;
+      name: string | null;
+      roles: Role[];
+      author?: { id: string } | null;
+    },
+    showOnAuthors?: boolean,
+  ) {
+    const isAuthorRole = user.roles.includes(Role.AUTHOR);
+    const hasAuthor = Boolean(user.author?.id);
+
+    if (showOnAuthors === true || isAuthorRole) {
+      const author = await this.ensureAuthorProfile(user, showOnAuthors);
+      return { authorId: author.id, authorCreated: author.created };
+    }
+
+    if (showOnAuthors === false && hasAuthor) {
+      await this.prisma.author.update({
+        where: { id: user.author!.id },
+        data: { showOnAuthors: false },
+      });
+      return { authorId: user.author!.id, authorCreated: false };
+    }
+
+    return { authorId: user.author?.id ?? null, authorCreated: false };
   }
 
   async list(
@@ -89,13 +147,24 @@ export class UsersService {
     const pageSize = Math.min(100, Math.max(1, Number(filters.pageSize) || 10));
     const where: Prisma.UserWhereInput = {};
 
-    if (filters.role) where.role = filters.role;
+    if (filters.role) {
+      where.OR = [
+        { role: filters.role },
+        { roles: { has: filters.role } },
+      ];
+    }
     if (filters.q?.trim()) {
       const q = filters.q.trim();
-      where.OR = [
+      const nameEmail: Prisma.UserWhereInput[] = [
         { email: { contains: q, mode: 'insensitive' } },
         { name: { contains: q, mode: 'insensitive' } },
       ];
+      if (where.OR) {
+        where.AND = [{ OR: where.OR }, { OR: nameEmail }];
+        delete where.OR;
+      } else {
+        where.OR = nameEmail;
+      }
     }
 
     const [total, rows] = await this.prisma.$transaction([
@@ -121,6 +190,8 @@ export class UsersService {
   async create(dto: CreateUserDto) {
     const email = dto.email.toLowerCase().trim();
     const name = dto.name.trim();
+    const roles = this.resolveRoles(dto);
+    const role = primaryRole(roles);
     const existing = await this.prisma.user.findUnique({ where: { email } });
     if (existing) {
       throw new ConflictException('A user with this email already exists');
@@ -134,7 +205,8 @@ export class UsersService {
           email,
           name,
           passwordHash,
-          role: dto.role,
+          role,
+          roles,
         },
         select: userSelect,
       });
@@ -148,21 +220,36 @@ export class UsersService {
       throw error;
     }
 
-    let authorCreated = false;
-    let authorId: string | null = row.author?.id ?? null;
-    if (row.role === Role.AUTHOR) {
-      const author = await this.ensureAuthorProfile(row);
-      authorId = author.id;
-      authorCreated = author.created;
-    }
+    const listing = await this.syncAuthorListing(
+      { ...row, roles },
+      dto.showOnAuthors,
+    );
 
-    return { user: this.toDto(row, authorId), authorCreated };
+    return {
+      user: this.toDto(
+        {
+          ...row,
+          author: listing.authorId
+            ? {
+                id: listing.authorId,
+                showOnAuthors:
+                  dto.showOnAuthors ?? roles.includes(Role.AUTHOR),
+              }
+            : row.author,
+        },
+        listing.authorId,
+      ),
+      authorCreated: listing.authorCreated,
+    };
   }
 
   async update(id: string, dto: UpdateUserDto, actorId: string) {
     const existing = await this.prisma.user.findUnique({
       where: { id },
-      select: { ...userSelect, author: { select: { id: true } } },
+      select: {
+        ...userSelect,
+        author: { select: { id: true, showOnAuthors: true } },
+      },
     });
     if (!existing) throw new NotFoundException('User not found');
 
@@ -170,9 +257,21 @@ export class UsersService {
       throw new BadRequestException('You cannot deactivate your own account');
     }
 
-    if (dto.role && dto.role !== Role.ADMIN && existing.role === Role.ADMIN) {
+    const nextRoles =
+      dto.roles !== undefined || dto.role !== undefined
+        ? this.resolveRoles({
+            role: dto.role,
+            roles: dto.roles ?? (dto.role ? [dto.role] : existing.roles),
+          })
+        : normalizeRoles(existing.role, existing.roles);
+    const nextPrimary = primaryRole(nextRoles);
+
+    if (hasAdminRole(existing) && !nextRoles.includes(Role.ADMIN)) {
       const adminCount = await this.prisma.user.count({
-        where: { role: Role.ADMIN, isActive: true },
+        where: {
+          isActive: true,
+          OR: [{ role: Role.ADMIN }, { roles: { has: Role.ADMIN } }],
+        },
       });
       if (adminCount <= 1 && existing.isActive) {
         throw new BadRequestException('Cannot demote the last active admin');
@@ -192,7 +291,8 @@ export class UsersService {
     const row = await this.prisma.user.update({
       where: { id },
       data: {
-        role: dto.role,
+        role: nextPrimary,
+        roles: nextRoles,
         isActive: dto.isActive,
         name: dto.name === undefined ? undefined : dto.name.trim() || null,
         email: emailChanged ? email : undefined,
@@ -201,15 +301,30 @@ export class UsersService {
       select: userSelect,
     });
 
-    let authorCreated = false;
-    let authorId: string | null = row.author?.id ?? null;
-    if (row.role === Role.AUTHOR && !authorId) {
-      const author = await this.ensureAuthorProfile(row);
-      authorId = author.id;
-      authorCreated = author.created;
-    }
+    const listing = await this.syncAuthorListing(
+      { ...row, roles: nextRoles },
+      dto.showOnAuthors,
+    );
 
-    return { user: this.toDto(row, authorId), authorCreated, emailChanged };
+    return {
+      user: this.toDto(
+        {
+          ...row,
+          author: listing.authorId
+            ? {
+                id: listing.authorId,
+                showOnAuthors:
+                  dto.showOnAuthors ??
+                  row.author?.showOnAuthors ??
+                  nextRoles.includes(Role.AUTHOR),
+              }
+            : row.author,
+        },
+        listing.authorId,
+      ),
+      authorCreated: listing.authorCreated,
+      emailChanged,
+    };
   }
 
   async getProfile(userId: string) {

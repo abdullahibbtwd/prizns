@@ -10,7 +10,7 @@ import {
   PrimaryButton,
   StatusPill,
 } from '@/cms/components/CmsUI'
-import { CmsField, CmsInput } from '@/cms/components/CmsFields'
+import { CmsField, CmsInput, CmsCheckbox } from '@/cms/components/CmsFields'
 import { CmsModal } from '@/cms/components/CmsModal'
 import { CmsPasswordInput } from '@/cms/components/CmsPasswordInput'
 import { Alert } from '@/components/ui/Alert'
@@ -20,9 +20,10 @@ import {
   createCmsUser,
   listCmsUsers,
   updateCmsUser,
+  type CmsUser,
   type CmsUserRole,
 } from '@/lib/users-api'
-import { CMS_USER_ROLES, cmsRoleI18nKey } from '@/lib/cms-roles'
+import { CMS_USER_ROLES, cmsRoleI18nKey, hasCmsRole } from '@/lib/cms-roles'
 import { cn } from '@/lib/utils'
 
 const PAGE_SIZE_OPTIONS = [5, 10, 20, 50] as const
@@ -33,14 +34,25 @@ const EMPTY_FORM = {
   email: '',
   password: '',
   confirmPassword: '',
-  role: 'EDITOR' as CmsUserRole,
+  roles: ['EDITOR'] as CmsUserRole[],
+  showOnAuthors: false,
+}
+
+function itemRoles(item: Pick<CmsUser, 'role' | 'roles'>): CmsUserRole[] {
+  return item.roles?.length ? item.roles : [item.role]
+}
+
+function toggleRole(roles: CmsUserRole[], role: CmsUserRole): CmsUserRole[] {
+  return roles.includes(role)
+    ? roles.filter((item) => item !== role)
+    : [...roles, role]
 }
 
 export default function CmsUsersPage() {
   const { t } = useTranslation()
   const { user: me } = useAuth()
   const queryClient = useQueryClient()
-  const isAdmin = me?.role === 'ADMIN'
+  const isAdmin = hasCmsRole(me, 'ADMIN')
 
   const [query, setQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
@@ -52,6 +64,8 @@ export default function CmsUsersPage() {
     id: string
     name: string
     email: string
+    roles: CmsUserRole[]
+    showOnAuthors: boolean
   } | null>(null)
   const [form, setForm] = useState(EMPTY_FORM)
   const [showPassword, setShowPassword] = useState(false)
@@ -125,17 +139,19 @@ export default function CmsUsersPage() {
   const updateMutation = useMutation({
     mutationFn: ({
       id,
-      role,
+      roles,
       isActive,
       name,
       email,
+      showOnAuthors,
     }: {
       id: string
-      role?: CmsUserRole
+      roles?: CmsUserRole[]
       isActive?: boolean
       name?: string
       email?: string
-    }) => updateCmsUser(id, { role, isActive, name, email }),
+      showOnAuthors?: boolean
+    }) => updateCmsUser(id, { roles, isActive, name, email, showOnAuthors }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['cms-users'] })
       await queryClient.invalidateQueries({ queryKey: ['cms-authors-desk'] })
@@ -159,7 +175,8 @@ export default function CmsUsersPage() {
         name: form.name.trim(),
         email: form.email.trim(),
         password: form.password,
-        role: form.role,
+        roles: form.roles,
+        showOnAuthors: form.showOnAuthors,
       }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['cms-users'] })
@@ -185,6 +202,7 @@ export default function CmsUsersPage() {
     form.email.trim().includes('@') &&
     form.password.length >= 8 &&
     passwordsMatch &&
+    form.roles.length > 0 &&
     !createMutation.isPending
 
   return (
@@ -289,25 +307,21 @@ export default function CmsUsersPage() {
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      {isAdmin ? (
-                        <div className="min-w-[180px] max-w-[240px]">
-                          <JournalSelect
-                            name={`role-${item.id}`}
-                            variant="boxed"
-                            value={item.role}
-                            onChange={(value) => {
-                              if (value === item.role) return
-                              updateMutation.mutate({
-                                id: item.id,
-                                role: value as CmsUserRole,
-                              })
-                            }}
-                            options={roleOptions}
-                          />
-                        </div>
-                      ) : (
-                        <StatusPill status={item.role.toLowerCase()} />
-                      )}
+                      <div className="flex flex-wrap gap-1.5">
+                        {itemRoles(item).map((role) => (
+                          <span
+                            key={role}
+                            className="rounded-full border border-[#E8E4DC] bg-stone-50 px-2 py-0.5 text-[11px] font-semibold text-stone-700"
+                          >
+                            {t(cmsRoleI18nKey(role))}
+                          </span>
+                        ))}
+                      </div>
+                      {item.showOnAuthors ? (
+                        <p className="mt-1 text-[11px] font-medium text-[#0C2686]">
+                          {t('cms.users.listedOnAuthors')}
+                        </p>
+                      ) : null}
                     </td>
                     <td className="px-4 py-3">
                       {isAdmin ? (
@@ -361,6 +375,8 @@ export default function CmsUsersPage() {
                               id: item.id,
                               name: item.name ?? '',
                               email: item.email,
+                              roles: itemRoles(item),
+                              showOnAuthors: item.showOnAuthors,
                             })
                           }
                           className="inline-flex items-center gap-1 rounded-xl border border-[#E8E4DC] bg-stone-50 px-2.5 py-1.5 text-xs font-semibold text-stone-700 transition hover:bg-white"
@@ -525,19 +541,44 @@ export default function CmsUsersPage() {
             )}
           </CmsField>
           <CmsField label={t('cms.users.colRole')}>
-            <JournalSelect
-              name="cms-user-role"
-              variant="boxed"
-              value={form.role}
-              onChange={(value) =>
-                setForm((prev) => ({ ...prev, role: value as CmsUserRole }))
-              }
-              options={roleOptions}
-            />
-            {form.role === 'AUTHOR' && (
-              <p className="text-xs text-stone-500">{t('cms.users.authorHint')}</p>
-            )}
+            <div className="grid gap-2 sm:grid-cols-2">
+              {CMS_USER_ROLES.map((role) => (
+                <CmsCheckbox
+                  key={role}
+                  name={`create-role-${role}`}
+                  label={t(cmsRoleI18nKey(role))}
+                  checked={form.roles.includes(role)}
+                  onChange={() =>
+                    setForm((prev) => {
+                      const roles = toggleRole(prev.roles, role)
+                      const addedAuthor =
+                        role === 'AUTHOR' &&
+                        roles.includes('AUTHOR') &&
+                        !prev.roles.includes('AUTHOR')
+                      return {
+                        ...prev,
+                        roles,
+                        showOnAuthors: addedAuthor ? true : prev.showOnAuthors,
+                      }
+                    })
+                  }
+                />
+              ))}
+            </div>
+            <p className="text-xs text-stone-500">{t('cms.users.rolesHint')}</p>
           </CmsField>
+          <CmsCheckbox
+            name="create-show-on-authors"
+            label={t('cms.users.showOnAuthors')}
+            description={t('cms.users.showOnAuthorsHint')}
+            checked={form.showOnAuthors}
+            onChange={() =>
+              setForm((prev) => ({
+                ...prev,
+                showOnAuthors: !prev.showOnAuthors,
+              }))
+            }
+          />
           <div className="flex justify-end gap-2 pt-2">
             <GhostButton type="button" onClick={closeCreate}>
               {t('cms.users.cancel')}
@@ -562,11 +603,14 @@ export default function CmsUsersPage() {
             className="space-y-4"
             onSubmit={(event) => {
               event.preventDefault()
-              if (!editing.name.trim() || !editing.email.includes('@')) return
+              if (!editing.name.trim() || !editing.email.includes('@') || !editing.roles.length)
+                return
               updateMutation.mutate({
                 id: editing.id,
                 name: editing.name.trim(),
                 email: editing.email.trim(),
+                roles: editing.roles,
+                showOnAuthors: editing.showOnAuthors,
               })
             }}
           >
@@ -597,6 +641,38 @@ export default function CmsUsersPage() {
                 required
               />
             </CmsField>
+            <CmsField label={t('cms.users.colRole')}>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {CMS_USER_ROLES.map((role) => (
+                  <CmsCheckbox
+                    key={role}
+                    name={`edit-role-${role}`}
+                    label={t(cmsRoleI18nKey(role))}
+                    checked={editing.roles.includes(role)}
+                    onChange={() =>
+                      setEditing((prev) =>
+                        prev
+                          ? { ...prev, roles: toggleRole(prev.roles, role) }
+                          : prev,
+                      )
+                    }
+                  />
+                ))}
+              </div>
+            </CmsField>
+            <CmsCheckbox
+              name="edit-show-on-authors"
+              label={t('cms.users.showOnAuthors')}
+              description={t('cms.users.showOnAuthorsHint')}
+              checked={editing.showOnAuthors}
+              onChange={() =>
+                setEditing((prev) =>
+                  prev
+                    ? { ...prev, showOnAuthors: !prev.showOnAuthors }
+                    : prev,
+                )
+              }
+            />
             <div className="flex justify-end gap-2 pt-2">
               <GhostButton type="button" onClick={() => setEditing(null)}>
                 {t('cms.users.cancel')}
@@ -606,7 +682,8 @@ export default function CmsUsersPage() {
                 disabled={
                   updateMutation.isPending ||
                   !editing.name.trim() ||
-                  !editing.email.includes('@')
+                  !editing.email.includes('@') ||
+                  editing.roles.length === 0
                 }
               >
                 {updateMutation.isPending

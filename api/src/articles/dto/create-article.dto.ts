@@ -67,8 +67,9 @@ export class CreateArticleDto {
   authorId?: string;
 
   @IsOptional()
+  @ValidateIf((_, value) => value !== null && value !== '')
   @IsString()
-  heroMediaId?: string;
+  heroMediaId?: string | null;
 
   @IsOptional()
   @IsArray()

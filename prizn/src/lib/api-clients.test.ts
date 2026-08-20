@@ -481,7 +481,8 @@ describe('cms dashboard / users / digest / social / community / content', () => 
       name: 'Iva',
       email: 'iva@prizni.bg',
       password: 'secret12',
-      role: 'AUTHOR',
+      roles: ['AUTHOR'],
+      showOnAuthors: true,
     })
     await getCmsProfile()
     await updateCmsProfile({ bio: 'Hi' })

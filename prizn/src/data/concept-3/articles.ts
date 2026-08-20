@@ -5,7 +5,7 @@
  * - category · read time · location
  * - centered headline + byline
  * - hero image + photo credit
- * - drop-cap opening paragraph
+ * - inline images in the body
  * - shared editorial style, different notes per piece
  *   (paragraphs, pull quotes, field notes, captions)
  *

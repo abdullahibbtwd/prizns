@@ -44,6 +44,30 @@ describe('RequireAuth', () => {
     expect(screen.getByText('Protected todos')).toBeInTheDocument()
   })
 
+  it('sends users away from pages their role cannot open', () => {
+    useAuth.mockReturnValue({
+      user: {
+        id: 'u1',
+        email: 'writer@prizni.bg',
+        role: 'AUTHOR',
+        emailVerified: true,
+      },
+      loading: false,
+    })
+    render(
+      <MemoryRouter initialEntries={['/cms/users']}>
+        <Routes>
+          <Route path="/cms" element={<RequireAuth />}>
+            <Route index element={<div>Dashboard</div>} />
+            <Route path="users" element={<div>Users page</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    )
+    expect(screen.getByText('Dashboard')).toBeInTheDocument()
+    expect(screen.queryByText('Users page')).not.toBeInTheDocument()
+  })
+
   it('sends unverified users to the email confirmation page', () => {
     useAuth.mockReturnValue({
       user: { id: 'u1', email: 'new@prizni.bg', role: 'EDITOR', emailVerified: false },

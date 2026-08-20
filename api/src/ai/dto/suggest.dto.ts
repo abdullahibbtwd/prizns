@@ -26,6 +26,16 @@ export class AiSuggestDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(200)
+  locationBg?: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  categoryBg?: string
+
+  @IsOptional()
+  @IsString()
   @MaxLength(80)
   lang?: 'bg' | 'en'
 }

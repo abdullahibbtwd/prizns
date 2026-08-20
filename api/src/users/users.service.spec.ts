@@ -27,6 +27,7 @@ describe('UsersService', () => {
     email: 'editor@prizni.bg',
     name: 'Editor',
     role: Role.EDITOR,
+    roles: [Role.EDITOR],
     isActive: true,
     emailVerifiedAt: new Date('2026-01-01'),
     createdAt: new Date('2026-01-01'),
@@ -98,6 +99,7 @@ describe('UsersService', () => {
       email: 'writer@prizni.bg',
       name: 'Iva Petrova',
       role: Role.AUTHOR,
+      roles: [Role.AUTHOR],
     });
 
     const created = await service.create({
@@ -113,6 +115,32 @@ describe('UsersService', () => {
       expect.objectContaining({
         nameBg: 'Iva Petrova',
         userId: 'user-3',
+      }),
+    );
+  });
+
+  it('lists an editor on the authors page when asked', async () => {
+    prisma.user.findUnique = jest.fn().mockResolvedValue(null);
+    prisma.user.create = jest.fn().mockResolvedValue({
+      ...row,
+      id: 'user-4',
+      email: 'desk@prizni.bg',
+      name: 'Desk Editor',
+    });
+
+    const created = await service.create({
+      email: 'desk@prizni.bg',
+      name: 'Desk Editor',
+      password: 'secret12',
+      roles: [Role.EDITOR],
+      showOnAuthors: true,
+    });
+
+    expect(created.authorCreated).toBe(true);
+    expect(authors.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'user-4',
+        showOnAuthors: true,
       }),
     );
   });
@@ -197,6 +225,7 @@ describe('UsersService', () => {
       ...row,
       id: 'admin-1',
       role: Role.ADMIN,
+      roles: [Role.ADMIN],
     });
     prisma.user.count = jest.fn().mockResolvedValue(1);
 

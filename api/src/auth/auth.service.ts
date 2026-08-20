@@ -108,14 +108,17 @@ export class AuthService {
     email: string;
     name: string | null;
     role: AuthUserPayload['role'];
+    roles?: AuthUserPayload['roles'] | null;
     imageUrl?: string | null;
     emailVerifiedAt?: Date | null;
   }): AuthUserPayload {
+    const roles = user.roles?.length ? user.roles : [user.role];
     return {
       id: user.id,
       email: user.email,
       name: user.name,
       role: user.role,
+      roles,
       imageUrl: user.imageUrl ?? null,
       emailVerified: Boolean(user.emailVerifiedAt),
     };

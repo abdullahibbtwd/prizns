@@ -1,6 +1,17 @@
 import type { Role } from '@prisma/client';
+import { primaryRole } from '../auth/role-access';
 import { slugify } from '../common/slug.util';
 import type { WpUser } from './types';
+
+const WP_ROLE_MAP: Record<string, Role> = {
+  administrator: 'ADMIN',
+  editor: 'EDITOR',
+  seo_manager: 'SEO_MANAGER',
+  seo_editor: 'SEO_EDITOR',
+  author: 'AUTHOR',
+  contributor: 'CONTRIBUTOR',
+  subscriber: 'SUBSCRIBER',
+};
 
 export type MappedWpUser = {
   wpId: number;
@@ -12,6 +23,7 @@ export type MappedWpUser = {
   /** Relative path inside an export package for a downloaded avatar. */
   imageFile?: string;
   role: Role;
+  roles: Role[];
 };
 
 export function parseWpUsersJson(raw: unknown): WpUser[] {
@@ -24,16 +36,21 @@ export function parseWpUsersJson(raw: unknown): WpUser[] {
   throw new Error('Expected a WP user object, an array of users, or { users: [...] }');
 }
 
+export function mapWpRoles(roles: string[] | undefined): Role[] {
+  const seen = new Set<Role>();
+  const mapped: Role[] = [];
+  for (const raw of roles ?? []) {
+    const role = WP_ROLE_MAP[raw.toLowerCase()];
+    if (role && !seen.has(role)) {
+      seen.add(role);
+      mapped.push(role);
+    }
+  }
+  return mapped.length ? mapped : ['AUTHOR'];
+}
+
 export function mapWpRole(roles: string[] | undefined): Role {
-  const set = new Set((roles ?? []).map((role) => role.toLowerCase()));
-  if (set.has('administrator')) return 'ADMIN';
-  if (set.has('editor')) return 'EDITOR';
-  if (set.has('seo_manager')) return 'SEO_MANAGER';
-  if (set.has('seo_editor')) return 'SEO_EDITOR';
-  if (set.has('author')) return 'AUTHOR';
-  if (set.has('contributor')) return 'CONTRIBUTOR';
-  if (set.has('subscriber')) return 'SUBSCRIBER';
-  return 'AUTHOR';
+  return primaryRole(mapWpRoles(roles));
 }
 
 export function mapWpUser(user: WpUser): MappedWpUser {
@@ -43,6 +60,7 @@ export function mapWpUser(user: WpUser): MappedWpUser {
   const imageUrl =
     avatars['96'] || avatars['48'] || avatars['24'] || Object.values(avatars)[0] || null;
 
+  const roles = mapWpRoles(user.roles);
   return {
     wpId: user.id,
     email,
@@ -50,7 +68,8 @@ export function mapWpUser(user: WpUser): MappedWpUser {
     slug,
     bioBg: user.description?.trim() || null,
     imageUrl,
-    role: mapWpRole(user.roles),
+    role: primaryRole(roles),
+    roles,
   };
 }
 

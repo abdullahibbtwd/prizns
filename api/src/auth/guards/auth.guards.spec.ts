@@ -106,7 +106,7 @@ describe('RolesGuard', () => {
   };
   const guard = new RolesGuard(reflector as unknown as Reflector);
 
-  const context = (user?: { role: string }) =>
+  const context = (user?: { role: string; roles?: string[] }) =>
     ({
       getHandler: () => ({}),
       getClass: () => ({}),
@@ -126,6 +126,15 @@ describe('RolesGuard', () => {
   it('allows when user role matches', () => {
     reflector.getAllAndOverride.mockReturnValue(['EDITOR']);
     expect(guard.canActivate(context({ role: 'EDITOR' }))).toBe(true);
+  });
+
+  it('allows when any of the user roles matches', () => {
+    reflector.getAllAndOverride.mockReturnValue(['AUTHOR']);
+    expect(
+      guard.canActivate(
+        context({ role: 'EDITOR', roles: ['EDITOR', 'AUTHOR'] }),
+      ),
+    ).toBe(true);
   });
 
   it('rejects when role is insufficient', () => {

@@ -100,7 +100,26 @@ describe('DonationsService', () => {
       email: 'donor@example.com',
     });
     expect(result.url).toContain('stripe.test');
-    expect(prisma.donation.create).toHaveBeenCalled();
+    expect(prisma.donation.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          amountCents: 1000,
+          currency: 'eur',
+        }),
+      }),
+    );
+    expect(mockCheckoutCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        line_items: [
+          expect.objectContaining({
+            price_data: expect.objectContaining({
+              currency: 'eur',
+              unit_amount: 1000,
+            }),
+          }),
+        ],
+      }),
+    );
   });
 
   it('requires published article when articleId is set', async () => {

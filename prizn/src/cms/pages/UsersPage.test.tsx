@@ -48,10 +48,11 @@ describe('CmsUsersPage', () => {
     expect(screen.getByRole('button', { name: /cms.users.newUser/ })).toBeInTheDocument()
 
     const user = userEvent.setup()
-    await user.click(screen.getByRole('button', { name: 'cms.roles.editor' }))
-    expect(screen.getByRole('option', { name: 'cms.roles.seoEditor' })).toBeInTheDocument()
-    expect(screen.getByRole('option', { name: 'cms.roles.author' })).toBeInTheDocument()
-    expect(screen.getByRole('option', { name: 'cms.roles.contributor' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /cms.users.newUser/ }))
+    expect(screen.getByRole('checkbox', { name: 'cms.roles.seoEditor' })).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: 'cms.roles.author' })).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: 'cms.roles.contributor' })).toBeInTheDocument()
+    expect(screen.getByText('cms.users.showOnAuthors')).toBeInTheDocument()
   })
 
   it('creates a user and links author pages in the table', async () => {

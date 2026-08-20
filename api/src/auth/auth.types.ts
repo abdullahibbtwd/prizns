@@ -10,6 +10,7 @@ export type AuthUserPayload = {
   email: string;
   name: string | null;
   role: Role;
+  roles: Role[];
   imageUrl: string | null;
   emailVerified: boolean;
   sessionId?: string;

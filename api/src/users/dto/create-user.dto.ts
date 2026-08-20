@@ -1,7 +1,11 @@
 import {
+  ArrayMinSize,
+  IsArray,
+  IsBoolean,
   IsEmail,
   IsEnum,
   IsNotEmpty,
+  IsOptional,
   IsString,
   MaxLength,
   MinLength,
@@ -22,6 +26,17 @@ export class CreateUserDto {
   @MaxLength(128)
   password!: string;
 
+  @IsOptional()
   @IsEnum(Role)
-  role!: Role;
+  role?: Role;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsEnum(Role, { each: true })
+  roles?: Role[];
+
+  @IsOptional()
+  @IsBoolean()
+  showOnAuthors?: boolean;
 }

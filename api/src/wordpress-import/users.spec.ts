@@ -1,9 +1,10 @@
-import { mapWpRole, mapWpUser, parseWpUsersJson, wpUserAlias } from './users';
+import { mapWpRole, mapWpRoles, mapWpUser, parseWpUsersJson, wpUserAlias } from './users';
 
 describe('wordpress users', () => {
   it('maps WP roles onto CMS roles', () => {
     expect(mapWpRole(['administrator'])).toBe('ADMIN');
     expect(mapWpRole(['editor', 'author'])).toBe('EDITOR');
+    expect(mapWpRoles(['editor', 'author'])).toEqual(['EDITOR', 'AUTHOR']);
     expect(mapWpRole(['author'])).toBe('AUTHOR');
     expect(mapWpRole(['subscriber'])).toBe('SUBSCRIBER');
     expect(mapWpRole([])).toBe('AUTHOR');
@@ -28,6 +29,7 @@ describe('wordpress users', () => {
       bioBg: 'Емоционална и емпатична.',
       imageUrl: 'https://prizni.bg/avatar.jpg',
       role: 'AUTHOR',
+      roles: ['AUTHOR'],
     });
     expect(wpUserAlias(42)).toBe('wp-user:42');
   });

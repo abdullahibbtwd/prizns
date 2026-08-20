@@ -43,7 +43,7 @@ import { cmsGlobalSearch } from '@/lib/cms-search-api'
 import { listCmsArticles } from '@/lib/articles-api'
 import { listCmsAuthors, listCmsSeries } from '@/lib/cms-content-api'
 import { useAuth } from '@/lib/auth'
-import { cmsRoleI18nKey, isCmsUserRole } from '@/lib/cms-roles'
+import { cmsRoleI18nKey, filterCmsNavGroups, isCmsUserRole, primaryCmsRole, userRoles } from '@/lib/cms-roles'
 import { pickLang } from '@/lib/pick-lang'
 
 export interface CmsNavItem {
@@ -124,9 +124,13 @@ export function CmsSidebar({ onNavigate }: CmsSidebarProps) {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const displayName = user?.name?.trim() || user?.email || t('cms.editorRole')
-  const displayRole = user?.role
-    ? t(cmsRoleI18nKey(user.role))
+  const heldRoles = userRoles(user)
+  const displayRole = heldRoles.length
+    ? heldRoles.length > 1
+      ? `${t(cmsRoleI18nKey(primaryCmsRole(heldRoles)))} +${heldRoles.length - 1}`
+      : t(cmsRoleI18nKey(heldRoles[0]!))
     : t('cms.editorRole')
+  const navGroups = filterCmsNavGroups(cmsNavGroups, user)
   const initials = displayName
     .split(/\s+/)
     .filter(Boolean)
@@ -195,7 +199,7 @@ export function CmsSidebar({ onNavigate }: CmsSidebarProps) {
 
       {/* Navigation Links */}
       <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-5 scrollbar-thin">
-        {cmsNavGroups.map((group) => (
+        {navGroups.map((group) => (
           <div key={group.labelKey}>
             <div className="mb-2 px-2.5 flex items-center justify-between">
               <p className="font-heading text-[11px] font-semibold uppercase tracking-[0.22em] text-stone-600">

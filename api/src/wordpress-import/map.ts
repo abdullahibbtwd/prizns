@@ -221,12 +221,19 @@ export function mapWpPost(post: WpPost): MappedWpArticle {
   const parsedBody = htmlToBlocks(contentHtml, { quoteCiteBg: '' });
   const hero = featuredImage(post);
   const galleryImages = parsedBody.images.filter((image) => image.src !== hero?.src);
+  const heroSrc = hero?.src;
+  const body = parsedBody.blocks.filter(
+    (block) => !(block.type === 'image' && heroSrc && block.url === heroSrc),
+  );
   const photoCreditBg =
     hero?.caption || galleryImages.find((image) => image.caption)?.caption || '';
   const publishedAtRaw = post.date_gmt || post.date;
   const publishedAt = publishedAtRaw ? new Date(publishedAtRaw) : null;
-  const bodyText = parsedBody.blocks
-    .map((block) => ('textBg' in block ? block.textBg : ''))
+  const bodyText = body
+    .map((block) => {
+      if (block.type === 'image') return block.captionBg ?? '';
+      return 'textBg' in block ? block.textBg : '';
+    })
     .join(' ');
 
   return {
@@ -250,7 +257,7 @@ export function mapWpPost(post: WpPost): MappedWpArticle {
     photoCreditBg,
     seoTitleBg: seoTitle(post, titleBg),
     seoDescriptionBg: post.yoast_head_json?.description?.trim() || excerpt || null,
-    body: parsedBody.blocks,
+    body,
     authorNameBg: author.nameBg,
     authorSlug: author.slug,
     authorBioBg: author.bioBg,

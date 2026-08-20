@@ -520,6 +520,8 @@ export class TranslationService {
       if (block.type === 'note') {
         if (block.labelBg) out.push(block.labelBg)
         if (block.textBg) out.push(block.textBg)
+      } else if (block.type === 'image' || block.type === 'video') {
+        if (block.captionBg) out.push(block.captionBg)
       } else if (block.textBg) {
         out.push(block.textBg)
       }
@@ -542,6 +544,15 @@ export class TranslationService {
           labelEn: label.en,
           textBg: text.bg,
           textEn: text.en,
+        }
+      }
+      if (block.type === 'image' || block.type === 'video') {
+        if (!block.captionBg) return block
+        const caption = this.pair(map, block.captionBg, sourceLang)
+        return {
+          ...block,
+          captionBg: caption.bg,
+          captionEn: caption.en,
         }
       }
       const text = this.pair(map, block.textBg, sourceLang)

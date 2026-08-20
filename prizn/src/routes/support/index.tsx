@@ -121,15 +121,15 @@ export default function SupportUsPage() {
 
   const handleDonate = async () => {
     setError('')
-    const amountBgn = Number(selectedAmount)
-    if (!Number.isFinite(amountBgn) || amountBgn < 1) {
-      setError('Please choose a valid amount (at least 1 BGN).')
+    const amount = Number(selectedAmount)
+    if (!Number.isFinite(amount) || amount < 1) {
+      setError('Please choose a valid amount (at least 1 EUR).')
       return
     }
     setSubmitting(true)
     try {
       const result = await createDonationCheckout({
-        amountBgn,
+        amountBgn: amount,
         email: email.trim() || undefined,
       })
       window.location.href = result.url
@@ -251,7 +251,7 @@ export default function SupportUsPage() {
                     >
                       <p className="font-heading text-4xl font-light text-[#0C2686]">
                         {tier.amount}{' '}
-                        <span className="text-xl">BGN</span>
+                        <span className="text-xl">EUR</span>
                       </p>
                       <h3 className="mt-4 font-heading text-2xl text-[#1A1A1A]">
                         {lang === 'bg' ? tier.titleBg : tier.title}
@@ -279,7 +279,7 @@ export default function SupportUsPage() {
                     </p>
                     {amount === 'custom' && (
                       <div className="mt-3">
-                        <FieldLabel>{lang === 'bg' ? 'Сума в лв.' : 'Amount in BGN'}</FieldLabel>
+                        <FieldLabel>{lang === 'bg' ? 'Сума в EUR' : 'Amount in EUR'}</FieldLabel>
                         <TextInput
                           type="number"
                           min="1"
@@ -322,8 +322,8 @@ export default function SupportUsPage() {
                         ? 'Пренасочване…'
                         : 'Redirecting…'
                       : lang === 'bg'
-                        ? `Дарете ${selectedAmount || '—'} лв.`
-                        : `Donate ${selectedAmount || '—'} BGN`}
+                        ? `Дарете ${selectedAmount || '—'} EUR`
+                        : `Donate ${selectedAmount || '—'} EUR`}
                   </button>
                   {error ? (
                     <p className="mt-4 font-sans text-sm text-rose-700">{error}</p>

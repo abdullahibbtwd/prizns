@@ -1,10 +1,15 @@
 import { screen, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import { Route, Routes } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
 import { buildCmsArticle } from '@/test/factories'
 import { renderPage } from '@/test/render-page'
 import ArticlePage from './index'
+
+vi.mock('@/components/concept-3/LuxuryVideoPlayer', () => ({
+  LuxuryVideoPlayer: ({ src }: { src: string }) => (
+    <div data-testid="story-video">{src}</div>
+  ),
+}))
 
 vi.mock('@/components/concept-3/JournalShell', () => ({
   JournalShell: ({
@@ -133,8 +138,7 @@ describe('ArticlePage', () => {
     })
   })
 
-  it('lets readers step through story photos in the hero', async () => {
-    const user = userEvent.setup()
+  it('places extra photos in the story body instead of the hero slider', async () => {
     getPublicArticle.mockResolvedValue(
       buildCmsArticle({
         section: 'stories',
@@ -152,6 +156,12 @@ describe('ArticlePage', () => {
             text: 'First paragraph of the story.',
             textBg: 'Първи параграф.',
           },
+          {
+            type: 'image',
+            url: 'https://cdn.example/two.jpg',
+            text: 'Archive photo',
+            textBg: 'Архивна снимка',
+          },
         ],
       }),
     )
@@ -162,11 +172,74 @@ describe('ArticlePage', () => {
       'src',
       'https://cdn.example/hero.jpg',
     )
-
-    await user.click(screen.getByRole('button', { name: 'nextPhoto' }))
-    expect(screen.getByRole('img', { name: 'Village life' })).toHaveAttribute(
+    expect(
+      screen.queryByRole('button', { name: 'nextPhoto' }),
+    ).not.toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'Archive photo' })).toHaveAttribute(
       'src',
       'https://cdn.example/two.jpg',
+    )
+    expect(screen.getByText('Archive photo')).toBeInTheDocument()
+  })
+
+  it('keeps the hero photo when a story also has a video', async () => {
+    getPublicArticle.mockResolvedValue(
+      buildCmsArticle({
+        section: 'stories',
+        slug: 'village-life',
+        path: '/stories/village-life',
+        title: 'Village life',
+        titleBg: 'Селски живот',
+        image: 'https://cdn.example/hero.jpg',
+        heroKind: 'image',
+        videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+        body: [
+          {
+            type: 'paragraph',
+            text: 'First paragraph of the story.',
+            textBg: 'Първи параграф.',
+          },
+        ],
+      }),
+    )
+
+    renderArticle()
+    await screen.findByRole('heading', { name: 'Village life' })
+    expect(screen.getByRole('img', { name: 'Village life' })).toHaveAttribute(
+      'src',
+      'https://cdn.example/hero.jpg',
+    )
+    expect(screen.getByTestId('story-video')).toHaveTextContent(
+      'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+    )
+  })
+
+  it('plays video as the hero when the story marks video as hero', async () => {
+    getPublicArticle.mockResolvedValue(
+      buildCmsArticle({
+        section: 'stories',
+        slug: 'village-life',
+        path: '/stories/village-life',
+        title: 'Village life',
+        titleBg: 'Селски живот',
+        image: 'https://cdn.example/poster.jpg',
+        heroKind: 'video',
+        videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+        body: [
+          {
+            type: 'paragraph',
+            text: 'First paragraph of the story.',
+            textBg: 'Първи параграф.',
+          },
+        ],
+      }),
+    )
+
+    renderArticle()
+    await screen.findByRole('heading', { name: 'Village life' })
+    expect(screen.queryByRole('img', { name: 'Village life' })).not.toBeInTheDocument()
+    expect(screen.getByTestId('story-video')).toHaveTextContent(
+      'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
     )
   })
 })

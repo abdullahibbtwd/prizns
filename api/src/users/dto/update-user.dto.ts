@@ -1,4 +1,13 @@
-import { IsBoolean, IsEmail, IsEnum, IsOptional, IsString, MinLength } from 'class-validator';
+import {
+  ArrayMinSize,
+  IsArray,
+  IsBoolean,
+  IsEmail,
+  IsEnum,
+  IsOptional,
+  IsString,
+  MinLength,
+} from 'class-validator';
 import { Role } from '@prisma/client';
 
 export class UpdateUserDto {
@@ -7,8 +16,18 @@ export class UpdateUserDto {
   role?: Role;
 
   @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsEnum(Role, { each: true })
+  roles?: Role[];
+
+  @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  showOnAuthors?: boolean;
 
   @IsOptional()
   @IsString()

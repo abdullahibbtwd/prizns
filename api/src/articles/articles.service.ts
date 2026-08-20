@@ -15,6 +15,7 @@ import {
   TranslationStatus,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { publicBodyWithInlineImages } from './article-body.util';
 import type { PublicArticleDto, StoredArticleBlock } from './article.types';
 import { CreateArticleDto } from './dto/create-article.dto';
 import { UpdateArticleDto } from './dto/update-article.dto';
@@ -34,6 +35,7 @@ type GalleryMedia = {
   id: string;
   url: string;
   creditBg: string | null;
+  kind?: 'IMAGE' | 'VIDEO' | 'AUDIO' | string | null;
 };
 
 type SeriesEpisodeRel = {
@@ -294,6 +296,36 @@ export class ArticlesService {
         };
       }
 
+      if (block.type === 'image' && prev.type === 'image') {
+        const captionSame = (block.captionBg ?? '') === (prev.captionBg ?? '');
+        const mediaSame =
+          (block.mediaId ?? '') === (prev.mediaId ?? '') &&
+          (block.url ?? '') === (prev.url ?? '');
+        if (!captionSame || !mediaSame) bgChanged = true;
+        return {
+          type: 'image' as const,
+          mediaId: block.mediaId,
+          url: block.url,
+          captionBg: block.captionBg ?? '',
+          captionEn: captionSame ? prev.captionEn : null,
+        };
+      }
+
+      if (block.type === 'video' && prev.type === 'video') {
+        const captionSame = (block.captionBg ?? '') === (prev.captionBg ?? '');
+        const mediaSame =
+          (block.mediaId ?? '') === (prev.mediaId ?? '') &&
+          (block.url ?? '') === (prev.url ?? '');
+        if (!captionSame || !mediaSame) bgChanged = true;
+        return {
+          type: 'video' as const,
+          mediaId: block.mediaId,
+          url: block.url,
+          captionBg: block.captionBg ?? '',
+          captionEn: captionSame ? prev.captionEn : null,
+        };
+      }
+
       bgChanged = true;
       return block;
     });
@@ -315,6 +347,7 @@ export class ArticlesService {
         id: item.media.id,
         url: this.mediaUrl(item.media),
         creditBg: item.media.creditBg,
+        kind: item.media.kind,
       }));
     }
     if (article.heroMedia) {
@@ -323,13 +356,27 @@ export class ArticlesService {
           id: article.heroMedia.id,
           url: this.mediaUrl(article.heroMedia),
           creditBg: article.heroMedia.creditBg,
+          kind: article.heroMedia.kind,
         },
       ];
     }
     return [];
   }
 
-  private async replaceGallery(articleId: string, mediaIds: string[]) {
+  private resolveHeroMediaId(
+    requested: string | null | undefined,
+    galleryIds: string[],
+  ): string | null | undefined {
+    if (requested === '' || requested === null) return null;
+    if (requested) return requested;
+    return galleryIds[0] || undefined;
+  }
+
+  private async replaceGallery(
+    articleId: string,
+    mediaIds: string[],
+    heroMediaId?: string | null,
+  ) {
     const unique = [...new Set(mediaIds.filter(Boolean))];
     await this.prisma.articleGalleryItem.deleteMany({ where: { articleId } });
     if (unique.length === 0) {
@@ -346,9 +393,15 @@ export class ArticlesService {
         sortOrder,
       })),
     });
+    const nextHero =
+      heroMediaId === null
+        ? null
+        : heroMediaId && unique.includes(heroMediaId)
+          ? heroMediaId
+          : unique[0] ?? null;
     await this.prisma.article.update({
       where: { id: articleId },
-      data: { heroMediaId: unique[0] },
+      data: { heroMediaId: nextHero },
     });
   }
 
@@ -383,38 +436,20 @@ export class ArticlesService {
 
   toPublicDto(article: ArticleWithRelations): PublicArticleDto {
     const section = toPublicSection(article.section);
-    const body = this.parseBody(article.body).map((block) => {
-      if (block.type === 'pullquote') {
-        return {
-          type: 'pullquote' as const,
-          text: block.textEn ?? block.textBg,
-          textBg: block.textBg,
-          cite: block.citeEn ?? block.citeBg,
-          citeBg: block.citeBg,
-        };
-      }
-      if (block.type === 'note') {
-        return {
-          type: 'note' as const,
-          label: block.labelEn ?? block.labelBg,
-          labelBg: block.labelBg,
-          text: block.textEn ?? block.textBg,
-          textBg: block.textBg,
-        };
-      }
-      if (block.type === 'caption') {
-        return {
-          type: 'caption' as const,
-          text: block.textEn ?? block.textBg,
-          textBg: block.textBg,
-        };
-      }
-      return {
-        type: 'paragraph' as const,
-        text: block.textEn ?? block.textBg,
-        textBg: block.textBg,
-      };
-    });
+    const gallery = this.galleryFromArticle(article);
+    const heroIsVideo =
+      article.heroMedia?.kind === 'VIDEO' ||
+      (!article.heroMedia && Boolean(article.videoUrl?.trim()));
+    const posterUrl =
+      gallery.find(
+        (item) => item.kind !== 'VIDEO' && item.kind !== 'AUDIO',
+      )?.url ?? '';
+    const heroUrl = heroIsVideo ? '' : this.mediaUrl(article.heroMedia);
+    const body = publicBodyWithInlineImages(
+      this.parseBody(article.body),
+      gallery,
+      heroUrl,
+    );
 
     return {
       id: article.id,
@@ -439,7 +474,8 @@ export class ArticlesService {
       speakerBg: article.speakerBg ?? undefined,
       date: article.dateEn ?? article.dateBg,
       dateBg: article.dateBg,
-      image: this.mediaUrl(article.heroMedia),
+      image: heroIsVideo ? posterUrl : this.mediaUrl(article.heroMedia),
+      heroKind: heroIsVideo ? 'video' : 'image',
       photoCredit: article.photoCreditEn ?? article.photoCreditBg,
       photoCreditBg: article.photoCreditBg,
       audioUrl: article.audioMedia
@@ -466,7 +502,7 @@ export class ArticlesService {
       seoTitleBg: article.seoTitleBg,
       seoDescription: article.seoDescriptionEn ?? article.seoDescriptionBg,
       seoDescriptionBg: article.seoDescriptionBg,
-      gallery: this.galleryFromArticle(article),
+      gallery: gallery,
       tags: this.tagsFromArticle(article),
       series: (() => {
         const membership = article.seriesEpisodes?.[0];
@@ -890,7 +926,7 @@ export class ArticlesService {
     });
     const path = buildArticlePath(section, slug);
     const galleryIds = dto.galleryMediaIds?.filter(Boolean) ?? [];
-    const heroMediaId = dto.heroMediaId || galleryIds[0] || undefined;
+    const heroMediaId = this.resolveHeroMediaId(dto.heroMediaId, galleryIds);
 
     const row = await this.prisma.article.create({
       data: {
@@ -928,7 +964,7 @@ export class ArticlesService {
     });
 
     if (galleryIds.length > 0) {
-      await this.replaceGallery(row.id, galleryIds);
+      await this.replaceGallery(row.id, galleryIds, heroMediaId ?? null);
     }
 
     if (dto.tagIds !== undefined) {
@@ -1072,7 +1108,12 @@ export class ArticlesService {
           ? { sponsorName: this.optionalText(dto.sponsorName) }
           : {}),
         authorId: dto.authorId,
-        heroMediaId: dto.heroMediaId,
+        ...(dto.galleryMediaIds !== undefined
+          ? {}
+          : {
+              heroMediaId:
+                dto.heroMediaId === '' ? null : dto.heroMediaId,
+            }),
         audioMediaId: dto.audioMediaId,
         ...(dto.videoMediaId !== undefined
           ? { videoMediaId: dto.videoMediaId || null }
@@ -1100,7 +1141,13 @@ export class ArticlesService {
     });
 
     if (dto.galleryMediaIds !== undefined) {
-      await this.replaceGallery(id, dto.galleryMediaIds);
+      const hero =
+        dto.heroMediaId === undefined
+          ? undefined
+          : dto.heroMediaId === '' || dto.heroMediaId === null
+            ? null
+            : dto.heroMediaId;
+      await this.replaceGallery(id, dto.galleryMediaIds, hero);
     }
 
     if (dto.tagIds !== undefined) {

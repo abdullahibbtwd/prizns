@@ -7,6 +7,7 @@ export type AuthUser = {
   email: string
   name: string | null
   role: CmsUserRole
+  roles?: CmsUserRole[]
   imageUrl?: string | null
   emailVerified?: boolean
 }

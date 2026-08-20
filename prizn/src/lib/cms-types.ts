@@ -48,7 +48,21 @@ export type BodyBlock =
       textBg: string;
       textEn?: string | null;
     }
-  | { type: "caption"; textBg: string; textEn?: string | null };
+  | { type: "caption"; textBg: string; textEn?: string | null }
+  | {
+      type: "image";
+      mediaId?: string;
+      url?: string;
+      captionBg: string;
+      captionEn?: string | null;
+    }
+  | {
+      type: "video";
+      mediaId?: string;
+      url?: string;
+      captionBg: string;
+      captionEn?: string | null;
+    };
 
 export type CmsArticle = {
   id: string;
@@ -75,6 +89,7 @@ export type CmsArticle = {
   speaker?: string;
   speakerBg?: string;
   image: string;
+  heroKind?: 'image' | 'video';
   photoCredit: string;
   photoCreditBg: string;
   audioUrl?: string;
@@ -84,7 +99,12 @@ export type CmsArticle = {
   audioMediaId?: string | null;
   videoMediaId?: string | null;
   galleryMediaIds?: string[];
-  gallery?: Array<{ id: string; url: string; creditBg?: string | null }>;
+  gallery?: Array<{
+    id: string;
+    url: string;
+    creditBg?: string | null;
+    kind?: 'IMAGE' | 'VIDEO' | 'AUDIO' | string | null;
+  }>;
   endLabel: string;
   endLabelBg: string;
   body: Array<{
@@ -95,6 +115,7 @@ export type CmsArticle = {
     citeBg?: string;
     label?: string;
     labelBg?: string;
+    url?: string;
   }>;
   bodyRaw?: BodyBlock[];
   featured: boolean;
@@ -147,6 +168,7 @@ export type CmsAuthor = CmsAuthorOption & {
   bioEn: string | null;
   aliases: string[];
   isActive: boolean;
+  showOnAuthors: boolean;
   translationStatus?: TranslationStatus;
   translationError?: string | null;
   createdAt?: string;
@@ -209,6 +231,7 @@ export type AuthorFormValues = {
   imageUrl: string;
   aliases: string;
   isActive: boolean;
+  showOnAuthors: boolean;
 };
 
 export type SeriesFormValues = {

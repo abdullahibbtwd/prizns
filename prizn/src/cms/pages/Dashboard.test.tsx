@@ -4,9 +4,18 @@ import { describe, expect, it, vi } from 'vitest'
 import { renderPage } from '@/test/render-page'
 import CmsDashboard from './Dashboard'
 
+const { authUser } = vi.hoisted(() => ({
+  authUser: {
+    name: 'Ada Editor',
+    email: 'ada@prizni.bg',
+    role: 'EDITOR' as string,
+    roles: ['EDITOR'] as string[],
+  },
+}))
+
 vi.mock('@/lib/auth', () => ({
   useAuth: () => ({
-    user: { name: 'Ada Editor', email: 'ada@prizni.bg' },
+    user: authUser,
     loading: false,
   }),
 }))
@@ -32,6 +41,8 @@ vi.mock('@/lib/analytics-api', () => ({
 
 describe('CmsDashboard', () => {
   beforeEach(() => {
+    authUser.role = 'EDITOR'
+    authUser.roles = ['EDITOR']
     getDashboardChecklist.mockResolvedValue({
       draftArticles: 2,
       reviewArticles: 1,
@@ -92,5 +103,14 @@ describe('CmsDashboard', () => {
     await waitFor(() => {
       expect(getAnalyticsSummary).toHaveBeenCalledWith('week')
     })
+  })
+
+  it('hides traffic analytics for authors', async () => {
+    authUser.role = 'AUTHOR'
+    authUser.roles = ['AUTHOR']
+    renderPage(<CmsDashboard />)
+    expect(await screen.findByText(/Ada/)).toBeInTheDocument()
+    expect(screen.queryByText('cms.dashboard.traffic')).not.toBeInTheDocument()
+    expect(screen.getByText('cms.dashboard.drafts')).toBeInTheDocument()
   })
 })

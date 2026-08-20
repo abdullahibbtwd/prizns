@@ -67,6 +67,7 @@ export const mockUser = {
   email: 'editor@prizni.bg',
   name: 'Editor',
   role: 'EDITOR' as const,
+  roles: ['EDITOR'] as const,
 };
 
 export const mockAuthUser = {
@@ -74,6 +75,7 @@ export const mockAuthUser = {
   email: mockUser.email,
   name: mockUser.name,
   role: mockUser.role,
+  roles: [...mockUser.roles],
   imageUrl: null,
   emailVerified: true,
 };

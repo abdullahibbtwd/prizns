@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { ArticleStatus, Prisma, Role, TranslationStatus } from '@prisma/client';
+import { ArticleStatus, TranslationStatus } from '@prisma/client';
 import { BadgesService } from '../badges/badges.service';
 import { ensureUniqueSlug } from '../common/slug.util';
 import { PrismaService } from '../prisma/prisma.service';
@@ -22,6 +22,7 @@ const authorSelect = {
   imageUrl: true,
   aliases: true,
   isActive: true,
+  showOnAuthors: true,
   translationStatus: true,
   translationError: true,
   sourceLang: true,
@@ -52,10 +53,7 @@ const publicAuthorSelect = {
   },
 } as const;
 
-/** Bylines on the Authors desk: CMS users with role AUTHOR, plus unlinked profiles. */
-const authorRoleFilter: Prisma.AuthorWhereInput = {
-  OR: [{ user: { is: { role: Role.AUTHOR } } }, { userId: null }],
-};
+const publicListingFilter = { isActive: true, showOnAuthors: true } as const;
 
 @Injectable()
 export class AuthorsService {
@@ -66,7 +64,7 @@ export class AuthorsService {
 
   listActive() {
     return this.prisma.author.findMany({
-      where: { isActive: true, AND: [authorRoleFilter] },
+      where: { isActive: true },
       orderBy: { nameBg: 'asc' },
       select: {
         id: true,
@@ -82,7 +80,7 @@ export class AuthorsService {
 
   async listPublic() {
     const rows = await this.prisma.author.findMany({
-      where: { isActive: true, AND: [authorRoleFilter] },
+      where: publicListingFilter,
       orderBy: { nameBg: 'asc' },
       select: publicAuthorSelect,
     });
@@ -91,7 +89,7 @@ export class AuthorsService {
 
   async getPublicBySlug(slug: string) {
     const row = await this.prisma.author.findFirst({
-      where: { slug, isActive: true, AND: [authorRoleFilter] },
+      where: { slug, ...publicListingFilter },
       select: publicAuthorSelect,
     });
     return row ? this.toPublicDto(row) : null;
@@ -140,7 +138,6 @@ export class AuthorsService {
 
   listCms() {
     return this.prisma.author.findMany({
-      where: authorRoleFilter,
       orderBy: { nameBg: 'asc' },
       select: authorSelect,
     });
@@ -185,6 +182,7 @@ export class AuthorsService {
         imageUrl: dto.imageUrl?.trim() || null,
         aliases: dto.aliases ?? [],
         isActive: dto.isActive ?? true,
+        showOnAuthors: dto.showOnAuthors ?? true,
         translationStatus: TranslationStatus.PENDING,
         translationError: null,
         userId: dto.userId || undefined,
@@ -239,6 +237,9 @@ export class AuthorsService {
           : {}),
         ...(dto.aliases !== undefined ? { aliases: dto.aliases } : {}),
         ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
+        ...(dto.showOnAuthors !== undefined
+          ? { showOnAuthors: dto.showOnAuthors }
+          : {}),
         ...(bgChanged
           ? {
               nameEn: null,
@@ -277,6 +278,7 @@ export class AuthorsService {
         bioBg: 'Редакционният екип на Призни.',
         bioEn: 'The PRIZN editorial team.',
         aliases: ['PRIZNI Audio Desk', 'PRIZN Desk'],
+        showOnAuthors: true,
         translationStatus: TranslationStatus.READY,
       },
     });

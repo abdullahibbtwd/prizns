@@ -10,7 +10,6 @@ const PRESETS = [5, 10, 25] as const
 
 export function SupportThisStory({
   articleId,
-  lang,
 }: {
   articleId?: string
   lang: JournalLang
@@ -123,7 +122,7 @@ export function SupportThisStory({
                 : 'border-black/10 text-[#1A1A1A]/65 hover:border-[#0C2686]/40'
             }`}
           >
-            {preset} {lang === 'bg' ? 'лв.' : 'BGN'}
+            {preset} EUR
           </button>
         ))}
       </div>

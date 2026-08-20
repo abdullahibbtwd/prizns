@@ -8,12 +8,14 @@ export type CmsUser = {
   email: string
   name: string | null
   role: CmsUserRole
+  roles: CmsUserRole[]
   isActive: boolean
   emailVerified: boolean
   createdAt: string
   updatedAt: string
   joinedAt: string
   authorId: string | null
+  showOnAuthors: boolean
 }
 
 export type CmsUsersPage = {
@@ -41,7 +43,14 @@ export function listCmsUsers(params?: {
 
 export function updateCmsUser(
   id: string,
-  body: { role?: CmsUserRole; isActive?: boolean; name?: string; email?: string },
+  body: {
+    role?: CmsUserRole
+    roles?: CmsUserRole[]
+    isActive?: boolean
+    name?: string
+    email?: string
+    showOnAuthors?: boolean
+  },
 ) {
   return api.patch<CmsUser>(`/cms/users/${id}`, body)
 }
@@ -50,7 +59,9 @@ export function createCmsUser(body: {
   name: string
   email: string
   password: string
-  role: CmsUserRole
+  role?: CmsUserRole
+  roles: CmsUserRole[]
+  showOnAuthors?: boolean
 }) {
   return api.post<CmsUser>('/cms/users', body)
 }
@@ -60,6 +71,7 @@ export type CmsProfile = {
   email: string
   name: string | null
   role: CmsUserRole
+  roles?: CmsUserRole[]
   imageUrl: string | null
   bio: string | null
   websiteUrl: string | null

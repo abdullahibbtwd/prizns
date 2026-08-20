@@ -12,6 +12,7 @@ import { useCmsConfirm } from '@/cms/components/CmsConfirmDialog'
 import { deleteCmsAuthor, listCmsAuthors } from '@/lib/cms-content-api'
 import { useJournalLang } from '@/hooks/useJournalLang'
 import { pickLang } from '@/lib/pick-lang'
+import { cn } from '@/lib/utils'
 
 export default function CmsAuthorsPage() {
   const { t } = useTranslation()
@@ -119,6 +120,18 @@ export default function CmsAuthorsPage() {
                     <StatusPill
                       status={author.isActive ? 'ACTIVE' : 'ARCHIVED'}
                     />
+                    <span
+                      className={cn(
+                        'rounded-full px-2.5 py-0.5 font-semibold',
+                        author.showOnAuthors
+                          ? 'bg-emerald-50 text-emerald-800'
+                          : 'bg-stone-100 text-stone-500',
+                      )}
+                    >
+                      {author.showOnAuthors
+                        ? t('cms.authors.listed')
+                        : t('cms.authors.hidden')}
+                    </span>
                     {author.translationStatus && (
                       <StatusPill status={author.translationStatus} />
                     )}

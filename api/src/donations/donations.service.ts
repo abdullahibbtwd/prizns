@@ -10,7 +10,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { ArticleStatus, DonationStatus, Prisma } from '@prisma/client';
 import Stripe from 'stripe';
-import { absoluteSiteUrl, bgnToEurCents } from '../common/money.util';
+import { absoluteSiteUrl } from '../common/money.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { ShopService } from '../shop/shop.service';
 import { CreateCheckoutDto } from './dto/create-checkout.dto';
@@ -50,7 +50,7 @@ export class DonationsService {
 
   /**
    * Stripe settlement currency (BGN removed after euro adoption).
-   * Donors still pick amounts in лв; we convert at the official rate.
+   * Donor amounts on Support are EUR.
    */
   private stripeCurrency(): string {
     const raw =
@@ -60,18 +60,10 @@ export class DonationsService {
 
   async createCheckout(dto: CreateCheckoutDto) {
     const stripe = this.requireStripe();
-    const amountBgn = Number(dto.amountBgn);
-    const amountBgnCents = Math.round(amountBgn * 100);
-    if (!Number.isFinite(amountBgnCents) || amountBgnCents < 100) {
-      throw new BadRequestException('amountBgn must be at least 1.00');
-    }
-
-    // Stripe only accepts EUR for Bulgaria now — convert at official fixed rate.
-    const amountEurCents = bgnToEurCents(amountBgn);
-    if (amountEurCents < 50) {
-      throw new BadRequestException(
-        'Amount is too small after conversion to EUR (minimum ~1 BGN).',
-      );
+    const amount = Number(dto.amountBgn);
+    const amountCents = Math.round(amount * 100);
+    if (!Number.isFinite(amountCents) || amountCents < 100) {
+      throw new BadRequestException('amount must be at least 1.00 EUR');
     }
 
     let article: {
@@ -91,11 +83,11 @@ export class DonationsService {
       }
     }
 
-    // Persist the donor-facing лв amount; Stripe charges EUR.
+    // Persist the donor-facing EUR amount; Stripe charges EUR.
     const donation = await this.prisma.donation.create({
       data: {
-        amountCents: amountBgnCents,
-        currency: 'bgn',
+        amountCents,
+        currency: 'eur',
         status: DonationStatus.PENDING,
         email: dto.email?.trim().toLowerCase() || null,
         name: dto.name?.trim() || null,
@@ -119,8 +111,7 @@ export class DonationsService {
       donation: 'cancelled',
     });
 
-    const amountLabel = `${amountBgn.toFixed(2)} лв`;
-    const eurLabel = `${(amountEurCents / 100).toFixed(2)} EUR`;
+    const amountLabel = `${amount.toFixed(2)} EUR`;
 
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
@@ -130,14 +121,14 @@ export class DonationsService {
           quantity: 1,
           price_data: {
             currency: this.stripeCurrency(),
-            unit_amount: amountEurCents,
+            unit_amount: amountCents,
             product_data: {
               name: storyTitle
                 ? `Support: ${storyTitle.slice(0, 100)}`
                 : 'Donation to Prizni',
               description: storyTitle
-                ? `Micro-donation ${amountLabel} (≈ ${eurLabel}) for this Prizni story`
-                : `One-time support ${amountLabel} (≈ ${eurLabel})`,
+                ? `Micro-donation ${amountLabel} for this Prizni story`
+                : `One-time support ${amountLabel}`,
             },
           },
         },
@@ -147,8 +138,8 @@ export class DonationsService {
       metadata: {
         kind: 'donation',
         donationId: donation.id,
-        amountBgn: String(amountBgn),
-        amountEurCents: String(amountEurCents),
+        amountEur: String(amount),
+        amountEurCents: String(amountCents),
         ...(article ? { articleId: article.id } : {}),
       },
     });

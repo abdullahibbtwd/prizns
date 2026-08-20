@@ -34,6 +34,7 @@ import {
   listCmsTodos,
   updateCmsTodo,
 } from '@/lib/dashboard-api'
+import { canAccessCmsPath } from '@/lib/cms-roles'
 import { formatTrendPct } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
@@ -56,6 +57,11 @@ export default function CmsDashboard() {
     user?.email?.split('@')[0] ||
     t('cms.editorRole')
 
+  const canStories = canAccessCmsPath(user, '/cms/stories')
+  const canAnalytics = canAccessCmsPath(user, '/cms/analytics')
+  const canAi = canAccessCmsPath(user, '/cms/ai')
+  const canSubmissions = canAccessCmsPath(user, '/cms/submissions')
+
   const checklistQuery = useQuery({
     queryKey: ['cms-dashboard-checklist'],
     queryFn: getDashboardChecklist,
@@ -64,6 +70,7 @@ export default function CmsDashboard() {
   const analyticsQuery = useQuery({
     queryKey: ['cms-analytics-summary', timeframe],
     queryFn: () => getAnalyticsSummary(timeframe),
+    enabled: canAnalytics,
   })
 
   const todosQuery = useQuery({
@@ -131,42 +138,50 @@ export default function CmsDashboard() {
     const data = checklistQuery.data
     if (!data) return []
     return [
-      {
-        id: 'submissions',
-        label: t('cms.dashboard.taskSubmissions', {
-          count: data.pendingSubmissions,
-        }),
-        done: data.pendingSubmissions === 0,
-        to: '/cms/submissions',
-      },
-      {
-        id: 'review',
-        label: t('cms.dashboard.taskReview', { count: data.reviewArticles }),
-        done: data.reviewArticles === 0,
-        to: '/cms/stories?status=REVIEW',
-      },
-      {
-        id: 'translations',
-        label: t('cms.dashboard.taskTranslations', {
-          count: data.failedTranslations,
-        }),
-        done: data.failedTranslations === 0,
-        to: '/cms/stories',
-      },
-      {
-        id: 'publish',
-        label: t('cms.dashboard.taskPublish', { count: data.publishedToday }),
-        done: data.publishedToday > 0,
-        to: '/cms/stories?status=PUBLISHED',
-      },
-    ]
-  }, [checklistQuery.data, t])
+      canSubmissions
+        ? {
+            id: 'submissions',
+            label: t('cms.dashboard.taskSubmissions', {
+              count: data.pendingSubmissions,
+            }),
+            done: data.pendingSubmissions === 0,
+            to: '/cms/submissions',
+          }
+        : null,
+      canStories
+        ? {
+            id: 'review',
+            label: t('cms.dashboard.taskReview', { count: data.reviewArticles }),
+            done: data.reviewArticles === 0,
+            to: '/cms/stories?status=REVIEW',
+          }
+        : null,
+      canStories
+        ? {
+            id: 'translations',
+            label: t('cms.dashboard.taskTranslations', {
+              count: data.failedTranslations,
+            }),
+            done: data.failedTranslations === 0,
+            to: '/cms/stories',
+          }
+        : null,
+      canStories
+        ? {
+            id: 'publish',
+            label: t('cms.dashboard.taskPublish', { count: data.publishedToday }),
+            done: data.publishedToday > 0,
+            to: '/cms/stories?status=PUBLISHED',
+          }
+        : null,
+    ].filter((task): task is NonNullable<typeof task> => Boolean(task))
+  }, [canStories, canSubmissions, checklistQuery.data, t])
 
   const aiSuggestions = useMemo(() => {
     const data = checklistQuery.data
     if (!data) return []
     const items: Array<{ id: string; label: string; to: string }> = []
-    if (data.failedTranslations > 0) {
+    if (data.failedTranslations > 0 && canStories) {
       items.push({
         id: 'ai-translations',
         label: t('cms.dashboard.aiFixTranslations', {
@@ -175,7 +190,7 @@ export default function CmsDashboard() {
         to: '/cms/stories',
       })
     }
-    if (data.reviewArticles > 0) {
+    if (data.reviewArticles > 0 && canStories) {
       items.push({
         id: 'ai-review',
         label: t('cms.dashboard.aiReviewStories', {
@@ -184,7 +199,7 @@ export default function CmsDashboard() {
         to: '/cms/stories?status=REVIEW',
       })
     }
-    if (data.pendingSubmissions > 0) {
+    if (data.pendingSubmissions > 0 && canSubmissions) {
       items.push({
         id: 'ai-submissions',
         label: t('cms.dashboard.aiReviewSubmissions', {
@@ -193,14 +208,14 @@ export default function CmsDashboard() {
         to: '/cms/submissions',
       })
     }
-    if (data.draftArticles > 0) {
+    if (data.draftArticles > 0 && canStories) {
       items.push({
         id: 'ai-drafts',
         label: t('cms.dashboard.aiFinishDrafts', { count: data.draftArticles }),
         to: '/cms/stories?status=DRAFT',
       })
     }
-    if (items.length === 0) {
+    if (items.length === 0 && canAi) {
       items.push({
         id: 'ai-clear',
         label: t('cms.dashboard.aiAllClear'),
@@ -208,7 +223,7 @@ export default function CmsDashboard() {
       })
     }
     return items.slice(0, 4)
-  }, [checklistQuery.data, t])
+  }, [canAi, canStories, canSubmissions, checklistQuery.data, t])
 
   const personalTodos = todosQuery.data ?? []
   const autoDone = autoTasks.filter((task) => task.done).length
@@ -249,30 +264,34 @@ export default function CmsDashboard() {
         badge={t('cms.dashboard.activeSession')}
         actions={
           <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center rounded-xl border border-[#E8E4DC] bg-white p-1 shadow-2xs">
-              {(['today', 'week', 'month'] as const).map((tf) => (
-                <button
-                  key={tf}
-                  type="button"
-                  onClick={() => setTimeframe(tf)}
-                  className={cn(
-                    'rounded-lg px-3 py-1.5 text-xs font-semibold uppercase tracking-wider transition-all duration-200 cursor-pointer',
-                    timeframe === tf
-                      ? 'bg-[#0C2686] text-white shadow-xs'
-                      : 'text-stone-600 hover:text-stone-900 hover:bg-stone-100',
-                  )}
-                >
-                  {t(`cms.dashboard.${tf}`)}
-                </button>
-              ))}
-            </div>
+            {canAnalytics ? (
+              <div className="flex items-center rounded-xl border border-[#E8E4DC] bg-white p-1 shadow-2xs">
+                {(['today', 'week', 'month'] as const).map((tf) => (
+                  <button
+                    key={tf}
+                    type="button"
+                    onClick={() => setTimeframe(tf)}
+                    className={cn(
+                      'rounded-lg px-3 py-1.5 text-xs font-semibold uppercase tracking-wider transition-all duration-200 cursor-pointer',
+                      timeframe === tf
+                        ? 'bg-[#0C2686] text-white shadow-xs'
+                        : 'text-stone-600 hover:text-stone-900 hover:bg-stone-100',
+                    )}
+                  >
+                    {t(`cms.dashboard.${tf}`)}
+                  </button>
+                ))}
+              </div>
+            ) : null}
 
-            <Link to="/cms/stories/new">
-              <PrimaryButton>
-                <Plus className="size-4" />
-                {t('cms.dashboard.newStory')}
-              </PrimaryButton>
-            </Link>
+            {canStories ? (
+              <Link to="/cms/stories/new">
+                <PrimaryButton>
+                  <Plus className="size-4" />
+                  {t('cms.dashboard.newStory')}
+                </PrimaryButton>
+              </Link>
+            ) : null}
           </div>
         }
       />
@@ -291,68 +310,81 @@ export default function CmsDashboard() {
       ) : null}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-        <StatCard
-          title={t('cms.dashboard.traffic')}
-          value={trafficValue}
-          trend={trafficTrend}
-          trendType={trafficTrendType}
-          hint={
-            analytics
-              ? t('cms.dashboard.trafficHint', {
-                  time: analytics.avgDwellLabel,
-                  views: analytics.pageviews.toLocaleString(),
-                })
-              : t('cms.dashboard.viewAnalytics')
-          }
-          icon={Eye}
-          sparklineData={sparklineData}
-          onClick={() => navigate('/cms/analytics')}
-        />
-        <StatCard
-          title={t('cms.dashboard.publishedStories')}
-          value={String(publishedToday)}
-          trend={t('cms.dashboard.live')}
-          trendType={publishedToday > 0 ? 'up' : 'neutral'}
-          hint={t('cms.dashboard.viewPublished')}
-          icon={FileText}
-          onClick={() => navigate('/cms/stories?status=PUBLISHED')}
-        />
-        <StatCard
-          title={t('cms.dashboard.drafts')}
-          value={String(drafts)}
-          trend={t('cms.dashboard.needsEdit')}
-          trendType="neutral"
-          hint={t('cms.dashboard.continueWriting')}
-          icon={Clock3}
-          onClick={() => navigate('/cms/stories?status=DRAFT')}
-        />
-        <StatCard
-          title={t('cms.dashboard.pendingReview')}
-          value={String(pending)}
-          trend={t('cms.dashboard.actionRequired')}
-          trendType={pending > 0 ? 'down' : 'neutral'}
-          hint={t('cms.dashboard.reviewQueue')}
-          icon={CheckSquare}
-          onClick={() =>
-            navigate(
-              (checklist?.reviewArticles ?? 0) > 0
-                ? '/cms/stories?status=REVIEW'
-                : '/cms/submissions',
-            )
-          }
-        />
-        <StatCard
-          title={t('cms.dashboard.scheduled')}
-          value={String(scheduled)}
-          trend={t('cms.dashboard.upcoming')}
-          trendType={scheduled > 0 ? 'up' : 'neutral'}
-          hint={t('cms.dashboard.calendar')}
-          icon={CalendarDays}
-          onClick={() => navigate('/cms/stories?status=SCHEDULED')}
-        />
+        {canAnalytics ? (
+          <StatCard
+            title={t('cms.dashboard.traffic')}
+            value={trafficValue}
+            trend={trafficTrend}
+            trendType={trafficTrendType}
+            hint={
+              analytics
+                ? t('cms.dashboard.trafficHint', {
+                    time: analytics.avgDwellLabel,
+                    views: analytics.pageviews.toLocaleString(),
+                  })
+                : t('cms.dashboard.viewAnalytics')
+            }
+            icon={Eye}
+            sparklineData={sparklineData}
+            onClick={() => navigate('/cms/analytics')}
+          />
+        ) : null}
+        {canStories ? (
+          <StatCard
+            title={t('cms.dashboard.publishedStories')}
+            value={String(publishedToday)}
+            trend={t('cms.dashboard.live')}
+            trendType={publishedToday > 0 ? 'up' : 'neutral'}
+            hint={t('cms.dashboard.viewPublished')}
+            icon={FileText}
+            onClick={() => navigate('/cms/stories?status=PUBLISHED')}
+          />
+        ) : null}
+        {canStories ? (
+          <StatCard
+            title={t('cms.dashboard.drafts')}
+            value={String(drafts)}
+            trend={t('cms.dashboard.needsEdit')}
+            trendType="neutral"
+            hint={t('cms.dashboard.continueWriting')}
+            icon={Clock3}
+            onClick={() => navigate('/cms/stories?status=DRAFT')}
+          />
+        ) : null}
+        {canStories || canSubmissions ? (
+          <StatCard
+            title={t('cms.dashboard.pendingReview')}
+            value={String(pending)}
+            trend={t('cms.dashboard.actionRequired')}
+            trendType={pending > 0 ? 'down' : 'neutral'}
+            hint={t('cms.dashboard.reviewQueue')}
+            icon={CheckSquare}
+            onClick={() =>
+              navigate(
+                canStories && (checklist?.reviewArticles ?? 0) > 0
+                  ? '/cms/stories?status=REVIEW'
+                  : canSubmissions
+                    ? '/cms/submissions'
+                    : '/cms/stories',
+              )
+            }
+          />
+        ) : null}
+        {canStories ? (
+          <StatCard
+            title={t('cms.dashboard.scheduled')}
+            value={String(scheduled)}
+            trend={t('cms.dashboard.upcoming')}
+            trendType={scheduled > 0 ? 'up' : 'neutral'}
+            hint={t('cms.dashboard.calendar')}
+            icon={CalendarDays}
+            onClick={() => navigate('/cms/stories?status=SCHEDULED')}
+          />
+        ) : null}
       </div>
 
       <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-3">
+        {canAnalytics ? (
         <CmsCard className="p-6">
           <div className="flex items-center justify-between border-b border-[#E8E4DC] pb-4">
             <div className="flex items-center gap-2">
@@ -418,7 +450,9 @@ export default function CmsDashboard() {
             ))}
           </ol>
         </CmsCard>
+        ) : null}
 
+        {canAi ? (
         <CmsCard className="p-6">
           <div className="flex items-center justify-between border-b border-[#E8E4DC] pb-4">
             <div className="flex items-center gap-2">
@@ -468,6 +502,7 @@ export default function CmsDashboard() {
             {t('cms.dashboard.aiOpen')}
           </Link>
         </CmsCard>
+        ) : null}
 
         <CmsCard className="p-6">
           <div className="flex items-center justify-between border-b border-[#E8E4DC] pb-4">

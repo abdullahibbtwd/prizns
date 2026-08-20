@@ -49,6 +49,7 @@ export function createCmsArticle(
     categoryBg: string;
     section: string;
     seriesId?: string | null;
+    heroMediaId?: string | null;
     videoUrl?: string | null;
     videoMediaId?: string | null;
     sponsorName?: string | null;
@@ -66,6 +67,7 @@ export function updateCmsArticle(
     "seriesId" | "seriesMode" | "videoUrl" | "videoMediaId" | "sponsorName" | "seoTitleBg" | "seoDescriptionBg"
   > & {
     seriesId?: string | null;
+    heroMediaId?: string | null;
     videoUrl?: string | null;
     videoMediaId?: string | null;
     sponsorName?: string | null;

@@ -1,5 +1,6 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '@/lib/auth'
+import { canAccessCmsPath } from '@/lib/cms-roles'
 
 function isEmailVerified(user: { emailVerified?: boolean } | null) {
   return user?.emailVerified !== false
@@ -24,6 +25,10 @@ export function RequireAuth() {
 
   if (!isEmailVerified(user)) {
     return <Navigate to="/cms/verify-email" replace />
+  }
+
+  if (!canAccessCmsPath(user, location.pathname)) {
+    return <Navigate to="/cms" replace />
   }
 
   return <Outlet />

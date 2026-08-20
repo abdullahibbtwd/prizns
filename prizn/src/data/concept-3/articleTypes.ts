@@ -44,6 +44,18 @@ export type ArticleBlock =
       text: string
       textBg: string
     }
+  | {
+      type: 'image'
+      url: string
+      text: string
+      textBg: string
+    }
+  | {
+      type: 'video'
+      url: string
+      text: string
+      textBg: string
+    }
 
 export interface JournalArticle {
   /** Matches / links from cards later, e.g. "walnut-keeper-varbovo" */
@@ -77,6 +89,8 @@ export interface JournalArticle {
   dateBg: string
 
   image: string
+  /** First CMS media slot — photo or video. */
+  heroKind?: 'image' | 'video'
   photoCredit: string
   photoCreditBg: string
 
@@ -99,7 +113,12 @@ export interface JournalArticle {
   seoDescription?: string | null
   seoDescriptionBg?: string | null
 
-  gallery?: Array<{ id: string; url: string; creditBg?: string | null }>
+  gallery?: Array<{
+    id: string
+    url: string
+    creditBg?: string | null
+    kind?: 'IMAGE' | 'VIDEO' | 'AUDIO' | string | null
+  }>
 
   /** Present when the story belongs to a series */
   series?: {
@@ -113,7 +132,6 @@ export interface JournalArticle {
 
   /**
    * Body blocks in reading order.
-   * First `paragraph` is intended for the drop-cap treatment (like the modal).
    */
   body: ArticleBlock[]
 

@@ -431,6 +431,7 @@ async function importWpUser(
         name: mapped.name,
         passwordHash: opts.passwordHash,
         role: mapped.role,
+        roles: mapped.roles,
         imageUrl: mapped.imageUrl,
         bio: mapped.bioBg,
         isActive: true,
@@ -444,7 +445,7 @@ async function importWpUser(
   if (!isSeedAdmin && existingUser && !existingUser.author) {
     await prisma.user.update({
       where: { id: user.id },
-      data: { role: mapped.role },
+      data: { role: mapped.role, roles: mapped.roles },
     });
   }
 
@@ -477,6 +478,9 @@ async function importWpUser(
           imageUrl: mapped.imageUrl,
           aliases: [...aliases],
           isActive: true,
+          showOnAuthors:
+            mapped.roles.includes('AUTHOR') ||
+            mapped.roles.includes('CONTRIBUTOR'),
           userId: user.id,
           sourceLang: 'bg',
           translationStatus,
@@ -574,13 +578,31 @@ async function saveArticle(
       }))?.id ?? null
     : null;
   const galleryIds: string[] = [];
+  const srcToMediaId = new Map<string, string>();
+  if (heroMediaId && mapped.heroImage?.src) {
+    srcToMediaId.set(mapped.heroImage.src, heroMediaId);
+  }
   for (const image of mapped.galleryImages) {
     const imported = await importImage(prisma, image, {
       skipMedia: opts.skipMedia,
       mediaDirs: opts.mediaDirs,
     });
-    if (imported) galleryIds.push(imported.id);
+    if (imported) {
+      galleryIds.push(imported.id);
+      if (image.src) srcToMediaId.set(image.src, imported.id);
+    }
   }
+
+  const body = mapped.body.map((block) => {
+    if (block.type !== 'image') return block;
+    const mediaId = block.url ? srcToMediaId.get(block.url) : block.mediaId;
+    return {
+      type: 'image' as const,
+      mediaId,
+      url: mediaId ? undefined : block.url,
+      captionBg: block.captionBg ?? '',
+    };
+  });
 
   const data = {
     section: mapped.section as ArticleSection,
@@ -595,7 +617,7 @@ async function saveArticle(
     dateBg: mapped.dateBg,
     photoCreditBg: mapped.photoCreditBg,
     endLabelBg: 'Край',
-    body: mapped.body,
+    body,
     authorId: author.id,
     heroMediaId,
     seoTitleBg: mapped.seoTitleBg,
@@ -724,6 +746,7 @@ function authorsFromArticles(articles: MappedWpArticle[]): PackagedAuthor[] {
       bioBg: article.authorBioBg,
       imageUrl: null,
       role: 'AUTHOR',
+      roles: ['AUTHOR'],
     });
   }
   return [...byKey.values()];

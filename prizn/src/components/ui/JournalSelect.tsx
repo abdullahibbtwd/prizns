@@ -14,6 +14,7 @@ interface JournalSelectProps {
   options: JournalSelectOption[]
   placeholder?: string
   label?: string
+  ariaLabel?: string
   required?: boolean
   value?: string
   defaultValue?: string
@@ -21,6 +22,8 @@ interface JournalSelectProps {
   className?: string
   /** underline = public journal; boxed = CMS dense forms */
   variant?: 'underline' | 'boxed'
+  /** sm = compact type chip used in the story body editor */
+  size?: 'md' | 'sm'
 }
 
 type MenuCoords = {
@@ -36,12 +39,14 @@ export function JournalSelect({
   options,
   placeholder = 'Select…',
   label,
+  ariaLabel,
   required = false,
   value: controlledValue,
   defaultValue = '',
   onChange,
   className,
   variant = 'underline',
+  size = 'md',
 }: JournalSelectProps) {
   const [open, setOpen] = useState(false)
   const [internalValue, setInternalValue] = useState(defaultValue)
@@ -53,13 +58,15 @@ export function JournalSelect({
   const isControlled = controlledValue !== undefined
   const value = isControlled ? controlledValue : internalValue
   const selected = options.find((option) => option.value === value)
+  const isCompact = size === 'sm'
+  const minMenu = isCompact ? 140 : 220
+  const minWidth = isCompact ? 148 : 180
 
   const updatePosition = () => {
     const trigger = triggerRef.current
     if (!trigger) return
     const rect = trigger.getBoundingClientRect()
     const gap = 8
-    const minMenu = 220
     const spaceBelow = window.innerHeight - rect.bottom - gap
     const spaceAbove = rect.top - gap
     const openUp = spaceBelow < minMenu && spaceAbove > spaceBelow
@@ -70,7 +77,7 @@ export function JournalSelect({
 
     setCoords({
       left: rect.left,
-      width: Math.max(rect.width, 180),
+      width: Math.max(rect.width, minWidth),
       maxHeight,
       ...(openUp
         ? { bottom: window.innerHeight - rect.top + gap }
@@ -118,7 +125,6 @@ export function JournalSelect({
     if (trigger) {
       const rect = trigger.getBoundingClientRect()
       const gap = 8
-      const minMenu = 220
       const spaceBelow = window.innerHeight - rect.bottom - gap
       const spaceAbove = rect.top - gap
       const openUp = spaceBelow < minMenu && spaceAbove > spaceBelow
@@ -128,7 +134,7 @@ export function JournalSelect({
       )
       setCoords({
         left: rect.left,
-        width: Math.max(rect.width, 180),
+        width: Math.max(rect.width, minWidth),
         maxHeight,
         ...(openUp
           ? { bottom: window.innerHeight - rect.top + gap }
@@ -152,7 +158,7 @@ export function JournalSelect({
               ref={listRef}
               id={listId}
               role="listbox"
-              aria-label={label ?? placeholder}
+              aria-label={ariaLabel ?? label ?? placeholder}
               initial={{ opacity: 0, y: 6, scale: 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 6, scale: 0.98 }}
@@ -168,7 +174,7 @@ export function JournalSelect({
               }}
               className="origin-top overflow-hidden rounded-[4px] border border-[#EAE6DF] bg-[#FDFBF7] shadow-[0_12px_40px_rgba(0,0,0,0.12)]"
             >
-              {label && (
+              {label && !isCompact && (
                 <div className="border-b border-[#EAE6DF] px-4 py-3">
                   <p className="font-sans text-[10px] uppercase tracking-[0.22em] text-[#1A1A1A]/40">
                     {label}
@@ -189,14 +195,16 @@ export function JournalSelect({
                       aria-selected={active}
                       onClick={() => selectValue(option.value)}
                       className={cn(
-                        'group flex w-full cursor-pointer items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-black/[0.03]',
+                        'group flex w-full cursor-pointer items-center justify-between gap-3 text-left transition-colors hover:bg-black/[0.03]',
+                        isCompact ? 'px-3 py-2' : 'px-4 py-3',
                         index < options.length - 1 &&
                           'border-b border-[#EAE6DF]/80',
                       )}
                     >
                       <span
                         className={cn(
-                          'font-sans text-[11px] uppercase tracking-[0.16em] transition-colors',
+                          'font-sans uppercase tracking-[0.16em] transition-colors',
+                          isCompact ? 'text-[10px]' : 'text-[11px]',
                           active
                             ? 'text-[#1A1A1A]'
                             : 'text-[#1A1A1A]/70 group-hover:text-[#1A1A1A]',
@@ -206,7 +214,8 @@ export function JournalSelect({
                       </span>
                       <span
                         className={cn(
-                          'flex size-7 shrink-0 items-center justify-center rounded-[3px] border transition-all',
+                          'flex shrink-0 items-center justify-center rounded-[3px] border transition-all',
+                          isCompact ? 'size-5' : 'size-7',
                           active
                             ? 'border-[#1A1A1A]/20 bg-white'
                             : 'border-transparent group-hover:border-[#EAE6DF] group-hover:bg-white',
@@ -242,6 +251,7 @@ export function JournalSelect({
       <button
         ref={triggerRef}
         type="button"
+        aria-label={ariaLabel}
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={listId}
@@ -250,29 +260,38 @@ export function JournalSelect({
           else openMenu()
         }}
         className={cn(
-          'flex w-full cursor-pointer items-center justify-between gap-3 text-left font-sans text-sm outline-none transition-all',
-          variant === 'boxed'
+          'flex cursor-pointer items-center text-left font-sans outline-none transition-all',
+          isCompact
             ? cn(
-                'rounded-xl border bg-white px-3.5 py-2.5 shadow-2xs',
-                open
-                  ? 'border-[#0C2686] ring-2 ring-[#0C2686]/10'
-                  : 'border-[#E8E4DC] hover:border-[#0C2686]/25',
-                selected ? 'text-stone-900' : 'text-stone-400',
+                'w-auto max-w-[11rem] gap-1 rounded-md bg-transparent px-0 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#0C2686]/70 hover:text-[#0C2686]',
+                open && 'text-[#0C2686]',
               )
             : cn(
-                'border-b bg-transparent py-3',
-                open
-                  ? 'border-[#0C2686]'
-                  : 'border-[#1A1A1A]/15 hover:border-[#1A1A1A]/35',
-                selected ? 'text-[#1A1A1A]' : 'text-[#1A1A1A]/30',
+                'w-full justify-between gap-3 text-sm',
+                variant === 'boxed'
+                  ? cn(
+                      'rounded-xl border bg-white px-3.5 py-2.5 shadow-2xs',
+                      open
+                        ? 'border-[#0C2686] ring-2 ring-[#0C2686]/10'
+                        : 'border-[#E8E4DC] hover:border-[#0C2686]/25',
+                      selected ? 'text-stone-900' : 'text-stone-400',
+                    )
+                  : cn(
+                      'border-b bg-transparent py-3',
+                      open
+                        ? 'border-[#0C2686]'
+                        : 'border-[#1A1A1A]/15 hover:border-[#1A1A1A]/35',
+                      selected ? 'text-[#1A1A1A]' : 'text-[#1A1A1A]/30',
+                    ),
               ),
         )}
       >
         <span className="truncate">{selected?.label ?? placeholder}</span>
         <ChevronDown
           className={cn(
-            'size-4 shrink-0 stroke-[1.5] transition-transform duration-300',
-            variant === 'boxed' ? 'text-stone-400' : 'text-[#1A1A1A]/45',
+            'shrink-0 stroke-[1.5] transition-transform duration-300',
+            isCompact ? 'size-3 text-[#0C2686]/50' : 'size-4',
+            !isCompact && (variant === 'boxed' ? 'text-stone-400' : 'text-[#1A1A1A]/45'),
             open && 'rotate-180',
           )}
         />

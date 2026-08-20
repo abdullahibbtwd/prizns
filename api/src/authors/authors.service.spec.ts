@@ -70,16 +70,20 @@ describe('AuthorsService', () => {
     );
   });
 
-  it('lists cms authors that belong to AUTHOR-role users', async () => {
+  it('lists cms authors including hidden bylines', async () => {
     await service.listCms();
     expect(prisma.author.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: {
-          OR: [
-            { user: { is: { role: 'AUTHOR' } } },
-            { userId: null },
-          ],
-        },
+        orderBy: { nameBg: 'asc' },
+      }),
+    );
+  });
+
+  it('lists public authors that are flagged for the authors page', async () => {
+    await service.listPublic();
+    expect(prisma.author.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { isActive: true, showOnAuthors: true },
       }),
     );
   });

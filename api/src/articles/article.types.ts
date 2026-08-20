@@ -18,10 +18,24 @@ export type StoredArticleBlock =
       textBg: string;
       textEn?: string | null;
     }
-  | {
+    | {
       type: 'caption';
       textBg: string;
       textEn?: string | null;
+    }
+  | {
+      type: 'image';
+      mediaId?: string;
+      url?: string;
+      captionBg: string;
+      captionEn?: string | null;
+    }
+  | {
+      type: 'video';
+      mediaId?: string;
+      url?: string;
+      captionBg: string;
+      captionEn?: string | null;
     };
 
 /** Public JournalArticle-shaped response for the reader. */
@@ -49,6 +63,8 @@ export type PublicArticleDto = {
   date: string;
   dateBg: string;
   image: string;
+  /** First slot in the CMS media strip — photo or video. */
+  heroKind?: 'image' | 'video';
   photoCredit: string;
   photoCreditBg: string;
   audioUrl?: string;
@@ -73,6 +89,8 @@ export type PublicArticleDto = {
         textBg: string;
       }
     | { type: 'caption'; text: string; textBg: string }
+    | { type: 'image'; url: string; text: string; textBg: string }
+    | { type: 'video'; url: string; text: string; textBg: string }
   >;
   endLabel: string;
   endLabelBg: string;
@@ -92,6 +110,7 @@ export type PublicArticleDto = {
     id: string;
     url: string;
     creditBg: string | null;
+    kind?: 'IMAGE' | 'VIDEO' | 'AUDIO' | string | null;
   }>;
   tags: Array<{
     id: string;

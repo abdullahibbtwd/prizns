@@ -15,6 +15,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import type { StoredArticleBlock } from '../articles/article.types'
 import { toPrismaSectionFilter } from '../articles/section.util'
 import { AiSuggestDto } from './dto/suggest.dto'
+import { buildSuggestPrompt } from './suggest-prompt'
 
 export type AiSuggestionResult = {
   promptVersion: string
@@ -27,7 +28,7 @@ export type AiSuggestionResult = {
   summary: string | null
 }
 
-const PROMPT_VERSION = 'prizni-editorial-v2'
+const PROMPT_VERSION = 'prizni-editorial-v3'
 const EMBED_TEXT_MAX = 8000
 
 @Injectable()
@@ -254,45 +255,24 @@ export class AiService {
     // Prefer the language of the draft the editor is writing.
     const lang = detected
     const langLabel = lang === 'bg' ? 'Bulgarian' : 'English'
-    const bodyPreview = (dto.bodyText || '').trim().slice(0, 6000)
-    const prompt = `You are the editorial assistant for Prizni, a warm digital journal of human stories, places, and traditions from Northwestern Bulgaria.
-
-IMPORTANT: The editor is writing in ${langLabel}. All suggestions MUST be written in ${langLabel} only. Do not mix languages. Do not default to English unless the draft itself is English.
-
-Tone: warm, concrete, photography-led, never clickbait.
-
-Return ONLY valid JSON with this shape:
-{
-  "headlines": ["...", "...", "..."],
-  "subtitle": "...",
-  "seoTitle": "...",
-  "seoDescription": "...",
-  "topicTags": ["...", "..."],
-  "episodeOutline": ["...", "..."],
-  "summary": "..."
-}
-
-Rules:
-- headlines: exactly 3 alternatives in ${langLabel}
-- subtitle, seoTitle, seoDescription, topicTags, episodeOutline, summary: all in ${langLabel}
-- seoTitle: under 60 characters when possible
-- seoDescription: under 155 characters
-- topicTags: 3–6 short topic labels (not places unless clearly about a place)
-- episodeOutline: 0–5 episode titles if the draft could be a series; else []
-- Do not invent facts not supported by the draft
-
-Detected draft language: ${langLabel}
-Section: ${dto.section || 'human-stories'}
-Title: ${dto.titleBg}
-Subtitle: ${dto.subtitleBg || ''}
-Draft body:
-${bodyPreview || '(empty draft)'}`
+    const bodyPreview = (dto.bodyText || '').trim()
+    const prompt = buildSuggestPrompt({
+      langLabel,
+      section: dto.section || 'human-stories',
+      titleBg: dto.titleBg,
+      subtitleBg: dto.subtitleBg || '',
+      locationBg: dto.locationBg,
+      categoryBg: dto.categoryBg,
+      bodyText: bodyPreview,
+      variation: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    })
 
     const genAI = new GoogleGenerativeAI(this.apiKey)
     const model = genAI.getGenerativeModel({
       model: this.modelName,
       generationConfig: {
-        temperature: 0.7,
+        temperature: 0.95,
+        topP: 0.95,
         responseMimeType: 'application/json',
       },
     })

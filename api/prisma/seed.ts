@@ -58,6 +58,7 @@ async function seedAdminUser() {
       data: {
         name,
         role: 'ADMIN',
+        roles: ['ADMIN'],
         isActive: true,
         emailVerifiedAt: existing.emailVerifiedAt ?? new Date(),
       },
@@ -73,6 +74,7 @@ async function seedAdminUser() {
       passwordHash,
       name,
       role: 'ADMIN',
+      roles: ['ADMIN'],
       isActive: true,
       emailVerifiedAt: existing?.emailVerifiedAt ?? new Date(),
     },
@@ -81,6 +83,7 @@ async function seedAdminUser() {
       passwordHash,
       name,
       role: 'ADMIN',
+      roles: ['ADMIN'],
       isActive: true,
       emailVerifiedAt: new Date(),
     },

@@ -13,6 +13,8 @@ type AiAssistantPanelProps = {
   subtitleBg: string
   section: string
   bodyText: string
+  locationBg?: string
+  categoryBg?: string
   lang: 'bg' | 'en'
   onApply: (patch: {
     titleBg?: string
@@ -28,12 +30,16 @@ export function AiAssistantPanel({
   subtitleBg,
   section,
   bodyText,
+  locationBg,
+  categoryBg,
   lang,
   onApply,
 }: AiAssistantPanelProps) {
   const { t } = useTranslation()
   const [result, setResult] = useState<AiSuggestionResult | null>(null)
   const [selectedHeadline, setSelectedHeadline] = useState(0)
+
+  const canSuggest = Boolean(titleBg.trim() || bodyText.trim())
 
   const suggestMutation = useMutation({
     mutationFn: () =>
@@ -43,6 +49,8 @@ export function AiAssistantPanel({
         subtitleBg,
         section,
         bodyText,
+        locationBg,
+        categoryBg,
         lang,
       }),
     onSuccess: (data) => {
@@ -64,7 +72,7 @@ export function AiAssistantPanel({
       <PrimaryButton
         type="button"
         className="w-full"
-        disabled={suggestMutation.isPending || !titleBg.trim()}
+        disabled={suggestMutation.isPending || !canSuggest}
         onClick={() => suggestMutation.mutate()}
       >
         <Sparkles className="size-3.5" />

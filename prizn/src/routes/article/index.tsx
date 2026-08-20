@@ -89,6 +89,7 @@ function toJournalArticle(api: CmsArticle): JournalArticle {
     date: api.date,
     dateBg: api.dateBg,
     image: api.image,
+    heroKind: api.heroKind,
     photoCredit: api.photoCredit,
     photoCreditBg: api.photoCreditBg,
     audioUrl: api.audioUrl,
@@ -130,22 +131,15 @@ function ArticleBlocks({
   article: JournalArticle
   lang: JournalLang
 }) {
-  let dropCapUsed = false
-
   return (
     <div className="space-y-8 font-sans text-base md:text-lg text-[#1A1A1A]/80 font-light leading-relaxed">
-      {article.body.map((block, index) => {
-        const useDropCap = block.type === 'paragraph' && !dropCapUsed
-        if (useDropCap) dropCapUsed = true
-        return (
-          <ArticleBlockView
-            key={`${block.type}-${index}`}
-            block={block}
-            lang={lang}
-            dropCap={useDropCap}
-          />
-        )
-      })}
+      {article.body.map((block, index) => (
+        <ArticleBlockView
+          key={`${block.type}-${index}`}
+          block={block}
+          lang={lang}
+        />
+      ))}
     </div>
   )
 }
@@ -153,24 +147,51 @@ function ArticleBlocks({
 function ArticleBlockView({
   block,
   lang,
-  dropCap,
 }: {
   block: ArticleBlock
   lang: JournalLang
-  dropCap: boolean
 }) {
-  if (block.type === 'paragraph') {
+  if (block.type === 'image') {
+    const caption = pick(lang, block.text, block.textBg).trim()
     return (
-      <p
-        className={
-          dropCap
-            ? 'first-letter:font-heading first-letter:text-6xl first-letter:font-normal first-letter:float-left first-letter:mr-3 first-letter:leading-none first-letter:text-[#0C2686]'
-            : undefined
-        }
-      >
-        {pick(lang, block.text, block.textBg)}
-      </p>
+      <figure className="my-10">
+        <img
+          src={block.url}
+          alt={caption}
+          className="w-full rounded-[16px] object-cover"
+        />
+        {caption ? (
+          <figcaption className="mt-3 text-center font-sans text-xs uppercase tracking-[0.16em] text-[#1A1A1A]/45">
+            {caption}
+          </figcaption>
+        ) : null}
+      </figure>
     )
+  }
+
+  if (block.type === 'video') {
+    const caption = pick(lang, block.text, block.textBg).trim()
+    return (
+      <figure className="my-10 print-hidden">
+        <LuxuryVideoPlayer
+          src={block.url}
+          title={caption}
+          aspectClassName="aspect-video"
+          tone="editorial"
+          size="featured"
+          className="rounded-[16px]"
+        />
+        {caption ? (
+          <figcaption className="mt-3 text-center font-sans text-xs uppercase tracking-[0.16em] text-[#1A1A1A]/45">
+            {caption}
+          </figcaption>
+        ) : null}
+      </figure>
+    )
+  }
+
+  if (block.type === 'paragraph') {
+    return <p>{pick(lang, block.text, block.textBg)}</p>
   }
 
   if (block.type === 'pullquote') {
@@ -542,6 +563,7 @@ function ArticleContent({
             type="button"
             disabled={hasRelated || relateMutation.isPending}
             onClick={() => relateMutation.mutate()}
+            title={t('iRelateHint')}
             className={`inline-flex items-center gap-2 rounded-full border px-5 py-2.5 font-sans text-[11px] uppercase tracking-[0.2em] transition-colors ${
               hasRelated
                 ? 'border-[#0C2686]/40 bg-[#0C2686]/5 text-[#0C2686]'
@@ -559,7 +581,7 @@ function ArticleContent({
           </button>
         </div>
 
-        {article.videoUrl ? (
+        {article.heroKind === 'video' && article.videoUrl ? (
           <div className="relative mb-14 w-full overflow-hidden rounded-[16px] shadow-[0_4px_24px_rgba(0,0,0,0.04)] print-hidden">
             <LuxuryVideoPlayer
               src={article.videoUrl}
@@ -576,7 +598,7 @@ function ArticleContent({
               </div>
             )}
           </div>
-        ) : (
+        ) : article.image ? (
           <ArticleHeroGallery
             slides={articleHeroSlides({
               image: article.image,
@@ -585,11 +607,30 @@ function ArticleContent({
                 article.photoCredit,
                 article.photoCreditBg,
               ),
-              gallery: article.gallery,
+              gallery:
+                article.section === 'gallery' ? article.gallery : undefined,
             })}
             title={pick(lang, article.title, article.titleBg)}
           />
-        )}
+        ) : null}
+
+        {article.videoUrl &&
+        article.heroKind !== 'video' &&
+        !article.body.some(
+          (block) => block.type === 'video' && block.url === article.videoUrl,
+        ) ? (
+          <div className="relative mb-14 w-full overflow-hidden rounded-[16px] shadow-[0_4px_24px_rgba(0,0,0,0.04)] print-hidden">
+            <LuxuryVideoPlayer
+              src={article.videoUrl}
+              poster={article.image}
+              title={pick(lang, article.title, article.titleBg)}
+              aspectClassName="aspect-[16/10]"
+              tone="editorial"
+              size="featured"
+              className="rounded-[16px]"
+            />
+          </div>
+        ) : null}
 
         {article.audioUrl && (
           <div className="mb-12 rounded-[16px] border border-[#EAE6DF] bg-white p-5 md:p-6 print-hidden" data-print-hide>

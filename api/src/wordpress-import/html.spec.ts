@@ -33,8 +33,9 @@ describe('wordpress htmlToBlocks', () => {
       textBg: 'Всеки от нас има поне един познат.',
     });
     expect(blocks[1]).toEqual({
-      type: 'caption',
-      textBg: 'Снимка: личен архив',
+      type: 'image',
+      url: 'https://prizni.bg/wp-content/uploads/2026/08/da-badesh.jpg',
+      captionBg: 'Снимка: личен архив',
     });
     expect(blocks[2]).toEqual({
       type: 'note',

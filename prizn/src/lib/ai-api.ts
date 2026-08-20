@@ -25,6 +25,8 @@ export function suggestCmsAi(body: {
   subtitleBg?: string
   section?: string
   bodyText?: string
+  locationBg?: string
+  categoryBg?: string
   lang?: 'bg' | 'en'
 }) {
   return api.post<AiSuggestionResult>('/cms/ai/suggest', body)

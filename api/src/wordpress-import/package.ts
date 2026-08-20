@@ -189,6 +189,10 @@ export function parseAuthorsJson(raw: unknown): PackagedAuthor[] {
       : [];
   return list.map((item) => {
     const record = asRecord(item) ?? {};
+    const role = (record.role as PackagedAuthor['role']) || 'AUTHOR';
+    const roles = Array.isArray(record.roles) && record.roles.length
+      ? (record.roles as PackagedAuthor['roles'])
+      : [role];
     return {
       wpId: Number(record.wpId ?? record.id ?? 0),
       email: String(record.email ?? ''),
@@ -197,7 +201,8 @@ export function parseAuthorsJson(raw: unknown): PackagedAuthor[] {
       bioBg: asString(record.bioBg) ?? null,
       imageUrl: asString(record.imageUrl) ?? null,
       imageFile: asString(record.imageFile),
-      role: (record.role as PackagedAuthor['role']) || 'AUTHOR',
+      role,
+      roles,
     };
   });
 }

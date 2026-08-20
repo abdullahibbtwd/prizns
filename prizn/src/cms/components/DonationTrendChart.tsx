@@ -16,8 +16,8 @@ import {
   type DonationChartGranularity,
 } from '@/lib/donations-api'
 
-function formatLev(n: number, locale: string) {
-  return `${n.toLocaleString(locale, { maximumFractionDigits: 0 })} лв.`
+function formatEuro(n: number, locale: string) {
+  return `${n.toLocaleString(locale, { maximumFractionDigits: 0 })} EUR`
 }
 
 function formatPointLabel(
@@ -63,7 +63,7 @@ function ChartTooltip({
         {label}
       </p>
       <p className="font-heading text-sm font-semibold tabular-nums text-[#0C2686]">
-        {formatLev(value, locale)}
+        {formatEuro(value, locale)}
       </p>
     </div>
   )
@@ -105,13 +105,13 @@ export function DonationTrendChart() {
         <div className="min-w-0">
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
             <p className="font-heading text-xl font-extrabold tracking-tight text-stone-900 sm:text-2xl">
-              {trendQuery.isLoading ? '…' : formatLev(monthTotal, locale)}
+              {trendQuery.isLoading ? '…' : formatEuro(monthTotal, locale)}
             </p>
             <p className="text-xs text-stone-500">
               {t('cms.donations.thisMonth')}
               <span className="mx-1.5 text-stone-300">·</span>
               {t('cms.donations.today')}{' '}
-              {trendQuery.isLoading ? '…' : formatLev(todayTotal, locale)}
+              {trendQuery.isLoading ? '…' : formatEuro(todayTotal, locale)}
             </p>
           </div>
           {trendQuery.isError ? (
@@ -209,7 +209,7 @@ export function DonationTrendChart() {
 
       <div className="flex items-center justify-between px-4 pb-3 pt-1 text-[10px] font-medium uppercase tracking-wider text-stone-400 sm:px-5">
         <span>
-          {t('cms.donations.range')} · {formatLev(seriesTotal, locale)}
+          {t('cms.donations.range')} · {formatEuro(seriesTotal, locale)}
         </span>
         <span>
           {granularity === 'day'

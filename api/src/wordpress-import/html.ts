@@ -92,7 +92,7 @@ export type HtmlToBlocksResult = {
 
 /**
  * Convert classic / block-editor WP HTML into journal body blocks.
- * Images are collected for gallery import; they are not inline body blocks.
+ * Figures become inline image blocks so photos stay next to the related text.
  */
 export function htmlToBlocks(
   html: string,
@@ -117,6 +117,16 @@ export function htmlToBlocks(
     images.push(image);
   };
 
+  const pushInlineImage = (image: WpInlineImage | null) => {
+    pushImage(image);
+    if (!image) return;
+    blocks.push({
+      type: 'image',
+      url: image.src,
+      captionBg: image.caption || '',
+    });
+  };
+
   const pushParagraph = (text: string) => {
     if (!text) return;
     blocks.push({ type: 'paragraph', textBg: text });
@@ -128,11 +138,7 @@ export function htmlToBlocks(
     const tag = match[1]!.toLowerCase();
 
     if (tag === 'figure') {
-      const image = imageFromHtml(full);
-      pushImage(image);
-      if (image?.caption) {
-        blocks.push({ type: 'caption', textBg: image.caption });
-      }
+      pushInlineImage(imageFromHtml(full));
       continue;
     }
 
@@ -169,8 +175,13 @@ export function htmlToBlocks(
     }
 
     const inner = innerHtml(full, 'p');
-    pushImage(imageFromHtml(inner));
+    const image = imageFromHtml(inner);
     const text = stripHtml(inner);
+    if (image && !text) {
+      pushInlineImage(image);
+      continue;
+    }
+    pushImage(image);
     if (!text) continue;
 
     if (isStrongOnly(inner) && text.length >= 40) {

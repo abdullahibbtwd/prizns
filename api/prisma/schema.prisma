@@ -103,6 +103,7 @@ model User {
   passwordHash  String         @map("password_hash")
   name          String?
   role          Role           @default(EDITOR)
+  roles         Role[]         @default([])
   imageUrl      String?        @map("image_url")
   bio           String?
   websiteUrl    String?        @map("website_url")
@@ -173,6 +174,7 @@ model Author {
   imageUrl          String?           @map("image_url")
   aliases           String[]          @default([])
   isActive          Boolean           @default(true) @map("is_active")
+  showOnAuthors     Boolean           @default(false) @map("show_on_authors")
   translationStatus TranslationStatus @default(PENDING) @map("translation_status")
   translationError  String?           @map("translation_error")
   sourceLang        String?           @map("source_lang")

@@ -9,6 +9,7 @@ import type { Request } from 'express';
 import { Role } from '@prisma/client';
 import { ROLES_KEY } from '../decorators/roles.decorator';
 import type { AuthUserPayload } from '../auth.types';
+import { userHasAnyRole } from '../role-access';
 
 @Injectable()
 export class RolesGuard implements CanActivate {
@@ -23,7 +24,7 @@ export class RolesGuard implements CanActivate {
 
     const req = context.switchToHttp().getRequest<Request>();
     const user = (req as Request & { user?: AuthUserPayload }).user;
-    if (!user || !roles.includes(user.role)) {
+    if (!user || !userHasAnyRole(user, roles)) {
       throw new ForbiddenException('Insufficient permissions');
     }
     return true;

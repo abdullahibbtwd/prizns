@@ -11,6 +11,7 @@ export class CreateCheckoutDto {
   @Type(() => Number)
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(1)
+  /** Donor amount in EUR (field name kept for API compatibility). */
   amountBgn!: number;
 
   @IsOptional()

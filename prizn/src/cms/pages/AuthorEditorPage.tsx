@@ -32,6 +32,7 @@ const schema = z.object({
   imageUrl: z.string(),
   aliases: z.string(),
   isActive: z.boolean(),
+  showOnAuthors: z.boolean(),
 })
 
 const emptyDefaults: AuthorFormValues = {
@@ -43,6 +44,7 @@ const emptyDefaults: AuthorFormValues = {
   imageUrl: '',
   aliases: '',
   isActive: true,
+  showOnAuthors: true,
 }
 
 function Field({
@@ -94,6 +96,7 @@ export default function CmsAuthorEditorPage() {
       imageUrl: author.imageUrl ?? '',
       aliases: (author.aliases ?? []).join(', '),
       isActive: author.isActive,
+      showOnAuthors: author.showOnAuthors ?? false,
     }
   }, [authorQuery.data])
 
@@ -290,6 +293,10 @@ export default function CmsAuthorEditorPage() {
             <label className="flex items-center gap-2 text-xs font-medium text-stone-700">
               <input type="checkbox" {...form.register('isActive')} />
               {t('cms.authors.active')}
+            </label>
+            <label className="flex items-center gap-2 text-xs font-medium text-stone-700">
+              <input type="checkbox" {...form.register('showOnAuthors')} />
+              {t('cms.authors.showOnAuthors')}
             </label>
             {translationStatus && (
               <div className="pt-2">

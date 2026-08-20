@@ -72,7 +72,7 @@ export default function CmsDonationsPage() {
                   <td className="px-4 py-3 font-medium text-stone-900">
                     {(row.amountCents / 100).toFixed(2)}{' '}
                     <span className="text-xs uppercase text-stone-500">
-                      {row.currency?.toLowerCase() === 'eur' ? 'EUR' : 'лв.'}
+                      {row.currency?.toLowerCase() === 'bgn' ? 'лв.' : 'EUR'}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-stone-700">
