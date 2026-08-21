@@ -66,6 +66,10 @@ export function createCmsUser(body: {
   return api.post<CmsUser>('/cms/users', body)
 }
 
+export function deleteCmsUser(id: string) {
+  return api.delete<{ ok: boolean; id: string }>(`/cms/users/${id}`)
+}
+
 export type CmsProfile = {
   id: string
   email: string

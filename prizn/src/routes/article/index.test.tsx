@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, fireEvent } from '@testing-library/react'
 import { Route, Routes } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
 import { buildCmsArticle } from '@/test/factories'
@@ -97,6 +97,9 @@ describe('ArticlePage', () => {
     expect(screen.getByText('First paragraph of the story.').className).not.toMatch(
       /font-heading/,
     )
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle menu' }))
+    expect(screen.getAllByRole('link', { name: 'Human Stories' }).length).toBeGreaterThan(0)
+    expect(screen.getByRole('navigation', { name: 'Primary' })).toBeInTheDocument()
   })
 
   it('shows the sourced pill when the article is marked sourced', async () => {

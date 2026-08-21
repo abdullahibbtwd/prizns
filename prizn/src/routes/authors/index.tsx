@@ -21,15 +21,17 @@ export default function AuthorsPage() {
           <main>
             <ListingHeader
               lang={lang}
-              eyebrow={lang === 'bg' ? 'Автори' : 'Authors'}
-              title={lang === 'bg' ? 'Гласовете на Призни' : 'The Voices of Prizni'}
+              eyebrow={lang === 'bg' ? 'Екипът' : 'The desk'}
+              title={lang === 'bg' ? 'Екипът на Призни' : 'The Prizni Team'}
               description={
                 lang === 'bg'
-                  ? 'Редактори, писатели и фотографи, които събират истории из Северозападна България.'
-                  : 'Editors, writers, and photographers gathering stories across Northwestern Bulgaria.'
+                  ? 'Редактори, автори и фотографи — хората зад журнала.'
+                  : 'Editors, writers, and photographers — the people behind the journal.'
               }
               countLabel={
-                lang === 'bg' ? `${authors.length} автори` : `${authors.length} authors`
+                lang === 'bg'
+                  ? `${authors.length} в екипа`
+                  : `${authors.length} team members`
               }
             />
 

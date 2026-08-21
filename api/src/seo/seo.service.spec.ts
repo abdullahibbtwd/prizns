@@ -51,6 +51,8 @@ describe('SeoService', () => {
   it('returns default bot shell html for unknown paths', async () => {
     const html = await service.botShellHtml('/unknown');
     expect(html).toContain('<title>Prizni</title>');
+    expect(html).toContain('https://prizni.bg/og-default.png');
+    expect(html).toContain('summary_large_image');
   });
 
   it('reports unique-meta coverage for published stories', async () => {

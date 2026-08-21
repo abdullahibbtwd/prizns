@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, Outlet, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Menu, Search, Bell, X, Sparkles, ChevronRight, CheckCircle2, AlertCircle, Globe } from 'lucide-react'
+import { Menu, Search, X, ChevronRight, Globe } from 'lucide-react'
 import { CmsSidebar, QuickSearchModal } from '@/cms/components/CmsUI'
 import { useAuth } from '@/lib/auth'
 import { useJournalLang } from '@/hooks/useJournalLang'
@@ -9,7 +9,6 @@ import { useJournalLang } from '@/hooks/useJournalLang'
 export function CmsLayout() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
-  const [notificationsOpen, setNotificationsOpen] = useState(false)
   const location = useLocation()
   const { user } = useAuth()
   const { t } = useTranslation()
@@ -131,55 +130,6 @@ export function CmsLayout() {
               <Globe className="size-3.5 stroke-[1.5]" />
               <span>{lang.toUpperCase()}</span>
             </button>
-
-            {/* Notifications Menu Button */}
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setNotificationsOpen((prev) => !prev)}
-                className="relative cursor-pointer rounded-xl border border-[#E8E4DC] bg-stone-50 p-2.5 text-stone-600 transition-colors hover:border-[#0C2686]/30 hover:bg-white hover:text-stone-900 shadow-2xs"
-              >
-                <Bell className="size-4.5" />
-                <span className="absolute top-2 right-2 size-2 rounded-full bg-amber-500 ring-2 ring-white" />
-              </button>
-
-              {notificationsOpen && (
-                <div className="absolute right-0 mt-3 w-80 rounded-2xl border border-[#E8E4DC] bg-white p-4 shadow-xl z-50 animate-in fade-in duration-150">
-                  <div className="flex items-center justify-between border-b border-stone-100 pb-3">
-                    <p className="font-heading text-sm font-bold text-stone-900">{t('cms.notifications')}</p>
-                    <span className="rounded-full bg-[#0C2686]/10 px-2 py-0.5 text-[10px] font-bold text-[#0C2686]">
-                      {t('cms.newCount', { count: 3 })}
-                    </span>
-                  </div>
-                  <div className="mt-3 space-y-3">
-                    <div className="flex items-start gap-3 rounded-xl p-2 bg-stone-50 hover:bg-stone-100/80 transition-colors">
-                      <CheckCircle2 className="size-4 text-emerald-600 mt-0.5 shrink-0" />
-                      <div>
-                        <p className="text-xs font-semibold text-stone-900">New Submission Received</p>
-                        <p className="text-[11px] text-stone-500">Elena M. submitted "My grandmother’s bread oven"</p>
-                        <span className="text-[10px] text-stone-400">10m ago</span>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-3 rounded-xl p-2 bg-stone-50 hover:bg-stone-100/80 transition-colors">
-                      <Sparkles className="size-4 text-[#0C2686] mt-0.5 shrink-0" />
-                      <div>
-                        <p className="text-xs font-semibold text-stone-900">AI SEO Insight Ready</p>
-                        <p className="text-[11px] text-stone-500">5 articles missing meta descriptions</p>
-                        <span className="text-[10px] text-stone-400">1h ago</span>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-3 rounded-xl p-2 bg-stone-50 hover:bg-stone-100/80 transition-colors">
-                      <AlertCircle className="size-4 text-amber-600 mt-0.5 shrink-0" />
-                      <div>
-                        <p className="text-xs font-semibold text-stone-900">Review Reminder</p>
-                        <p className="text-[11px] text-stone-500">Episode 4 draft is pending review</p>
-                        <span className="text-[10px] text-stone-400">3h ago</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
 
             <Link
               to="/cms/profile"

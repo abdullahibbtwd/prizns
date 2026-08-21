@@ -64,6 +64,7 @@ describe('AuthorsSection', () => {
       </MemoryRouter>,
     )
     expect(screen.getByText('Maria')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'The Prizni Team' })).toBeInTheDocument()
     expect(screen.getByText(/4 stories/)).toBeInTheDocument()
   })
 })

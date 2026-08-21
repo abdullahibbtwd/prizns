@@ -109,7 +109,7 @@ import {
   listCmsDigestHistory,
   sendCmsDigest,
 } from '@/lib/digest-api'
-import { listCmsUsers, updateCmsUser, createCmsUser, getCmsProfile, updateCmsProfile } from '@/lib/users-api'
+import { listCmsUsers, updateCmsUser, createCmsUser, deleteCmsUser, getCmsProfile, updateCmsProfile } from '@/lib/users-api'
 import {
   createCmsTodo,
   deleteCmsTodo,
@@ -484,6 +484,7 @@ describe('cms dashboard / users / digest / social / community / content', () => 
       roles: ['AUTHOR'],
       showOnAuthors: true,
     })
+    await deleteCmsUser('u1')
     await getCmsProfile()
     await updateCmsProfile({ bio: 'Hi' })
     await getCmsDigestPreview('ser-1')
@@ -512,6 +513,7 @@ describe('cms dashboard / users / digest / social / community / content', () => 
     expect(mocked.post).toHaveBeenCalledWith('/archive/ask', {
       question: 'What is Kukeri?',
     })
+    expect(mocked.delete).toHaveBeenCalledWith('/cms/users/u1')
   })
 
   it('covers social posts', async () => {

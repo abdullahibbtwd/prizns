@@ -9,8 +9,10 @@ interface EditorialHeroProps {
 export function EditorialHero({ lang }: EditorialHeroProps) {
   const content = journalContent.hero
 
-  const scrollToLetter = () => {
-    const el = document.getElementById('editors-letter')
+  const scrollToStories = () => {
+    const el =
+      document.getElementById('featured-story') ||
+      document.getElementById('human-stories')
     if (el) {
       el.scrollIntoView({ behavior: 'smooth' })
     }
@@ -75,7 +77,7 @@ export function EditorialHero({ lang }: EditorialHeroProps) {
         className="relative z-10 pb-6 md:pb-8 text-center"
       >
         <button
-          onClick={scrollToLetter}
+          onClick={scrollToStories}
           className="group inline-flex items-center gap-3 font-sans text-xs uppercase tracking-[0.3em] text-white/90 hover:text-white border border-white/30 hover:border-white rounded-full px-7 py-3.5 backdrop-blur-xs transition-all duration-300 hover:bg-white/10"
         >
           <span>{lang === 'bg' ? content.ctaBg : content.cta}</span>

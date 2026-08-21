@@ -43,6 +43,7 @@ describe('UsersService', () => {
         findUnique: jest.fn().mockResolvedValue(row),
         create: jest.fn().mockResolvedValue(row),
         update: jest.fn().mockResolvedValue({ ...row, name: 'Updated' }),
+        delete: jest.fn().mockResolvedValue(row),
       },
       author: {
         findUnique: jest.fn().mockResolvedValue(null),
@@ -232,6 +233,42 @@ describe('UsersService', () => {
     await expect(
       service.update('admin-1', { role: Role.AUTHOR }, 'admin-1'),
     ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('deletes another CMS user', async () => {
+    prisma.user.findUnique = jest.fn().mockResolvedValue(row);
+    const result = await service.remove('user-1', 'admin-1');
+    expect(prisma.user.delete).toHaveBeenCalledWith({ where: { id: 'user-1' } });
+    expect(result).toEqual({ ok: true, id: 'user-1' });
+  });
+
+  it('prevents deleting your own account', async () => {
+    await expect(service.remove('user-1', 'user-1')).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    expect(prisma.user.delete).not.toHaveBeenCalled();
+  });
+
+  it('prevents deleting the last admin', async () => {
+    prisma.user.findUnique = jest.fn().mockResolvedValue({
+      ...row,
+      id: 'admin-2',
+      role: Role.ADMIN,
+      roles: [Role.ADMIN],
+    });
+    prisma.user.count = jest.fn().mockResolvedValue(1);
+
+    await expect(service.remove('admin-2', 'admin-1')).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    expect(prisma.user.delete).not.toHaveBeenCalled();
+  });
+
+  it('throws when deleting a missing user', async () => {
+    prisma.user.findUnique = jest.fn().mockResolvedValue(null);
+    await expect(service.remove('missing', 'admin-1')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
   });
 
   it('returns the current user profile', async () => {

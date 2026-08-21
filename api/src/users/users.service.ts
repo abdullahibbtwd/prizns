@@ -327,6 +327,29 @@ export class UsersService {
     };
   }
 
+  async remove(id: string, actorId: string) {
+    const existing = await this.prisma.user.findUnique({
+      where: { id },
+      select: { id: true, role: true, roles: true },
+    });
+    if (!existing) throw new NotFoundException('User not found');
+    if (existing.id === actorId) {
+      throw new BadRequestException('You cannot delete your own account');
+    }
+    if (hasAdminRole(existing)) {
+      const adminCount = await this.prisma.user.count({
+        where: {
+          OR: [{ role: Role.ADMIN }, { roles: { has: Role.ADMIN } }],
+        },
+      });
+      if (adminCount <= 1) {
+        throw new BadRequestException('Cannot delete the last admin');
+      }
+    }
+    await this.prisma.user.delete({ where: { id } });
+    return { ok: true as const, id };
+  }
+
   async getProfile(userId: string) {
     const row = await this.prisma.user.findUnique({
       where: { id: userId },

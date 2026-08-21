@@ -341,7 +341,7 @@ ${items}
         article.subtitleEn ??
         article.subtitleBg ??
         DEFAULT_DESCRIPTION;
-      const image = article.heroMedia?.url?.trim() || `${base}/og-default.jpg`;
+      const image = article.heroMedia?.url?.trim() || `${base}/og-default.png`;
       const authorName =
         article.author?.nameEn ?? article.author?.nameBg ?? undefined;
       const published = article.publishedAt?.toISOString();
@@ -363,6 +363,7 @@ ${items}
           '@type': 'Organization',
           name: SITE_NAME,
           url: base,
+          logo: `${base}/prizni.svg`,
         },
       };
 
@@ -380,8 +381,16 @@ ${items}
       title: SITE_NAME,
       description: DEFAULT_DESCRIPTION,
       canonical,
-      image: `${base}/og-default.jpg`,
+      image: `${base}/og-default.png`,
       type: 'website',
+      jsonLd: {
+        '@context': 'https://schema.org',
+        '@type': 'Organization',
+        name: SITE_NAME,
+        url: base,
+        logo: `${base}/prizni.svg`,
+        description: DEFAULT_DESCRIPTION,
+      },
     });
   }
 
@@ -397,6 +406,9 @@ ${items}
     const description = this.escapeHtml(meta.description);
     const canonical = this.escapeHtml(meta.canonical);
     const image = this.escapeHtml(meta.image);
+    const imageType = meta.image.toLowerCase().includes('.png')
+      ? 'image/png'
+      : 'image/jpeg';
     const jsonLdBlock = meta.jsonLd
       ? `<script type="application/ld+json">${JSON.stringify(meta.jsonLd)}</script>`
       : '';
@@ -414,10 +426,14 @@ ${items}
 <meta property="og:description" content="${description}" />
 <meta property="og:url" content="${canonical}" />
 <meta property="og:image" content="${image}" />
+<meta property="og:image:alt" content="${title}" />
+<meta property="og:image:type" content="${imageType}" />
+<meta property="og:locale" content="bg_BG" />
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content="${title}" />
 <meta name="twitter:description" content="${description}" />
 <meta name="twitter:image" content="${image}" />
+<meta name="twitter:image:alt" content="${title}" />
 ${jsonLdBlock}
 </head>
 <body>

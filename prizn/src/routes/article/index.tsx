@@ -14,7 +14,9 @@ import {
   Heart,
 } from 'lucide-react'
 import { JournalShell } from '@/components/concept-3/JournalShell'
+import { MobileNavMenu } from '@/components/concept-3/MobileNavMenu'
 import { Logo } from '@/components/Logo'
+import { getPrimaryNavLinks } from '@/data/concept-3/nav'
 import { PageMeta } from '@/components/PageMeta'
 import { SponsoredBadge } from '@/components/concept-3/SponsoredBadge'
 import { SourcedBadge } from '@/components/concept-3/SourcedBadge'
@@ -423,22 +425,31 @@ function ArticleContent({
           />
         </div>
 
-        <div className="flex items-center justify-between border-b border-[#EAE6DF] bg-[#FDFBF7]/95 px-6 py-4 backdrop-blur-md md:px-12">
-          <div className="flex items-center gap-3">
-            <Link to="/" className="shrink-0 cursor-pointer transition-opacity hover:opacity-90">
-              <Logo className="h-6 md:h-7" showSlogan={false} />
-            </Link>
-            <span className="h-4 w-px bg-[#1A1A1A]/20" />
-            <span className="hidden font-sans text-xs font-medium uppercase tracking-widest text-[#0C2686] sm:inline">
-              {t('journalArticle')}
-            </span>
-          </div>
+        <div className="flex items-center justify-between gap-4 border-b border-[#EAE6DF] bg-[#FDFBF7]/95 px-6 py-4 backdrop-blur-md md:px-12">
+          <Link to="/" className="shrink-0 cursor-pointer transition-opacity hover:opacity-90">
+            <Logo className="h-6 md:h-7" showSlogan={false} />
+          </Link>
 
-          <div className="flex items-center gap-2 md:gap-4">
+          <nav
+            className="hidden flex-1 items-center justify-center gap-8 lg:gap-10 md:flex"
+            aria-label="Primary"
+          >
+            {getPrimaryNavLinks(lang).map((link) => (
+              <Link
+                key={link.to}
+                to={link.to}
+                className="font-sans text-xs uppercase tracking-[0.25em] text-[#1A1A1A]/80 transition-colors duration-300 hover:text-[#0C2686]"
+              >
+                {link.label}
+              </Link>
+            ))}
+          </nav>
+
+          <div className="flex shrink-0 items-center gap-2 md:gap-4">
             <button
               type="button"
               onClick={() => window.print()}
-              className="cursor-pointer rounded-full p-2 text-[#1A1A1A]/60 transition-colors hover:bg-black/5 hover:text-[#0C2686]"
+              className="hidden cursor-pointer rounded-full p-2 text-[#1A1A1A]/60 transition-colors hover:bg-black/5 hover:text-[#0C2686] sm:inline-flex"
               aria-label={t('print')}
               title={t('print')}
             >
@@ -480,6 +491,11 @@ function ArticleContent({
               <ArrowLeft className="size-3.5" />
               <span className="hidden sm:inline">{t('back')}</span>
             </button>
+            <MobileNavMenu
+              lang={lang}
+              setLang={setLang}
+              panelOffsetClassName="top-[73px]"
+            />
           </div>
         </div>
       </div>

@@ -1039,6 +1039,13 @@ const cmsBg = {
     createFailed: 'Неуспешно създаване на потребител.',
     openAuthor: 'Авторска страница',
     cancel: 'Отказ',
+    delete: 'Изтрий',
+    deleting: 'Изтриване…',
+    deleteConfirm:
+      'Изтриване на {{name}} ({{email}})? Няма да може да влиза в системата. Авторските страници и историите остават в журнала.',
+    deleted: 'Потребителят е изтрит.',
+    deleteFailed: 'Неуспешно изтриване на потребител.',
+    deleteSelf: 'Не можете да изтриете собствения си акаунт.',
   },
 
   profile: {
@@ -2217,6 +2224,13 @@ const cmsEn = {
     createFailed: 'Failed to create user.',
     openAuthor: 'Author page',
     cancel: 'Cancel',
+    delete: 'Delete',
+    deleting: 'Deleting…',
+    deleteConfirm:
+      'Delete {{name}} ({{email}})? They will no longer be able to sign in. Linked author pages and stories stay in the journal.',
+    deleted: 'User deleted.',
+    deleteFailed: 'Failed to delete user.',
+    deleteSelf: 'You cannot delete your own account.',
   },
 
   profile: {

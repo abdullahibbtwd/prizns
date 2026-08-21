@@ -5,6 +5,7 @@ import { buildCmsArticle } from '@/test/factories'
 import { QuoteSection } from './QuoteSection'
 import { JournalFooter } from './JournalFooter'
 import { VideoSection } from './VideoSection'
+import { VoicesAudioSection } from './VoicesAudioSection'
 
 vi.mock('framer-motion', () => ({
   motion: {
@@ -75,5 +76,13 @@ describe('misc concept-3 sections', () => {
     expect(screen.getByText('Film desk')).toBeInTheDocument()
     expect(screen.getAllByTestId('video-player')).toHaveLength(2)
     expect(screen.getByRole('link', { name: 'Side film' })).toBeInTheDocument()
+  })
+
+  it('VoicesAudioSection shows a continue-below cue', () => {
+    usePublicArticles.mockReturnValue({ data: [], isLoading: false })
+    renderSection(<VoicesAudioSection lang="en" />)
+    expect(
+      screen.getByRole('button', { name: 'More content below' }),
+    ).toBeInTheDocument()
   })
 })

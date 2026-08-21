@@ -27,4 +27,17 @@ describe('PageMeta', () => {
     const ogImage = document.head.querySelector('meta[property="og:image"]')
     expect(ogImage?.getAttribute('content')).toContain('/hero.jpg')
   })
+
+  it('falls back to the default share image', () => {
+    render(
+      <HelmetProvider>
+        <PageMeta title="Home" path="/" lang="bg" />
+      </HelmetProvider>,
+    )
+    const ogImage = document.head.querySelector('meta[property="og:image"]')
+    expect(ogImage?.getAttribute('content')).toContain('/og-default.png')
+    expect(
+      document.head.querySelector('meta[name="twitter:card"]')?.getAttribute('content'),
+    ).toBe('summary_large_image')
+  })
 })

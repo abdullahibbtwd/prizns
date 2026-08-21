@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -78,5 +79,11 @@ export class UsersController {
       await this.translation.enqueueAuthor(user.authorId);
     }
     return user;
+  }
+
+  @Delete(':id')
+  @Roles('ADMIN')
+  remove(@Param('id') id: string, @CurrentUser() actor: AuthUserPayload) {
+    return this.users.remove(id, actor.id);
   }
 }

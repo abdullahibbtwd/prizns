@@ -10,13 +10,14 @@ import { mockAuthUser } from '../../test/helpers/mocks';
 
 describe('UsersController', () => {
   let controller: UsersController;
-  const users = { list: jest.fn(), update: jest.fn(), create: jest.fn() };
+  const users = { list: jest.fn(), update: jest.fn(), create: jest.fn(), remove: jest.fn() };
   const translation = { enqueueAuthor: jest.fn() };
   const auth = { sendAccountCreatedEmail: jest.fn() };
 
   beforeEach(async () => {
     users.create.mockReset();
     users.update.mockReset();
+    users.remove.mockReset();
     translation.enqueueAuthor.mockReset();
     auth.sendAccountCreatedEmail.mockReset();
     auth.sendAccountCreatedEmail.mockResolvedValue({ sent: true });
@@ -67,5 +68,12 @@ describe('UsersController', () => {
     expect(users.update).toHaveBeenCalledWith('user-2', dto, mockAuthUser.id);
     expect(updated.name).toBe('Updated');
     expect(translation.enqueueAuthor).not.toHaveBeenCalled();
+  });
+
+  it('deletes a user with actor id', async () => {
+    users.remove.mockResolvedValue({ ok: true, id: 'user-2' });
+    const removed = await controller.remove('user-2', mockAuthUser);
+    expect(users.remove).toHaveBeenCalledWith('user-2', mockAuthUser.id);
+    expect(removed).toEqual({ ok: true, id: 'user-2' });
   });
 });

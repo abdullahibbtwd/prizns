@@ -1,15 +1,12 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { Search, X, Globe, Menu, Heart, ChevronDown, PenLine, Handshake, Bookmark } from 'lucide-react'
+import { Search, X, Globe, Heart, ChevronDown, PenLine, Handshake, Bookmark } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Logo } from '@/components/Logo'
 import { cn } from '@/lib/utils'
-import {
-  getFooterSecondaryLinks,
-  getPrimaryNavLinks,
-  getTertiaryNavLinks,
-} from '@/data/concept-3/nav'
+import { getPrimaryNavLinks } from '@/data/concept-3/nav'
 import { useReaderAuth } from '@/lib/reader-auth'
+import { MobileNavMenu } from '@/components/concept-3/MobileNavMenu'
 
 interface MinimalNavProps {
   lang: 'bg' | 'en'
@@ -21,7 +18,6 @@ export function MinimalNav({ lang, setLang, variant = 'hero' }: MinimalNavProps)
   const [scrolled, setScrolled] = useState(variant === 'solid')
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [contributeOpen, setContributeOpen] = useState(false)
   const contributeRef = useRef<HTMLDivElement>(null)
   const isSolid = variant === 'solid' || scrolled
@@ -52,10 +48,6 @@ export function MinimalNav({ lang, setLang, variant = 'hero' }: MinimalNavProps)
   }, [])
 
   const navLinks = getPrimaryNavLinks(lang)
-  const mobileSecondary = [
-    ...getFooterSecondaryLinks(lang),
-    ...getTertiaryNavLinks(lang),
-  ]
 
   const contributeLinks = [
     {
@@ -73,27 +65,6 @@ export function MinimalNav({ lang, setLang, variant = 'hero' }: MinimalNavProps)
       href: '/partnerships',
       icon: Handshake,
     },
-  ]
-
-  const mobileLinks = [
-    ...navLinks,
-    ...mobileSecondary,
-    ...contributeLinks.map(({ label, href }) => ({ label, to: href })),
-    { label: lang === 'bg' ? 'Защо Prizni' : 'Why Prizni', to: '/why-prizni' },
-    ...(readerAuthEnabled
-      ? [
-          {
-            label: reader
-              ? lang === 'bg'
-                ? 'Запазени'
-                : 'Saved'
-              : lang === 'bg'
-                ? 'Вход'
-                : 'Sign in',
-            to: reader ? '/me' : '#signin',
-          },
-        ]
-      : []),
   ]
 
   const searchSuggestions = [
@@ -276,77 +247,15 @@ export function MinimalNav({ lang, setLang, variant = 'hero' }: MinimalNavProps)
               <span>{lang.toUpperCase()}</span>
             </button>
 
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className={cn(
-                'md:hidden p-1 transition-colors duration-300',
-                isSolid ? 'text-journal-ink' : 'text-white'
-              )}
-              aria-label="Toggle menu"
-            >
-              {mobileMenuOpen ? <X className="size-6 stroke-[1.5]" /> : <Menu className="size-6 stroke-[1.5]" />}
-            </button>
+            <MobileNavMenu
+              lang={lang}
+              setLang={setLang}
+              onSearch={() => setSearchOpen(true)}
+              className={isSolid ? 'text-journal-ink' : 'text-white'}
+            />
           </div>
         </div>
       </header>
-
-      <AnimatePresence>
-        {mobileMenuOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="fixed inset-x-0 top-[70px] z-30 max-h-[calc(100svh-70px)] overflow-y-auto bg-[#FDFBF7] border-b border-[#EAE6DF] px-8 py-8 shadow-xl md:hidden"
-          >
-            <div className="flex flex-col gap-5 text-center">
-              {mobileLinks.map((link) =>
-                link.to === '#signin' ? (
-                  <button
-                    key={link.to}
-                    type="button"
-                    onClick={() => {
-                      setMobileMenuOpen(false)
-                      openSignIn({ returnUrl: '/me' })
-                    }}
-                    className="cursor-pointer font-heading text-xl tracking-widest text-journal-ink hover:text-journal-navy"
-                  >
-                    {link.label}
-                  </button>
-                ) : (
-                  <Link
-                    key={link.to}
-                    to={link.to}
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="font-heading text-xl tracking-widest text-journal-ink hover:text-journal-navy"
-                  >
-                    {link.label}
-                  </Link>
-                ),
-              )}
-
-              <div className="mt-2 flex flex-col gap-3 border-t border-[#EAE6DF] pt-5">
-                <button
-                  onClick={() => {
-                    setMobileMenuOpen(false)
-                    setSearchOpen(true)
-                  }}
-                  className="inline-flex items-center justify-center gap-2 text-xs uppercase tracking-[0.2em] text-[#1A1A1A]/70"
-                >
-                  <Search className="size-3.5" />
-                  {lang === 'bg' ? 'Търсене' : 'Search'}
-                </button>
-                <button
-                  onClick={() => setLang(lang === 'bg' ? 'en' : 'bg')}
-                  className="inline-flex items-center justify-center gap-2 text-xs uppercase tracking-[0.2em] text-[#1A1A1A]/70"
-                >
-                  <Globe className="size-3.5" />
-                  {lang === 'bg' ? 'Език: BG' : 'Language: EN'}
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       <AnimatePresence>
         {searchOpen && (

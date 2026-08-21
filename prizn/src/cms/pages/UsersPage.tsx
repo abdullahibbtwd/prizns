@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { ChevronLeft, ChevronRight, Pencil, Plus, Search } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Pencil, Plus, Search, Trash2 } from 'lucide-react'
 import {
   CmsCard,
   CmsPageHeader,
@@ -13,11 +13,13 @@ import {
 import { CmsField, CmsInput, CmsCheckbox } from '@/cms/components/CmsFields'
 import { CmsModal } from '@/cms/components/CmsModal'
 import { CmsPasswordInput } from '@/cms/components/CmsPasswordInput'
+import { useCmsConfirm } from '@/cms/components/CmsConfirmDialog'
 import { Alert } from '@/components/ui/Alert'
 import { JournalSelect } from '@/components/ui/JournalSelect'
 import { useAuth } from '@/lib/auth'
 import {
   createCmsUser,
+  deleteCmsUser,
   listCmsUsers,
   updateCmsUser,
   type CmsUser,
@@ -52,6 +54,7 @@ export default function CmsUsersPage() {
   const { t } = useTranslation()
   const { user: me } = useAuth()
   const queryClient = useQueryClient()
+  const { confirm, dialog } = useCmsConfirm()
   const isAdmin = hasCmsRole(me, 'ADMIN')
 
   const [query, setQuery] = useState('')
@@ -194,6 +197,44 @@ export default function CmsUsersPage() {
       })
     },
   })
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => deleteCmsUser(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['cms-users'] })
+      await queryClient.invalidateQueries({ queryKey: ['cms-authors-desk'] })
+      await queryClient.invalidateQueries({ queryKey: ['cms-authors'] })
+      await queryClient.invalidateQueries({ queryKey: ['cms-authors-count'] })
+      setToast({ open: true, variant: 'success', message: t('cms.users.deleted') })
+    },
+    onError: (err: Error) => {
+      setToast({
+        open: true,
+        variant: 'error',
+        message: err.message || t('cms.users.deleteFailed'),
+      })
+    },
+  })
+
+  const confirmDelete = async (item: CmsUser) => {
+    if (me?.id === item.id) {
+      setToast({
+        open: true,
+        variant: 'error',
+        message: t('cms.users.deleteSelf'),
+      })
+      return
+    }
+    const ok = await confirm({
+      title: t('cms.users.delete'),
+      description: t('cms.users.deleteConfirm', {
+        name: item.name || item.email,
+        email: item.email,
+      }),
+    })
+    if (!ok) return
+    deleteMutation.mutate(item.id)
+  }
 
   const passwordsMatch =
     form.password.length > 0 && form.password === form.confirmPassword
@@ -368,22 +409,37 @@ export default function CmsUsersPage() {
                     <td className="px-4 py-3 text-stone-500">{item.joinedAt}</td>
                     {isAdmin && (
                       <td className="px-4 py-3 text-right">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setEditing({
-                              id: item.id,
-                              name: item.name ?? '',
-                              email: item.email,
-                              roles: itemRoles(item),
-                              showOnAuthors: item.showOnAuthors,
-                            })
-                          }
-                          className="inline-flex items-center gap-1 rounded-xl border border-[#E8E4DC] bg-stone-50 px-2.5 py-1.5 text-xs font-semibold text-stone-700 transition hover:bg-white"
-                        >
-                          <Pencil className="size-3.5" />
-                          {t('cms.users.edit')}
-                        </button>
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setEditing({
+                                id: item.id,
+                                name: item.name ?? '',
+                                email: item.email,
+                                roles: itemRoles(item),
+                                showOnAuthors: item.showOnAuthors,
+                              })
+                            }
+                            className="inline-flex items-center gap-1 rounded-xl border border-[#E8E4DC] bg-stone-50 px-2.5 py-1.5 text-xs font-semibold text-stone-700 transition hover:bg-white"
+                          >
+                            <Pencil className="size-3.5" />
+                            {t('cms.users.edit')}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void confirmDelete(item)}
+                            disabled={
+                              deleteMutation.isPending || me?.id === item.id
+                            }
+                            className="inline-flex items-center gap-1 rounded-xl border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            <Trash2 className="size-3.5" />
+                            {deleteMutation.isPending
+                              ? t('cms.users.deleting')
+                              : t('cms.users.delete')}
+                          </button>
+                        </div>
                       </td>
                     )}
                   </tr>
@@ -701,6 +757,7 @@ export default function CmsUsersPage() {
         message={toast.message}
         onClose={() => setToast((prev) => ({ ...prev, open: false }))}
       />
+      {dialog}
     </div>
   )
 }

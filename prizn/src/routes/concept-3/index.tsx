@@ -36,11 +36,11 @@ export default function HomePage() {
             path="/"
           />
           <EditorialHero lang={lang} />
-          <EditorsLetter lang={lang} />
           <FeaturedStoryCard lang={lang} />
           <StoryYearSection lang={lang} />
-          <OurPlacesSection lang={lang} />
           <HumanStoriesSection lang={lang} />
+          <EditorsLetter lang={lang} />
+          <OurPlacesSection lang={lang} />
           <AuthorsSection lang={lang} />
           <VoicesAudioSection lang={lang} />
           <CuratedCollections lang={lang} />

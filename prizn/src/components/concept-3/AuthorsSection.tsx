@@ -14,61 +14,64 @@ export function AuthorsSection({ lang }: AuthorsSectionProps) {
       ...author,
       path: `/authors/${author.slug}`,
     })),
-  ).slice(0, 4)
+  )
+  const featured = authors.slice(0, 8)
+
+  if (featured.length === 0) return null
 
   return (
-    <section id="authors" className="bg-[#FDFBF7] py-20 md:py-28 px-6 md:px-12 border-t border-[#EAE6DF]">
+    <section id="authors" className="border-t border-[#EAE6DF] bg-[#FDFBF7] px-6 py-16 md:px-12 md:py-20">
       <div className="mx-auto max-w-7xl">
-        <div className="mx-auto mb-14 max-w-2xl text-center md:mb-16">
-          <p className="font-sans text-xs uppercase tracking-[0.3em] text-[#0C2686]/80">
-            {lang === 'bg' ? 'Автори' : 'Authors'}
-          </p>
-          <h2 className="mt-3 font-heading text-4xl font-light tracking-tight text-[#1A1A1A] md:text-5xl">
-            {lang === 'bg' ? 'Гласовете на Призни' : 'The voices of Prizni'}
-          </h2>
-          <p className="mx-auto mt-4 max-w-md font-sans text-sm font-light leading-relaxed text-[#1A1A1A]/55">
-            {lang === 'bg'
-              ? 'Редактори и фотографи, които събират истории из Северозапада.'
-              : 'Editors and photographers gathering stories across the Northwest.'}
-          </p>
-          <div className="mt-5 flex justify-center">
-            <ViewAllLink to="/authors" lang={lang} />
+        <div className="mb-10 flex flex-col gap-4 md:mb-12 md:flex-row md:items-end md:justify-between">
+          <div>
+            <span className="mb-2 block font-sans text-xs font-medium uppercase tracking-[0.3em] text-[#0C2686]">
+              {lang === 'bg' ? 'Екипът' : 'The desk'}
+            </span>
+            <h2 className="font-heading text-4xl font-light tracking-tight text-[#1A1A1A] md:text-5xl">
+              {lang === 'bg' ? 'Екипът на Призни' : 'The Prizni Team'}
+            </h2>
           </div>
+          <ViewAllLink to="/authors" lang={lang} />
         </div>
 
-        <div className="grid grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-4 lg:gap-8">
-          {authors.map((author, index) => {
+        <div className="grid grid-cols-2 gap-x-6 gap-y-10 lg:grid-cols-4 lg:gap-x-10">
+          {featured.map((author, index) => {
+            const name = lang === 'bg' ? author.nameBg || author.name : author.name
+            const role = lang === 'bg' ? author.roleBg || author.role : author.role
+
             return (
               <motion.div
                 key={author.slug}
-                initial={{ opacity: 0, y: 16 }}
+                initial={{ opacity: 0, y: 12 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: index * 0.06 }}
+                transition={{ duration: 0.5, delay: index * 0.05 }}
               >
-                <Link to={author.path} className="group block cursor-pointer">
-                  <div className="relative mb-5 aspect-[3/4] overflow-hidden rounded-[4px] bg-[#EAE6DF]">
+                <Link
+                  to={author.path}
+                  className="group flex cursor-pointer flex-col items-center text-center"
+                >
+                  <div className="mb-4 size-24 overflow-hidden rounded-[4px] bg-[#EAE6DF] md:size-28">
                     <img
                       src={author.image}
-                      alt={lang === 'bg' ? author.nameBg : author.name}
+                      alt={name}
                       loading="lazy"
-                      className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.03]"
+                      className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.04]"
                     />
                   </div>
 
-                  <div className="border-t border-[#EAE6DF] pt-4">
-                    <h3 className="font-heading text-xl font-normal text-[#1A1A1A] transition-colors group-hover:text-[#0C2686] md:text-2xl">
-                      {lang === 'bg' ? author.nameBg : author.name}
-                    </h3>
-                    <p className="mt-1 font-sans text-[11px] uppercase tracking-[0.2em] text-[#1A1A1A]/45">
-                      {lang === 'bg' ? author.roleBg : author.role}
-                      <span className="mx-2 text-[#EAE6DF]">·</span>
-                      {author.storyCount} {lang === 'bg' ? 'истории' : 'stories'}
-                    </p>
-                    <p className="mt-3 font-heading text-[15px] italic leading-relaxed text-[#1A1A1A]/60">
-                      “{lang === 'bg' ? author.quoteBg : author.quote}”
-                    </p>
-                  </div>
+                  <h3 className="line-clamp-1 font-heading text-lg font-normal text-[#1A1A1A] transition-colors group-hover:text-[#0C2686] md:text-xl">
+                    {name}
+                  </h3>
+                  <p className="mt-1 line-clamp-1 font-sans text-[11px] uppercase tracking-[0.18em] text-[#1A1A1A]/45">
+                    {role}
+                    {author.storyCount != null ? (
+                      <>
+                        <span className="mx-1.5 text-[#EAE6DF]">·</span>
+                        {author.storyCount} {lang === 'bg' ? 'истории' : 'stories'}
+                      </>
+                    ) : null}
+                  </p>
                 </Link>
               </motion.div>
             )

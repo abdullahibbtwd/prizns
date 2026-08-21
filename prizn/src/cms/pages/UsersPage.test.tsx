@@ -14,11 +14,13 @@ vi.mock('@/lib/auth', () => ({
 const listCmsUsers = vi.fn()
 const createCmsUser = vi.fn()
 const updateCmsUser = vi.fn()
+const deleteCmsUser = vi.fn()
 
 vi.mock('@/lib/users-api', () => ({
   listCmsUsers: (...args: unknown[]) => listCmsUsers(...args),
   updateCmsUser: (...args: unknown[]) => updateCmsUser(...args),
   createCmsUser: (...args: unknown[]) => createCmsUser(...args),
+  deleteCmsUser: (...args: unknown[]) => deleteCmsUser(...args),
 }))
 
 describe('CmsUsersPage', () => {
@@ -123,5 +125,6 @@ describe('CmsUsersPage', () => {
     await user.click(screen.getByRole('button', { name: 'cms.users.edit' }))
     expect(screen.getByText('cms.users.editTitle')).toBeInTheDocument()
     expect(screen.getByDisplayValue('editor@prizni.bg')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'cms.users.delete' })).toBeInTheDocument()
   })
 })

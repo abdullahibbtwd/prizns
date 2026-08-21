@@ -26,10 +26,10 @@ describe('EditorialHero', () => {
     expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument()
   })
 
-  it('scrolls to the editors letter', async () => {
+  it('scrolls to the featured story', async () => {
     const user = userEvent.setup()
     const target = document.createElement('div')
-    target.id = 'editors-letter'
+    target.id = 'featured-story'
     target.scrollIntoView = vi.fn()
     document.body.appendChild(target)
 
