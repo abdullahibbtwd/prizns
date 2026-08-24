@@ -5,7 +5,7 @@ export interface JournalNavLink {
   to: string
 }
 
-/** Primary browse destinations — Phase 1 pillars. */
+/** Primary browse destinations — Human Stories, Places, Events, Traditions. */
 export function getPrimaryNavLinks(lang: JournalLang): JournalNavLink[] {
   return [
     {
@@ -17,47 +17,57 @@ export function getPrimaryNavLinks(lang: JournalLang): JournalNavLink[] {
       to: '/places',
     },
     {
+      label: lang === 'bg' ? 'Събития' : 'Events',
+      to: '/events',
+    },
+    {
       label: lang === 'bg' ? 'Традиции' : 'Traditions',
       to: '/traditions',
     },
   ]
 }
 
-/** Footer secondary sections (lower UX priority). */
+/**
+ * Destinations after Shop. Sports and News are topic tags, not menu items.
+ * Story of the Year / Archive / Discover / Voices stay reachable from the homepage.
+ */
 export function getFooterSecondaryLinks(lang: JournalLang): JournalNavLink[] {
   return [
-    { label: lang === 'bg' ? 'Спорт' : 'Sports', to: '/sports' },
-    { label: lang === 'bg' ? 'Събития' : 'Events', to: '/events' },
-    { label: lang === 'bg' ? 'Новини' : 'News', to: '/news' },
     { label: lang === 'bg' ? 'Магазин' : 'Shop', to: '/shop' },
+    { label: lang === 'bg' ? 'Автори' : 'Authors', to: '/authors' },
+  ]
+}
+
+/** Contribute destinations that always remain in the menu after Shop. */
+export function getContributeNavLinks(lang: JournalLang): JournalNavLink[] {
+  return [
     {
-      label: lang === 'bg' ? 'История на годината' : 'Story of the Year',
-      to: '/story-of-the-year',
+      label: lang === 'bg' ? 'Пишете за нас' : 'Write for Us',
+      to: '/write-for-us',
     },
     {
-      label: lang === 'bg' ? 'Архивът' : 'Ask the Archive',
-      to: '/archive',
+      label: lang === 'bg' ? 'Подкрепете ни' : 'Support Us',
+      to: '/support',
+    },
+    {
+      label: lang === 'bg' ? 'Партньорства' : 'Partnerships',
+      to: '/partnerships',
     },
   ]
 }
 
-/** Tertiary destinations kept for deep links / mobile overflow. */
+/** @deprecated Prefer getPrimaryNavLinks / getFooterSecondaryLinks */
 export function getTertiaryNavLinks(lang: JournalLang): JournalNavLink[] {
-  return [
-    { label: lang === 'bg' ? 'Открийте' : 'Discover', to: '/discover' },
-    { label: lang === 'bg' ? 'Автори' : 'Authors', to: '/authors' },
-    { label: lang === 'bg' ? 'Гласове' : 'Voices', to: '/voices' },
-  ]
+  return getContributeNavLinks(lang)
 }
 
 /** @deprecated Prefer getPrimaryNavLinks / getFooterSecondaryLinks */
 export function getJournalNavLinks(lang: JournalLang): JournalNavLink[] {
   return [
     ...getPrimaryNavLinks(lang),
-    ...getTertiaryNavLinks(lang),
     ...getFooterSecondaryLinks(lang),
+    ...getContributeNavLinks(lang),
     { label: lang === 'bg' ? 'Видео' : 'Video', to: '/video' },
     { label: lang === 'bg' ? 'Кампании' : 'Campaigns', to: '/campaigns' },
-    { label: lang === 'bg' ? 'Магазин' : 'Shop', to: '/shop' },
   ]
 }

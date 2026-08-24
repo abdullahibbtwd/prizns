@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
 import { NewsletterSection } from './NewsletterSection'
 import { AuthorsSection } from './AuthorsSection'
+import { StayWithUsSection } from './StayWithUsSection'
 
 const subscribeNewsletter = vi.fn()
 const usePublicAuthors = vi.fn()
@@ -30,6 +31,35 @@ describe('NewsletterSection', () => {
     render(<NewsletterSection lang="en" />)
     await user.type(screen.getByRole('textbox'), 'reader@example.com')
     await user.click(screen.getByRole('button'))
+
+    await waitFor(() => {
+      expect(subscribeNewsletter).toHaveBeenCalledWith(
+        'reader@example.com',
+        'website',
+      )
+    })
+  })
+})
+
+describe('StayWithUsSection', () => {
+  it('merges support, partnerships, and newsletter', async () => {
+    subscribeNewsletter.mockResolvedValue(undefined)
+    const user = userEvent.setup()
+
+    render(
+      <MemoryRouter>
+        <StayWithUsSection lang="en" />
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByRole('heading', { name: 'Support Prizni' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Partnerships' })).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: 'Receive one story every Sunday.' }),
+    ).toBeInTheDocument()
+
+    await user.type(screen.getByRole('textbox'), 'reader@example.com')
+    await user.click(screen.getByRole('button', { name: /Subscribe/i }))
 
     await waitFor(() => {
       expect(subscribeNewsletter).toHaveBeenCalledWith(

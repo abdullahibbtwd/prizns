@@ -57,4 +57,17 @@ describe('ArticleHeroGallery', () => {
       'https://cdn.example/three.jpg',
     )
   })
+
+  it('opens the heading photo in a full-screen view', async () => {
+    const user = userEvent.setup()
+    renderPage(<ArticleHeroGallery slides={slides} title="Story" />)
+
+    await user.click(screen.getByRole('button', { name: 'viewFullPhoto' }))
+    expect(screen.getByRole('dialog', { name: 'Story' })).toBeInTheDocument()
+    expect(
+      screen.getAllByRole('img', { name: 'Story' }).some(
+        (img) => img.getAttribute('src') === 'https://cdn.example/one.jpg',
+      ),
+    ).toBe(true)
+  })
 })

@@ -5,9 +5,9 @@ import { Globe, Menu, Search, X } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import {
+  getContributeNavLinks,
   getFooterSecondaryLinks,
   getPrimaryNavLinks,
-  getTertiaryNavLinks,
 } from '@/data/concept-3/nav'
 import { useReaderAuth } from '@/lib/reader-auth'
 
@@ -31,37 +31,19 @@ export function MobileNavMenu({
   const [open, setOpen] = useState(false)
   const { reader, enabled: readerAuthEnabled, openSignIn } = useReaderAuth()
 
-  const mobileLinks = [
-    ...getPrimaryNavLinks(lang),
-    ...getFooterSecondaryLinks(lang),
-    ...getTertiaryNavLinks(lang),
+  const groups = [
     {
-      label: lang === 'bg' ? 'Пишете за нас' : 'Write for Us',
-      to: '/write-for-us',
+      label: lang === 'bg' ? 'Разкази' : 'Stories',
+      links: getPrimaryNavLinks(lang),
     },
     {
-      label: lang === 'bg' ? 'Подкрепете ни' : 'Support Us',
-      to: '/support',
+      label: lang === 'bg' ? 'Журналът' : 'The journal',
+      links: getFooterSecondaryLinks(lang),
     },
     {
-      label: lang === 'bg' ? 'Партньорства' : 'Partnerships',
-      to: '/partnerships',
+      label: lang === 'bg' ? 'Присъединете се' : 'Get involved',
+      links: getContributeNavLinks(lang),
     },
-    { label: lang === 'bg' ? 'Защо Prizni' : 'Why Prizni', to: '/why-prizni' },
-    ...(readerAuthEnabled
-      ? [
-          {
-            label: reader
-              ? lang === 'bg'
-                ? 'Запазени'
-                : 'Saved'
-              : lang === 'bg'
-                ? 'Вход'
-                : 'Sign in',
-            to: reader ? '/me' : '#signin',
-          },
-        ]
-      : []),
   ]
 
   const close = () => setOpen(false)
@@ -72,7 +54,7 @@ export function MobileNavMenu({
         type="button"
         onClick={() => setOpen((current) => !current)}
         className={cn(
-          'md:hidden p-1 transition-colors duration-300 text-journal-ink',
+          'p-1 text-journal-ink transition-colors duration-300 lg:hidden',
           className,
         )}
         aria-label="Toggle menu"
@@ -93,37 +75,59 @@ export function MobileNavMenu({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
               className={cn(
-                'fixed inset-x-0 z-30 max-h-[calc(100svh-70px)] overflow-y-auto bg-[#FDFBF7] border-b border-[#EAE6DF] px-8 py-8 shadow-xl md:hidden',
+                'fixed inset-x-0 z-30 max-h-[calc(100svh-70px)] overflow-y-auto border-b border-[#EAE6DF] bg-[#FDFBF7] px-8 py-8 shadow-xl lg:hidden',
                 panelOffsetClassName,
               )}
             >
-              <div className="flex flex-col gap-5 text-center">
-                {mobileLinks.map((link) =>
-                  link.to === '#signin' ? (
-                    <button
-                      key={link.to}
-                      type="button"
-                      onClick={() => {
-                        close()
-                        openSignIn({ returnUrl: '/me' })
-                      }}
-                      className="cursor-pointer font-heading text-xl tracking-widest text-journal-ink hover:text-journal-navy"
-                    >
-                      {link.label}
-                    </button>
-                  ) : (
-                    <Link
-                      key={link.to}
-                      to={link.to}
-                      onClick={close}
-                      className="font-heading text-xl tracking-widest text-journal-ink hover:text-journal-navy"
-                    >
-                      {link.label}
-                    </Link>
-                  ),
-                )}
+              <div className="mx-auto flex max-w-sm flex-col gap-8">
+                {groups.map((group) => (
+                  <div key={group.label} className="flex flex-col gap-3 text-center">
+                    <p className="font-sans text-[10px] uppercase tracking-[0.28em] text-[#1A1A1A]/40">
+                      {group.label}
+                    </p>
+                    {group.links.map((link) => (
+                      <Link
+                        key={link.to}
+                        to={link.to}
+                        onClick={close}
+                        className="font-heading text-xl tracking-widest text-journal-ink hover:text-journal-navy"
+                      >
+                        {link.label}
+                      </Link>
+                    ))}
+                  </div>
+                ))}
 
-                <div className="mt-2 flex flex-col gap-3 border-t border-[#EAE6DF] pt-5">
+                <div className="flex flex-col gap-3 border-t border-[#EAE6DF] pt-5 text-center">
+                  <Link
+                    to="/why-prizni"
+                    onClick={close}
+                    className="font-heading text-lg tracking-widest text-journal-ink hover:text-journal-navy"
+                  >
+                    {lang === 'bg' ? 'Защо Prizni' : 'Why Prizni'}
+                  </Link>
+                  {readerAuthEnabled ? (
+                    reader ? (
+                      <Link
+                        to="/me"
+                        onClick={close}
+                        className="font-heading text-lg tracking-widest text-journal-ink hover:text-journal-navy"
+                      >
+                        {lang === 'bg' ? 'Запазени' : 'Saved'}
+                      </Link>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          close()
+                          openSignIn({ returnUrl: '/me' })
+                        }}
+                        className="cursor-pointer font-heading text-lg tracking-widest text-journal-ink hover:text-journal-navy"
+                      >
+                        {lang === 'bg' ? 'Вход' : 'Sign in'}
+                      </button>
+                    )
+                  ) : null}
                   {onSearch ? (
                     <button
                       type="button"

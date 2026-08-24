@@ -302,3 +302,19 @@ export const ARTICLE_SECTIONS: ArticleSection[] = [
   "campaigns",
   "gallery",
 ];
+
+/** Sports and News live as topic tags, not editorial sections. */
+export const TOPIC_TAG_SECTIONS: ArticleSection[] = ["sports", "news"];
+
+export const EDITOR_SECTIONS: ArticleSection[] = ARTICLE_SECTIONS.filter(
+  (section) => !TOPIC_TAG_SECTIONS.includes(section),
+);
+
+export function editorSectionChoices(
+  current?: ArticleSection | null,
+): ArticleSection[] {
+  if (current && !EDITOR_SECTIONS.includes(current)) {
+    return [...EDITOR_SECTIONS, current];
+  }
+  return EDITOR_SECTIONS;
+}

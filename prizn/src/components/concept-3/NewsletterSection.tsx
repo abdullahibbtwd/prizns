@@ -8,9 +8,13 @@ import { subscribeNewsletter } from '@/lib/newsletter-api'
 
 interface NewsletterSectionProps {
   lang: 'bg' | 'en'
+  variant?: 'page' | 'panel'
 }
 
-export function NewsletterSection({ lang }: NewsletterSectionProps) {
+export function NewsletterSection({
+  lang,
+  variant = 'page',
+}: NewsletterSectionProps) {
   const newsletter = journalContent.newsletter
   const [email, setEmail] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -18,6 +22,7 @@ export function NewsletterSection({ lang }: NewsletterSectionProps) {
   const [alertVariant, setAlertVariant] = useState<AlertVariant>('success')
   const [alertTitle, setAlertTitle] = useState('')
   const [alertMessage, setAlertMessage] = useState('')
+  const panel = variant === 'panel'
 
   const showAlert = (
     variant: AlertVariant,
@@ -75,29 +80,64 @@ export function NewsletterSection({ lang }: NewsletterSectionProps) {
     }
   }
 
+  const Root = panel ? 'div' : 'section'
+
   return (
-    <section className="bg-[#FDFBF7] py-28 md:py-40 px-6 md:px-12 border-b border-[#EAE6DF]">
-      <div className="max-w-xl mx-auto text-center">
+    <Root
+      className={
+        panel
+          ? 'flex h-full flex-col justify-end text-left'
+          : 'border-b border-[#EAE6DF] bg-[#FDFBF7] px-6 py-28 md:px-12 md:py-40'
+      }
+    >
+      <div className={panel ? 'w-full' : 'mx-auto max-w-xl text-center'}>
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.8 }}
         >
-          <span className="text-xs uppercase tracking-[0.3em] font-sans text-[#0C2686] font-medium block mb-4">
+          <span
+            className={
+              panel
+                ? 'mb-3 block font-sans text-[10px] font-medium uppercase tracking-[0.28em] text-white/65 sm:text-[11px]'
+                : 'mb-4 block font-sans text-xs font-medium uppercase tracking-[0.3em] text-[#0C2686]'
+            }
+          >
             {lang === 'bg' ? 'Седмичен Журнал' : 'Weekly Dispatch'}
           </span>
 
-          <h2 className="font-heading text-4xl md:text-5xl text-[#1A1A1A] font-light leading-tight mb-4">
-            {lang === 'bg' ? newsletter.titleBg : newsletter.title}
-          </h2>
+          {panel ? (
+            <h3 className="font-heading text-2xl font-light leading-tight tracking-tight sm:text-3xl lg:text-4xl">
+              {lang === 'bg' ? newsletter.titleBg : newsletter.title}
+            </h3>
+          ) : (
+            <h2 className="mb-4 font-heading text-4xl font-light leading-tight text-[#1A1A1A] md:text-5xl">
+              {lang === 'bg' ? newsletter.titleBg : newsletter.title}
+            </h2>
+          )}
 
-          <p className="font-sans text-xs md:text-sm text-[#1A1A1A]/60 font-light leading-relaxed mb-10">
+          <p
+            className={
+              panel
+                ? 'mt-3 hidden font-sans text-sm font-light leading-relaxed text-white/70 lg:block'
+                : 'mb-10 font-sans text-xs font-light leading-relaxed text-[#1A1A1A]/60 md:text-sm'
+            }
+          >
             {newsletter.subtitle}
           </p>
 
-          <form onSubmit={handleSubmit} className="relative max-w-md mx-auto">
-            <div className="relative border-b-2 border-[#1A1A1A] pb-2 flex items-center gap-2">
+          <form
+            onSubmit={handleSubmit}
+            className={panel ? 'relative mt-5 max-w-md' : 'relative mx-auto max-w-md'}
+          >
+            <div
+              className={
+                panel
+                  ? 'flex items-center gap-2 border-b border-white/40 pb-2'
+                  : 'relative flex items-center gap-2 border-b-2 border-[#1A1A1A] pb-2'
+              }
+            >
               <input
                 type="email"
                 name="email"
@@ -106,12 +146,20 @@ export function NewsletterSection({ lang }: NewsletterSectionProps) {
                 disabled={submitting}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder={newsletter.emailPlaceholder}
-                className="w-full bg-transparent font-sans text-sm md:text-base text-[#1A1A1A] placeholder:text-[#1A1A1A]/30 outline-none disabled:opacity-60"
+                className={
+                  panel
+                    ? 'w-full bg-transparent font-sans text-sm text-white outline-none placeholder:text-white/40 disabled:opacity-60'
+                    : 'w-full bg-transparent font-sans text-sm text-[#1A1A1A] outline-none placeholder:text-[#1A1A1A]/30 disabled:opacity-60 md:text-base'
+                }
               />
               <button
                 type="submit"
                 disabled={submitting}
-                className="shrink-0 flex items-center gap-2 font-sans text-xs uppercase tracking-[0.25em] font-medium text-[#0C2686] hover:text-[#1A1A1A] transition-colors py-2 px-3 disabled:cursor-not-allowed disabled:opacity-60"
+                className={
+                  panel
+                    ? 'flex shrink-0 cursor-pointer items-center gap-2 px-2 py-2 font-sans text-[10px] font-medium uppercase tracking-[0.22em] text-white transition-colors hover:text-white/80 disabled:cursor-not-allowed disabled:opacity-60 sm:text-xs'
+                    : 'flex shrink-0 items-center gap-2 px-3 py-2 font-sans text-xs font-medium uppercase tracking-[0.25em] text-[#0C2686] transition-colors hover:text-[#1A1A1A] disabled:cursor-not-allowed disabled:opacity-60'
+                }
               >
                 <span>
                   {submitting
@@ -136,6 +184,6 @@ export function NewsletterSection({ lang }: NewsletterSectionProps) {
         message={alertMessage}
         onClose={() => setAlertOpen(false)}
       />
-    </section>
+    </Root>
   )
 }

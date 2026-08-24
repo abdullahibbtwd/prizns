@@ -55,7 +55,7 @@ import {
   listCmsSeries,
 } from '@/lib/cms-content-api'
 import {
-  ARTICLE_SECTIONS,
+  editorSectionChoices,
   type ArticleFormValues,
   type ArticleSection,
   type BodyBlock,
@@ -1030,7 +1030,7 @@ export default function CmsStoryEditorPage() {
     form.watch('titleBg') || articleQuery.data?.titleBg,
   )
 
-  const sectionOptions = ARTICLE_SECTIONS.map((item) => ({
+  const sectionOptions = editorSectionChoices(section).map((item) => ({
     value: item,
     label: t(`cms.sections.${item}`),
   }))

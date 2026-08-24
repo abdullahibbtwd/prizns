@@ -51,9 +51,19 @@ describe('CmsStoriesPage', () => {
     deleteCmsArticle.mockResolvedValue(undefined)
   })
 
-  it('lists stories in grid view', async () => {
+  it('omits sports and news from the section filter', async () => {
+    const user = userEvent.setup()
     renderPage(<CmsStoriesPage />)
-    expect(await screen.findByText('Draft story')).toBeInTheDocument()
+    await screen.findByText('Draft story')
+
+    await user.click(
+      screen.getByRole('button', { name: 'cms.stories.filterSectionAll' }),
+    )
+
+    expect(screen.getByRole('option', { name: 'Human stories' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Events' })).toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: 'Sports' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: 'News' })).not.toBeInTheDocument()
   })
 
   it('switches to table view', async () => {

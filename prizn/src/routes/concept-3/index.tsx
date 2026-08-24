@@ -12,8 +12,7 @@ import { VoicesAudioSection } from '@/components/concept-3/VoicesAudioSection'
 import { PhotographyGallery } from '@/components/concept-3/PhotographyGallery'
 import { WriteForUsSection } from '@/components/concept-3/WriteForUsSection'
 import { ShopWithUsSection } from '@/components/concept-3/ShopWithUsSection'
-import { SupportSection } from '@/components/concept-3/SupportSection'
-import { NewsletterSection } from '@/components/concept-3/NewsletterSection'
+import { StayWithUsSection } from '@/components/concept-3/StayWithUsSection'
 import { StoryYearSection } from '@/components/concept-3/StoryYearSection'
 
 export default function HomePage() {
@@ -45,13 +44,12 @@ export default function HomePage() {
           <VoicesAudioSection lang={lang} />
           <CuratedCollections lang={lang} />
           <PhotographyGallery lang={lang} />
-          {/* Last editorial pillar — Sports / Events / News live in the footer */}
+          {/* Traditions is the last editorial pillar on the homepage */}
           <TraditionsSection lang={lang} />
           {/* Contribute — always last above footer */}
           <WriteForUsSection lang={lang} />
           <ShopWithUsSection lang={lang} />
-          <SupportSection lang={lang} />
-          <NewsletterSection lang={lang} />
+          <StayWithUsSection lang={lang} />
         </main>
       )}
     </JournalShell>

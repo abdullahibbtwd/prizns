@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { Search, X, Globe, Heart, ChevronDown, PenLine, Handshake, Bookmark } from 'lucide-react'
+import { Search, X, Globe, Heart, ChevronDown, PenLine, Handshake, Bookmark, Users } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Logo } from '@/components/Logo'
 import { cn } from '@/lib/utils'
@@ -56,6 +56,11 @@ export function MinimalNav({ lang, setLang, variant = 'hero' }: MinimalNavProps)
       icon: PenLine,
     },
     {
+      label: lang === 'bg' ? 'Автори' : 'Authors',
+      href: '/authors',
+      icon: Users,
+    },
+    {
       label: lang === 'bg' ? 'Подкрепете ни' : 'Support Us',
       href: '/support',
       icon: Heart,
@@ -103,7 +108,7 @@ export function MinimalNav({ lang, setLang, variant = 'hero' }: MinimalNavProps)
             />
           </Link>
 
-          <nav className="hidden md:flex items-center gap-10">
+          <nav className="hidden lg:flex items-center gap-7 xl:gap-10">
             {navLinks.map((link) => (
               <Link
                 key={link.to}

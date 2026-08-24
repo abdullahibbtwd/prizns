@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getSectionProfile } from './section-profiles'
+import { editorSectionChoices } from '@/lib/cms-types'
 
 describe('getSectionProfile', () => {
   it('uses a teaser field for places and traditions', () => {
@@ -19,5 +20,12 @@ describe('getSectionProfile', () => {
     expect(profile.showAuthor).toBe(true)
     expect(profile.showTeaser).toBe(false)
     expect(profile.defaultCategoryBg).toBeTruthy()
+  })
+
+  it('hides sports and news from the editor dropdown unless already selected', () => {
+    expect(editorSectionChoices()).not.toContain('sports')
+    expect(editorSectionChoices()).not.toContain('news')
+    expect(editorSectionChoices('sports')).toContain('sports')
+    expect(editorSectionChoices('human-stories')).not.toContain('news')
   })
 })

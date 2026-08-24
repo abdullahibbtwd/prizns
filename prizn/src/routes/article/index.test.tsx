@@ -186,6 +186,13 @@ describe('ArticlePage', () => {
       'https://cdn.example/two.jpg',
     )
     expect(screen.getByText('Archive photo')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('img', { name: 'Archive photo' }).closest('button')!)
+    expect(screen.getByRole('dialog', { name: 'Archive photo' })).toBeInTheDocument()
+    expect(
+      screen.getAllByRole('img', { name: 'Archive photo' }).some(
+        (img) => img.getAttribute('src') === 'https://cdn.example/two.jpg',
+      ),
+    ).toBe(true)
   })
 
   it('renders quotes in body type without a drop-cap heading', async () => {

@@ -23,7 +23,7 @@ import { JournalSelect } from '@/components/ui/JournalSelect'
 import { useCmsConfirm } from '@/cms/components/CmsConfirmDialog'
 import { deleteCmsArticle, listCmsArticles, listCmsAuthors } from '@/lib/articles-api'
 import type { ArticleSection, ArticleStatus, CmsArticle } from '@/lib/cms-types'
-import { ARTICLE_SECTIONS } from '@/lib/cms-types'
+import { EDITOR_SECTIONS } from '@/lib/cms-types'
 import { cn } from '@/lib/utils'
 import { useJournalLang } from '@/hooks/useJournalLang'
 import { pickLang } from '@/lib/pick-lang'
@@ -153,7 +153,7 @@ export default function CmsStoriesPage() {
   const sectionOptions = useMemo(
     () => [
       { value: ALL_SECTIONS, label: t('cms.stories.filterSectionAll') },
-      ...ARTICLE_SECTIONS.map((item) => ({
+      ...EDITOR_SECTIONS.map((item) => ({
         value: item,
         label: getSectionLabel(item, lang),
       })),

@@ -26,7 +26,7 @@ import { JournalSelect } from '@/components/ui/JournalSelect'
 import { listCmsArticles, listCmsAuthors } from '@/lib/articles-api'
 import { ApiError } from '@/lib/api'
 import type { ArticleStatus, CmsArticle } from '@/lib/cms-types'
-import { ARTICLE_SECTIONS } from '@/lib/cms-types'
+import { EDITOR_SECTIONS } from '@/lib/cms-types'
 import { useJournalLang } from '@/hooks/useJournalLang'
 import { pickLang } from '@/lib/pick-lang'
 import { getSectionLabel } from '@/lib/section-i18n'
@@ -167,7 +167,7 @@ export default function CmsSocialPage() {
   const sectionOptions = useMemo(
     () => [
       { value: ALL_SECTIONS, label: t('cms.social.filterSectionAll') },
-      ...ARTICLE_SECTIONS.map((item) => ({
+      ...EDITOR_SECTIONS.map((item) => ({
         value: item,
         label: getSectionLabel(item, lang),
       })),

@@ -459,7 +459,7 @@ const cmsBg = {
     seoDescription: 'SEO описание',
     tags: 'Етикети',
     tagsHint:
-      'Категорията идва от секцията на историята. Добавете места и теми тук.',
+      'Категорията идва от секцията. Спорт и новини са етикети (теми), не отделни секции.',
     readTime: 'Време за четене',
     readTimeHint:
       'Изчислява се автоматично от текста. Можете да го промените.',
@@ -1644,7 +1644,8 @@ const cmsEn = {
     seoTitle: 'SEO title',
     seoDescription: 'SEO description',
     tags: 'Tags',
-    tagsHint: 'Category comes from the story section. Add places and topics here.',
+    tagsHint:
+      'Category comes from the story section. Use topic tags for Sports and News — they are no longer separate sections.',
     readTime: 'Read time',
     readTimeHint: 'Calculated automatically from the text. You can override it.',
     readTimeApply: 'Use estimate ({{n}} min)',
@@ -2392,6 +2393,8 @@ const bgTranslation = {
   prevPhoto: 'Предишна снимка',
   nextPhoto: 'Следваща снимка',
   photoOf: '{{current}} / {{total}}',
+  viewFullPhoto: 'Вижте в пълен размер',
+  closePhoto: 'Затворете снимката',
   read: 'Прочетете',
   print: 'Печат',
   share: 'Сподели',
@@ -2548,6 +2551,8 @@ const enTranslation = {
   prevPhoto: 'Previous photo',
   nextPhoto: 'Next photo',
   photoOf: '{{current}} / {{total}}',
+  viewFullPhoto: 'View full photo',
+  closePhoto: 'Close photo',
   read: 'Read',
   print: 'Print',
   share: 'Share',

@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import {
   ArrowLeft,
   Clock,
+  Expand,
   MapPin,
   Share2,
   Bookmark,
@@ -31,6 +32,7 @@ import {
   ArticleHeroGallery,
   articleHeroSlides,
 } from '@/components/concept-3/ArticleHeroGallery'
+import { ImageLightbox } from '@/components/concept-3/ImageLightbox'
 import {
   getPublicArticle,
   listRelatedArticles,
@@ -133,35 +135,89 @@ function ArticleBlocks({
   article: JournalArticle
   lang: JournalLang
 }) {
+  const { t } = useTranslation()
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
+  const fallbackAlt = pick(lang, article.title, article.titleBg)
+  const slides = article.body.flatMap((block) => {
+    if (block.type !== 'image' || !block.url) return []
+    const caption = pick(lang, block.text, block.textBg).trim()
+    return [{ url: block.url, alt: caption || fallbackAlt, caption }]
+  })
+  const imageSlot = new Map<number, number>()
+  let imageOrdinal = 0
+  article.body.forEach((block, index) => {
+    if (block.type === 'image' && block.url) {
+      imageSlot.set(index, imageOrdinal)
+      imageOrdinal += 1
+    }
+  })
+
   return (
-    <div className="article-body space-y-8 font-sans text-base md:text-lg text-[#1A1A1A]/80 font-light leading-relaxed">
-      {article.body.map((block, index) => (
-        <ArticleBlockView
-          key={`${block.type}-${index}`}
-          block={block}
-          lang={lang}
-        />
-      ))}
-    </div>
+    <>
+      <div className="article-body space-y-8 font-sans text-base md:text-lg text-[#1A1A1A]/80 font-light leading-relaxed">
+        {article.body.map((block, index) => (
+          <ArticleBlockView
+            key={`${block.type}-${index}`}
+            block={block}
+            lang={lang}
+            openLabel={t('viewFullPhoto')}
+            onOpenImage={
+              imageSlot.has(index)
+                ? () => setLightboxIndex(imageSlot.get(index) ?? 0)
+                : undefined
+            }
+          />
+        ))}
+      </div>
+      <ImageLightbox
+        open={lightboxIndex !== null}
+        slides={slides}
+        index={lightboxIndex ?? 0}
+        onIndexChange={(next) => setLightboxIndex(next)}
+        onClose={() => setLightboxIndex(null)}
+      />
+    </>
   )
 }
 
 function ArticleBlockView({
   block,
   lang,
+  openLabel,
+  onOpenImage,
 }: {
   block: ArticleBlock
   lang: JournalLang
+  openLabel?: string
+  onOpenImage?: () => void
 }) {
   if (block.type === 'image') {
     const caption = pick(lang, block.text, block.textBg).trim()
     return (
       <figure className="my-10">
-        <img
-          src={block.url}
-          alt={caption}
-          className="w-full rounded-[16px] object-cover"
-        />
+        {onOpenImage ? (
+          <button
+            type="button"
+            onClick={onOpenImage}
+            aria-label={openLabel}
+            className="group relative block w-full cursor-zoom-in print:cursor-default"
+          >
+            <img
+              src={block.url}
+              alt={caption}
+              className="w-full rounded-[16px] object-cover"
+            />
+            <span className="pointer-events-none absolute right-3 top-3 flex size-9 items-center justify-center rounded-full bg-black/45 text-white opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 print:hidden">
+              <Expand className="size-4 stroke-[1.5]" />
+            </span>
+          </button>
+        ) : (
+          <img
+            src={block.url}
+            alt={caption}
+            className="w-full rounded-[16px] object-cover"
+          />
+        )}
         {caption ? (
           <figcaption className="mt-3 text-center font-sans text-xs uppercase tracking-[0.16em] text-[#1A1A1A]/45">
             {caption}
@@ -431,7 +487,7 @@ function ArticleContent({
           </Link>
 
           <nav
-            className="hidden flex-1 items-center justify-center gap-8 lg:gap-10 md:flex"
+            className="hidden flex-1 items-center justify-center gap-7 lg:flex xl:gap-10"
             aria-label="Primary"
           >
             {getPrimaryNavLinks(lang).map((link) => (
