@@ -2,18 +2,22 @@
  * Import WordPress REST users + posts into the current journal (Prisma + MinIO).
  *
  * Local — fetch WP, write a migration package (no database):
- *   npm run import:wordpress:export --prefix api -- --limit=20
+ *   npm run import:wordpress:export --prefix api
  *
- * Coolify — import that package (no WordPress network):
- *   node dist/wordpress-import/import-wordpress.js --package=/migration --users
+ * Coolify / VPS Docker — copy wordpress-export onto the API container, then:
+ *   docker compose exec api node dist/wordpress-import/import-wordpress.js --package=/app/wordpress-export --users
+ * Skip CMS category records:
+ *   ... --package=/app/wordpress-export --users --skip-categories
  *
  * Live WP (only when the API can reach the site):
- *   node dist/wordpress-import/import-wordpress.js --users --limit=20
+ *   node dist/wordpress-import/import-wordpress.js --users
+ *
+ * Optional cap: pass --limit=20 to fetch a subset.
  */
 import { createHash } from 'crypto';
 import { setDefaultResultOrder } from 'dns';
 import { config } from 'dotenv';
-import { access, mkdir, readFile, writeFile } from 'fs/promises';
+import { access, mkdir, readFile, unlink, writeFile } from 'fs/promises';
 import { dirname, join, relative, resolve, sep } from 'path';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient, type ArticleSection } from '@prisma/client';
@@ -46,6 +50,17 @@ config({ path: resolve(process.cwd(), '.env') });
 setDefaultResultOrder('ipv4first');
 
 const UA = 'PriznsWordpressImport/1.0';
+const FETCH_ATTEMPTS = 8;
+const PAGE_GAP_MS = 800;
+const POSTS_PER_PAGE = 25;
+
+type PostsCheckpoint = {
+  origin: string;
+  perPage: number;
+  page: number;
+  totalPages: number;
+  posts: WpPost[];
+};
 
 type Flags = {
   from?: string;
@@ -62,6 +77,7 @@ type Flags = {
   export?: string;
   package?: string;
   images?: string;
+  'skip-categories'?: boolean;
 };
 
 type MediaDirs = {
@@ -87,6 +103,49 @@ function wpOrigin(from: string): string {
   return from.replace(/\/$/, '').replace(/\/wp-json.*$/i, '');
 }
 
+function sleep(ms: number) {
+  return new Promise((resolveSleep) => setTimeout(resolveSleep, ms));
+}
+
+function errorCode(error: unknown): string {
+  let current: unknown = error;
+  for (let i = 0; i < 4 && current; i += 1) {
+    if (current && typeof current === 'object' && 'code' in current) {
+      const code = (current as { code?: string }).code;
+      if (code) return String(code);
+    }
+    current =
+      current instanceof Error && 'cause' in current
+        ? current.cause
+        : undefined;
+  }
+  return '';
+}
+
+function isRetryable(error: unknown, status?: number): boolean {
+  if (status && [408, 429, 500, 502, 503, 504].includes(status)) return true;
+  const code = errorCode(error);
+  if (
+    [
+      'ECONNRESET',
+      'ETIMEDOUT',
+      'ECONNREFUSED',
+      'EPIPE',
+      'EAI_AGAIN',
+      'UND_ERR_SOCKET',
+      'UND_ERR_CONNECT_TIMEOUT',
+      'UND_ERR_HEADERS_TIMEOUT',
+      'UND_ERR_BODY_TIMEOUT',
+    ].includes(code)
+  ) {
+    return true;
+  }
+  const message = error instanceof Error ? error.message : String(error);
+  return /econnreset|etimedout|fetch failed|socket|network|aborted/i.test(
+    message,
+  );
+}
+
 async function fetchJson(
   url: string,
 ): Promise<{ body: unknown; headers: Headers }> {
@@ -107,21 +166,54 @@ async function fetchJson(
     headers.Authorization = `Basic ${token}`;
   }
 
-  let response: Response;
-  try {
-    response = await fetch(url, { headers });
-  } catch (error) {
-    throw new Error(formatNetworkError(url, error));
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= FETCH_ATTEMPTS; attempt += 1) {
+    try {
+      const response = await fetch(url, {
+        headers,
+        signal: AbortSignal.timeout(90_000),
+      });
+      if (!response.ok) {
+        const err = new Error(
+          `${response.status} ${response.statusText} for ${url}`,
+        );
+        if (attempt < FETCH_ATTEMPTS && isRetryable(err, response.status)) {
+          const retryAfter = Number(response.headers.get('Retry-After'));
+          const waitMs =
+            Number.isFinite(retryAfter) && retryAfter > 0
+              ? retryAfter * 1000
+              : Math.min(30_000, 1000 * 2 ** (attempt - 1));
+          console.warn(
+            `WordPress ${response.status} on attempt ${attempt}/${FETCH_ATTEMPTS}; retrying in ${Math.round(waitMs / 1000)}s`,
+          );
+          await sleep(waitMs);
+          continue;
+        }
+        throw err;
+      }
+      return {
+        body: await response.json(),
+        headers: response.headers,
+      };
+    } catch (error) {
+      lastError = error;
+      const httpStatus =
+        error instanceof Error ? Number(/^(\d{3})\s/.exec(error.message)?.[1]) : 0;
+      if (httpStatus && !isRetryable(error, httpStatus)) {
+        throw error;
+      }
+      if (attempt >= FETCH_ATTEMPTS || !isRetryable(error, httpStatus || undefined)) {
+        throw new Error(formatNetworkError(url, error));
+      }
+      const waitMs = Math.min(30_000, 1000 * 2 ** (attempt - 1));
+      console.warn(
+        `WordPress connection dropped (${errorCode(error) || 'network'}) on attempt ${attempt}/${FETCH_ATTEMPTS}; retrying in ${Math.round(waitMs / 1000)}s`,
+      );
+      await sleep(waitMs);
+    }
   }
 
-  if (!response.ok) {
-    throw new Error(`${response.status} ${response.statusText} for ${url}`);
-  }
-
-  return {
-    body: await response.json(),
-    headers: response.headers,
-  };
+  throw new Error(formatNetworkError(url, lastError));
 }
 
 async function loadUsers(origin: string): Promise<WpUser[]> {
@@ -143,7 +235,36 @@ async function loadUsers(origin: string): Promise<WpUser[]> {
   return users;
 }
 
-async function loadPosts(flags: Flags): Promise<WpPost[]> {
+async function readPostsCheckpoint(
+  path: string,
+  origin: string,
+  perPage: number,
+): Promise<PostsCheckpoint | null> {
+  try {
+    const raw = JSON.parse(await readFile(path, 'utf8')) as PostsCheckpoint;
+    if (
+      raw.origin !== origin ||
+      raw.perPage !== perPage ||
+      !Array.isArray(raw.posts) ||
+      !raw.page
+    ) {
+      return null;
+    }
+    return raw;
+  } catch {
+    return null;
+  }
+}
+
+async function writePostsCheckpoint(path: string, data: PostsCheckpoint) {
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, JSON.stringify(data));
+}
+
+async function loadPosts(
+  flags: Flags,
+  options?: { checkpointPath?: string },
+): Promise<WpPost[]> {
   if (flags.file) {
     const raw = JSON.parse(await readFile(resolve(flags.file), 'utf8')) as unknown;
     let posts = parseWpPostsJson(raw);
@@ -162,11 +283,22 @@ async function loadPosts(flags: Flags): Promise<WpPost[]> {
     return parseWpPostsJson(body);
   }
 
-  const posts: WpPost[] = [];
-  const perPage = 50;
+  const perPage = POSTS_PER_PAGE;
   const limit = flags.limit ? Number(flags.limit) : Number.POSITIVE_INFINITY;
-  let page = 1;
-  let totalPages = 1;
+  const checkpointPath = options?.checkpointPath;
+  const saved = checkpointPath
+    ? await readPostsCheckpoint(checkpointPath, origin, perPage)
+    : null;
+
+  const posts: WpPost[] = saved?.posts ? [...saved.posts] : [];
+  let page = saved ? saved.page + 1 : 1;
+  let totalPages = saved?.totalPages || 1;
+
+  if (saved) {
+    console.log(
+      `Resuming WordPress export from page ${page} (${posts.length} posts already fetched).`,
+    );
+  }
 
   while (page <= totalPages && posts.length < limit) {
     const url = new URL(`${origin}/wp-json/wp/v2/posts`);
@@ -179,8 +311,25 @@ async function loadPosts(flags: Flags): Promise<WpPost[]> {
     const batch = parseWpPostsJson(body);
     posts.push(...batch);
     totalPages = Number(headers.get('X-WP-TotalPages') || page);
+    const total = headers.get('X-WP-Total');
+    console.log(
+      `Fetched posts page ${page}/${totalPages}` +
+        (total ? ` (${posts.length}/${total})` : ` (${posts.length})`),
+    );
+    if (checkpointPath) {
+      await writePostsCheckpoint(checkpointPath, {
+        origin,
+        perPage,
+        page,
+        totalPages,
+        posts,
+      });
+    }
     if (batch.length === 0 || flags.slug) break;
     page += 1;
+    if (page <= totalPages && posts.length < limit) {
+      await sleep(PAGE_GAP_MS);
+    }
   }
 
   return posts.slice(0, Number.isFinite(limit) ? limit : posts.length);
@@ -565,6 +714,7 @@ async function saveArticle(
     draft: boolean;
     skipMedia: boolean;
     skipTranslate: boolean;
+    skipCategories?: boolean;
     authorsByWpId: Map<number, string>;
     mediaDirs?: MediaDirs;
   },
@@ -650,7 +800,9 @@ async function saveArticle(
     });
   }
 
-  await syncCategories(prisma, row.id, mapped.categorySlugs);
+  if (!opts.skipCategories) {
+    await syncCategories(prisma, row.id, mapped.categorySlugs);
+  }
   await syncTags(prisma, row.id, mapped.tagNames);
 
   return { id: row.id, action: existing ? ('updated' as const) : ('created' as const) };
@@ -809,7 +961,7 @@ async function loadExportPackage(flags: Flags): Promise<{
   }
   let categories: PackagedCategory[] = [];
   const categoriesPath = join(packageDir, 'categories.json');
-  if (await pathExists(categoriesPath)) {
+  if (!flags['skip-categories'] && (await pathExists(categoriesPath))) {
     categories = parseCategoriesJson(
       JSON.parse(await readFile(categoriesPath, 'utf8')) as unknown,
     );
@@ -862,7 +1014,7 @@ async function importMappedPackage(
   };
 
   console.log(
-    `Package ${loaded.packageDir}: ${loaded.authors.length} author(s), ${loaded.articles.length} article(s), images ${loaded.imagesDir}`,
+    `Package ${loaded.packageDir}: ${loaded.authors.length} author(s), ${loaded.articles.length} article(s), images ${loaded.imagesDir}${flags['skip-categories'] ? ', skip-categories' : ''}`,
   );
 
   if (flags['dry-run']) {
@@ -927,6 +1079,7 @@ async function importMappedPackage(
         draft: Boolean(flags.draft),
         skipMedia: Boolean(flags['skip-media']),
         skipTranslate,
+        skipCategories: Boolean(flags['skip-categories']),
         authorsByWpId,
         mediaDirs,
       });
@@ -940,10 +1093,10 @@ async function importMappedPackage(
 }
 
 async function exportFromWordpress(flags: Flags, origin: string) {
-  const postLimit = flags.limit ?? '20';
   const exportDir = resolve(
     typeof flags.export === 'string' ? flags.export : '../wordpress-export',
   );
+  const checkpointPath = join(exportDir, '.posts-checkpoint.json');
   console.log(`Exporting from ${origin} → ${exportDir}`);
 
   let wpUsers: WpUser[] = [];
@@ -956,7 +1109,10 @@ async function exportFromWordpress(flags: Flags, origin: string) {
     );
   }
 
-  const posts = await loadPosts({ ...flags, file: undefined, limit: postLimit });
+  const posts = await loadPosts(
+    { ...flags, file: undefined },
+    { checkpointPath },
+  );
   console.log(`Loaded ${posts.length} WordPress post(s).`);
   const articles = posts.map(mapWpPost);
   const authors: PackagedAuthor[] =
@@ -970,6 +1126,11 @@ async function exportFromWordpress(flags: Flags, origin: string) {
 
   const pkg = buildWordpressPackage({ origin, articles, authors });
   await writeExportPackage(exportDir, pkg);
+  try {
+    await unlink(checkpointPath);
+  } catch {
+    // no checkpoint to clear
+  }
   console.log(
     `Wrote ${articles.length} article(s), ${authors.length} author(s), ${pkg.categories.length} categor${pkg.categories.length === 1 ? 'y' : 'ies'} to ${exportDir}`,
   );
@@ -1007,14 +1168,9 @@ async function main() {
     `WordPress origin: ${origin}${process.env.WORDPRESS_URL ? '' : ' (default; set WORDPRESS_URL in Coolify)'}`,
   );
   const importUsers = Boolean(flags.users);
-  const postLimit = flags.limit
-    ? flags.limit
-    : importUsers
-      ? '20'
-      : undefined;
 
   const wpUsers = importUsers ? await loadUsers(origin) : [];
-  const posts = await loadPosts({ ...flags, limit: postLimit });
+  const posts = await loadPosts(flags);
 
   if (wpUsers.length === 0 && posts.length === 0) {
     console.log('No WordPress users or posts found.');
@@ -1095,6 +1251,7 @@ async function main() {
         draft: Boolean(flags.draft),
         skipMedia: Boolean(flags['skip-media']),
         skipTranslate,
+        skipCategories: Boolean(flags['skip-categories']),
         authorsByWpId,
       });
       console.log(

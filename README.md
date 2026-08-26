@@ -55,6 +55,7 @@ prizns/
 ├── .env.example              # Shared env template (copy to .env)
 ├── docker-compose.yml        # postgres, redis, minio, api, web
 ├── docker-compose.test.yml   # isolated test infra (ports 5434 / 6381 / 9014)
+├── deploy/                   # stage2 host nginx + fail2ban (not the in-container nginx)
 ├── package.json              # root scripts: infra, api, web, prisma, tests
 ├── .github/workflows/test.yml
 ├── api/                      # NestJS API
@@ -537,6 +538,8 @@ npm run docker:down
 - `/sitemap.xml`, `/feed.xml`, `/feed.json`, `/robots.txt` → API
 - Known crawler user-agents get a server-rendered **bot shell** instead of the SPA
 - SPA fallback: `try_files` → `index.html`
+
+**Stage2 host nginx** (`deploy/nginx/stage2.conf`): public `:80` on the VM, `access.log` for Fail2ban, proxy to `127.0.0.1:${WEB_PORT}`. Set `PUBLISH_BIND=127.0.0.1` in `.env`. Jail: `deploy/fail2ban/`.
 
 Coolify / compose notes:
 

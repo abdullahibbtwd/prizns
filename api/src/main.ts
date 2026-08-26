@@ -11,6 +11,8 @@ async function bootstrap() {
 
   const prefix = config.get<string>('API_PREFIX', 'api');
   app.setGlobalPrefix(prefix);
+  // Host nginx → web container nginx → API. Trust one hop so req.ip is the client.
+  app.getHttpAdapter().getInstance().set('trust proxy', 1);
   app.use(helmet());
   app.use(cookieParser());
 
