@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ViewAllLink } from '@/components/concept-3/ViewAllLink'
+import { SectionLoading } from '@/components/concept-3/SectionLoading'
 import { SponsoredBadge } from '@/components/concept-3/SponsoredBadge'
 import {
   articlePath,
@@ -14,7 +15,7 @@ interface TraditionsSectionProps {
 }
 
 export function TraditionsSection({ lang }: TraditionsSectionProps) {
-  const { data } = usePublicArticles('traditions')
+  const { data, isLoading } = usePublicArticles('traditions')
   const traditions = preferApi(
     data?.map((article) => ({
       ...toTraditionCard(article),
@@ -37,6 +38,13 @@ export function TraditionsSection({ lang }: TraditionsSectionProps) {
           <ViewAllLink to="/traditions" lang={lang} />
         </div>
 
+        {isLoading ? (
+          <SectionLoading
+            lang={lang}
+            count={3}
+            cardClassName="aspect-[16/11]"
+          />
+        ) : (
         <div className="grid grid-cols-1 gap-6 md:grid-cols-3 md:gap-8">
           {traditions.map((item, index) => {
             return (
@@ -77,6 +85,7 @@ export function TraditionsSection({ lang }: TraditionsSectionProps) {
             )
           })}
         </div>
+        )}
       </div>
     </section>
   )

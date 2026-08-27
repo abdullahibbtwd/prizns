@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { Search, X, Globe, Heart, ChevronDown, PenLine, Handshake, Bookmark, Users } from 'lucide-react'
+import { Search, Globe, Heart, ChevronDown, PenLine, Handshake, Bookmark, Users } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Logo } from '@/components/Logo'
 import { cn } from '@/lib/utils'
 import { getPrimaryNavLinks } from '@/data/concept-3/nav'
 import { useReaderAuth } from '@/lib/reader-auth'
 import { MobileNavMenu } from '@/components/concept-3/MobileNavMenu'
+import { JournalSearchOverlay } from '@/components/concept-3/JournalSearchOverlay'
 
 interface MinimalNavProps {
   lang: 'bg' | 'en'
@@ -17,7 +18,6 @@ interface MinimalNavProps {
 export function MinimalNav({ lang, setLang, variant = 'hero' }: MinimalNavProps) {
   const [scrolled, setScrolled] = useState(variant === 'solid')
   const [searchOpen, setSearchOpen] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
   const [contributeOpen, setContributeOpen] = useState(false)
   const contributeRef = useRef<HTMLDivElement>(null)
   const isSolid = variant === 'solid' || scrolled
@@ -70,14 +70,6 @@ export function MinimalNav({ lang, setLang, variant = 'hero' }: MinimalNavProps)
       href: '/partnerships',
       icon: Handshake,
     },
-  ]
-
-  const searchSuggestions = [
-    'Белоградчик',
-    'Чипровски килими',
-    'Дунавски рибари',
-    'Магията на кваса',
-    'Вършец минерални извори',
   ]
 
   const navItemClass = isSolid
@@ -263,59 +255,9 @@ export function MinimalNav({ lang, setLang, variant = 'hero' }: MinimalNavProps)
       </header>
 
       <AnimatePresence>
-        {searchOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-[#FDFBF7]/98 backdrop-blur-xl flex flex-col justify-between p-6 md:p-16"
-          >
-            <div className="flex items-center justify-between max-w-5xl mx-auto w-full">
-              <Logo className="h-7" sloganClassName="text-[10px]" />
-              <button
-                onClick={() => setSearchOpen(false)}
-                className="p-2 text-journal-ink hover:text-journal-navy transition-colors rounded-full border border-black/10 hover:border-black"
-              >
-                <X className="size-6 stroke-[1.5]" />
-              </button>
-            </div>
-
-            <div className="max-w-3xl mx-auto w-full py-12">
-              <p className="text-xs uppercase tracking-[0.25em] text-[#1A1A1A]/50 mb-4 font-sans text-center">
-                {lang === 'bg' ? 'Търсете из дигиталния журнал' : 'Search the digital journal'}
-              </p>
-              <div className="relative border-b-2 border-[#1A1A1A] pb-4">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder={lang === 'bg' ? 'Търсене на села, занаяти, разкази...' : 'Search villages, crafts, stories...'}
-                  className="w-full bg-transparent font-heading text-3xl md:text-5xl text-journal-ink outline-none placeholder:text-[#1A1A1A]/20"
-                  autoFocus
-                />
-              </div>
-
-              <div className="mt-8 flex flex-wrap items-center gap-2 justify-center">
-                <span className="text-xs text-[#1A1A1A]/50 uppercase tracking-widest mr-2">
-                  {lang === 'bg' ? 'Популярни:' : 'Popular:'}
-                </span>
-                {searchSuggestions.map((item) => (
-                  <button
-                    key={item}
-                    onClick={() => setSearchQuery(item)}
-                    className="text-xs font-sans text-[#1A1A1A]/70 hover:text-[#0C2686] hover:underline px-3 py-1 bg-black/5 rounded-full"
-                  >
-                    {item}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="text-center text-xs text-[#1A1A1A]/40 uppercase tracking-widest font-sans">
-              Press Esc or click top right to close
-            </div>
-          </motion.div>
-        )}
+        {searchOpen ? (
+          <JournalSearchOverlay lang={lang} onClose={() => setSearchOpen(false)} />
+        ) : null}
       </AnimatePresence>
     </>
   )

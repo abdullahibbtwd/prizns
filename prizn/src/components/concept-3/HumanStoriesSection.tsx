@@ -10,13 +10,15 @@ import {
   usePublicArticles,
 } from '@/lib/public-content'
 import { toHumanStoryCard } from '@/lib/section-cards'
+import { LandingCategoryChips } from '@/components/concept-3/LandingCategoryChips'
+import { SectionLoading } from '@/components/concept-3/SectionLoading'
 
 interface HumanStoriesSectionProps {
   lang: 'bg' | 'en'
 }
 
 export function HumanStoriesSection({ lang }: HumanStoriesSectionProps) {
-  const { data } = usePublicArticles('stories')
+  const { data, isLoading } = usePublicArticles('stories')
   const stories = preferApi(
     data?.map((article) => ({
       ...toHumanStoryCard(article),
@@ -45,7 +47,11 @@ export function HumanStoriesSection({ lang }: HumanStoriesSectionProps) {
             <ViewAllLink to="/stories" lang={lang} />
           </div>
         </div>
+        <LandingCategoryChips lang={lang} landing="stories" className="mb-10" />
 
+        {isLoading ? (
+          <SectionLoading lang={lang} count={3} />
+        ) : (
         <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
           {stories.map((story, index) => {
             return (
@@ -105,6 +111,7 @@ export function HumanStoriesSection({ lang }: HumanStoriesSectionProps) {
             )
           })}
         </div>
+        )}
       </div>
     </section>
   )

@@ -30,6 +30,7 @@ import { StorageService } from '../storage/storage.service';
 import { BadgesService } from '../badges/badges.service';
 import { DigestService } from '../digest/digest.service';
 import { AiService } from '../ai/ai.service';
+import { sectionFromCategorySlugs } from '../categories/category-section';
 
 type GalleryMedia = {
   id: string;
@@ -52,6 +53,16 @@ type ArticleTagRel = {
   tag: Tag;
 };
 
+type ArticleCategoryRel = {
+  category: {
+    id: string;
+    slug: string;
+    nameBg: string;
+    nameEn: string | null;
+    parentId: string | null;
+  };
+};
+
 type ArticleWithRelations = Article & {
   author: Author | null;
   heroMedia: MediaAsset | null;
@@ -63,6 +74,7 @@ type ArticleWithRelations = Article & {
   }>;
   seriesEpisodes?: SeriesEpisodeRel[];
   articleTags?: ArticleTagRel[];
+  articleCategories?: ArticleCategoryRel[];
 };
 
 @Injectable()
@@ -182,6 +194,19 @@ export class ArticlesService {
     },
     articleTags: {
       include: { tag: true },
+    },
+    articleCategories: {
+      include: {
+        category: {
+          select: {
+            id: true,
+            slug: true,
+            nameBg: true,
+            nameEn: true,
+            parentId: true,
+          },
+        },
+      },
     },
   } as const;
 
@@ -423,6 +448,59 @@ export class ArticlesService {
     });
   }
 
+  private async syncArticleCategories(articleId: string, categoryIds: string[]) {
+    const unique = [...new Set(categoryIds.filter(Boolean))];
+    if (unique.length > 0) {
+      const found = await this.prisma.category.findMany({
+        where: { id: { in: unique } },
+        select: { id: true },
+      });
+      if (found.length !== unique.length) {
+        throw new BadRequestException('One or more categories were not found');
+      }
+    }
+    await this.prisma.articleCategory.deleteMany({ where: { articleId } });
+    if (unique.length === 0) return;
+    await this.prisma.articleCategory.createMany({
+      data: unique.map((categoryId) => ({ articleId, categoryId })),
+    });
+  }
+
+  private async resolveSectionFromCategoryIds(
+    categoryIds: string[] | undefined,
+    fallback: Article['section'],
+  ): Promise<Article['section']> {
+    const unique = [...new Set((categoryIds ?? []).filter(Boolean))];
+    if (unique.length === 0) return fallback;
+    const rows = await this.prisma.category.findMany({
+      where: { id: { in: unique } },
+      select: { slug: true, parent: { select: { slug: true } } },
+    });
+    return sectionFromCategorySlugs(
+      rows.flatMap((row) => [row.slug, row.parent?.slug]),
+      fallback,
+    );
+  }
+
+  private async categoryIdsFilter(
+    slug: string,
+  ): Promise<Prisma.ArticleWhereInput> {
+    const row = await this.prisma.category.findUnique({
+      where: { slug },
+      select: { id: true, children: { select: { id: true } } },
+    });
+    if (!row) return { id: { in: [] } };
+    return {
+      articleCategories: {
+        some: {
+          categoryId: {
+            in: [row.id, ...row.children.map((child) => child.id)],
+          },
+        },
+      },
+    };
+  }
+
   private tagsFromArticle(article: ArticleWithRelations) {
     return (article.articleTags ?? []).map((row) => ({
       id: row.tag.id,
@@ -431,6 +509,17 @@ export class ArticlesService {
       nameBg: row.tag.nameBg,
       nameEn: row.tag.nameEn,
       name: row.tag.nameEn ?? row.tag.nameBg,
+    }));
+  }
+
+  private categoriesFromArticle(article: ArticleWithRelations) {
+    return (article.articleCategories ?? []).map((row) => ({
+      id: row.category.id,
+      slug: row.category.slug,
+      nameBg: row.category.nameBg,
+      nameEn: row.category.nameEn,
+      name: row.category.nameEn ?? row.category.nameBg,
+      parentId: row.category.parentId,
     }));
   }
 
@@ -504,6 +593,8 @@ export class ArticlesService {
       seoDescriptionBg: article.seoDescriptionBg,
       gallery: gallery,
       tags: this.tagsFromArticle(article),
+      categories: this.categoriesFromArticle(article),
+      categoryIds: this.categoriesFromArticle(article).map((item) => item.id),
       series: (() => {
         const membership = article.seriesEpisodes?.[0];
         if (!membership) return null;
@@ -533,6 +624,8 @@ export class ArticlesService {
       gallery,
       tagIds: tags.map((tag) => tag.id),
       tags,
+      categories: this.categoriesFromArticle(article),
+      categoryIds: this.categoriesFromArticle(article).map((item) => item.id),
       bodyRaw: this.parseBody(article.body),
       publishedAt: article.publishedAt,
       translationError: article.translationError,
@@ -560,7 +653,10 @@ export class ArticlesService {
       location?: string;
       topic?: string;
       category?: string;
+      categorySlug?: string;
       hasAudio?: boolean;
+      q?: string;
+      limit?: number;
     },
   ) {
     const where: Prisma.ArticleWhereInput = {
@@ -577,6 +673,9 @@ export class ArticlesService {
       where.seriesEpisodes = {
         some: { series: { slug: seriesSlug.trim() } },
       };
+    }
+    if (filters?.categorySlug?.trim()) {
+      Object.assign(where, await this.categoryIdsFilter(filters.categorySlug.trim()));
     }
 
     const tagFilters: Array<{ slug: string; kind: TagKind }> = [];
@@ -607,11 +706,30 @@ export class ArticlesService {
         },
       }));
     }
+    const q = filters?.q?.trim();
+    if (q) {
+      where.OR = [
+        { titleBg: { contains: q, mode: 'insensitive' } },
+        { titleEn: { contains: q, mode: 'insensitive' } },
+        { slug: { contains: q, mode: 'insensitive' } },
+        { categoryBg: { contains: q, mode: 'insensitive' } },
+        { subtitleBg: { contains: q, mode: 'insensitive' } },
+        { subtitleEn: { contains: q, mode: 'insensitive' } },
+        { locationBg: { contains: q, mode: 'insensitive' } },
+        { locationEn: { contains: q, mode: 'insensitive' } },
+      ];
+    }
+
+    const take =
+      q || filters?.limit
+        ? Math.min(50, Math.max(1, Number(filters?.limit) || 24))
+        : undefined;
 
     const rows = await this.prisma.article.findMany({
       where,
       include: this.include,
       orderBy: [{ publishedAt: 'desc' }, { updatedAt: 'desc' }],
+      ...(take ? { take } : {}),
     });
     return rows.map((row) => this.toPublicDto(row));
   }
@@ -862,6 +980,7 @@ export class ArticlesService {
     authorId?: string;
     q?: string;
     sponsored?: boolean;
+    categorySlug?: string;
     page?: number;
     pageSize?: number;
   }) {
@@ -872,6 +991,9 @@ export class ArticlesService {
     if (filters.status) where.status = filters.status;
     if (filters.authorId) where.authorId = filters.authorId;
     if (filters.sponsored === true) where.sponsored = true;
+    if (filters.categorySlug?.trim()) {
+      Object.assign(where, await this.categoryIdsFilter(filters.categorySlug.trim()));
+    }
     if (filters.q) {
       where.OR = [
         { titleBg: { contains: filters.q, mode: 'insensitive' } },
@@ -916,7 +1038,11 @@ export class ArticlesService {
   }
 
   async create(dto: CreateArticleDto) {
-    const section = toPrismaSection(dto.section);
+    const fallbackSection = toPrismaSection(dto.section);
+    const section = await this.resolveSectionFromCategoryIds(
+      dto.categoryIds,
+      fallbackSection,
+    );
     const slug = await ensureUniqueSlug(dto.titleBg, async (candidate) => {
       const found = await this.prisma.article.findUnique({
         where: { section_slug: { section, slug: candidate } },
@@ -970,6 +1096,9 @@ export class ArticlesService {
     if (dto.tagIds !== undefined) {
       await this.syncArticleTags(row.id, dto.tagIds);
     }
+    if (dto.categoryIds !== undefined) {
+      await this.syncArticleCategories(row.id, dto.categoryIds);
+    }
 
     await this.syncSeriesMembership(row.id, dto.seriesId);
     if (
@@ -990,9 +1119,13 @@ export class ArticlesService {
     const existing = await this.prisma.article.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Article not found');
 
-    const section = dto.section
+    const fallbackSection = dto.section
       ? toPrismaSection(dto.section)
       : existing.section;
+    const section = await this.resolveSectionFromCategoryIds(
+      dto.categoryIds,
+      fallbackSection,
+    );
     const titleBgChanged = this.fieldChanged(dto.titleBg, existing.titleBg);
     const nextSlug = titleBgChanged
       ? await ensureUniqueSlug(dto.titleBg!, async (candidate) => {
@@ -1152,6 +1285,9 @@ export class ArticlesService {
 
     if (dto.tagIds !== undefined) {
       await this.syncArticleTags(id, dto.tagIds);
+    }
+    if (dto.categoryIds !== undefined) {
+      await this.syncArticleCategories(id, dto.categoryIds);
     }
 
     await this.syncSeriesMembership(id, dto.seriesId);

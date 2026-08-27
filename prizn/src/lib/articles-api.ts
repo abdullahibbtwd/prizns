@@ -21,6 +21,7 @@ export function listCmsArticles(params?: {
   authorId?: string;
   q?: string;
   sponsored?: boolean;
+  categorySlug?: string;
   page?: number;
   pageSize?: number;
 }) {
@@ -30,6 +31,7 @@ export function listCmsArticles(params?: {
   if (params?.authorId) search.set("authorId", params.authorId);
   if (params?.q) search.set("q", params.q);
   if (params?.sponsored === true) search.set("sponsored", "true");
+  if (params?.categorySlug) search.set("categorySlug", params.categorySlug);
   if (params?.page != null) search.set("page", String(params.page));
   if (params?.pageSize != null) search.set("pageSize", String(params.pageSize));
   const qs = search.toString();
@@ -162,7 +164,10 @@ export function listPublicArticles(
     location?: string
     topic?: string
     category?: string
+    categorySlug?: string
     hasAudio?: boolean
+    q?: string
+    limit?: number
   },
 ) {
   const params = new URLSearchParams();
@@ -171,7 +176,10 @@ export function listPublicArticles(
   if (opts?.location) params.set("location", opts.location);
   if (opts?.topic) params.set("topic", opts.topic);
   if (opts?.category) params.set("category", opts.category);
+  if (opts?.categorySlug) params.set("categorySlug", opts.categorySlug);
   if (opts?.hasAudio === true) params.set("hasAudio", "true");
+  if (opts?.q?.trim()) params.set("q", opts.q.trim());
+  if (opts?.limit != null) params.set("limit", String(opts.limit));
   const qs = params.toString();
   return api.get<CmsArticle[]>(`/articles${qs ? `?${qs}` : ""}`);
 }

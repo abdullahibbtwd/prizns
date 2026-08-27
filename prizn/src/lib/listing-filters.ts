@@ -1,6 +1,6 @@
 import { useSearchParams } from 'react-router-dom'
 
-export type ListingFilterKey = 'location' | 'topic' | 'series'
+export type ListingFilterKey = 'location' | 'topic' | 'series' | 'category'
 
 export function patchListingParams(
   current: URLSearchParams,
@@ -8,7 +8,7 @@ export function patchListingParams(
 ) {
   const next = new URLSearchParams(current)
   next.delete('view')
-  for (const key of ['location', 'topic', 'series'] as const) {
+  for (const key of ['location', 'topic', 'series', 'category'] as const) {
     if (!(key in patch)) continue
     const value = patch[key]?.trim() ?? ''
     if (value) next.set(key, value)
@@ -22,10 +22,11 @@ export function useListingFilters() {
   const location = searchParams.get('location') || ''
   const topic = searchParams.get('topic') || ''
   const series = searchParams.get('series') || ''
+  const category = searchParams.get('category') || ''
 
   const setFilters = (patch: Partial<Record<ListingFilterKey, string>>) => {
     setSearchParams(patchListingParams(searchParams, patch), { replace: false })
   }
 
-  return { location, topic, series, searchParams, setFilters }
+  return { location, topic, series, category, searchParams, setFilters }
 }

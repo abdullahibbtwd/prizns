@@ -62,6 +62,14 @@ describe('ArticlesService', () => {
         deleteMany: jest.fn(),
         createMany: jest.fn(),
       },
+      articleCategory: {
+        deleteMany: jest.fn(),
+        createMany: jest.fn(),
+      },
+      category: {
+        findMany: jest.fn().mockResolvedValue([]),
+        findUnique: jest.fn().mockResolvedValue(null),
+      },
       articleGalleryItem: {
         deleteMany: jest.fn(),
         createMany: jest.fn(),
@@ -237,6 +245,46 @@ describe('ArticlesService', () => {
     const result = await service.listCms({ page: 1, pageSize: 9 });
     expect(result.items).toHaveLength(1);
     expect(result.total).toBe(1);
+  });
+
+  it('searches public articles by query and caps the result set', async () => {
+    await service.listPublic(undefined, undefined, {
+      q: 'Belogradchik',
+      limit: 12,
+    });
+    expect(prisma.article.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        take: 12,
+        where: expect.objectContaining({
+          OR: expect.arrayContaining([
+            expect.objectContaining({
+              titleBg: { contains: 'Belogradchik', mode: 'insensitive' },
+            }),
+          ]),
+        }),
+      }),
+    );
+  });
+
+  it('filters public articles by CMS category including children', async () => {
+    prisma.category.findUnique = jest.fn().mockResolvedValue({
+      id: 'cat-human',
+      children: [{ id: 'cat-portraits' }],
+    });
+    await service.listPublic('stories', undefined, {
+      categorySlug: 'choveshki-istorii',
+    });
+    expect(prisma.article.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          articleCategories: {
+            some: {
+              categoryId: { in: ['cat-human', 'cat-portraits'] },
+            },
+          },
+        }),
+      }),
+    );
   });
 
   it('gets cms article by id', async () => {

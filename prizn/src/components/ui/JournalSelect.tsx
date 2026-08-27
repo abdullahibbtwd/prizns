@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 export interface JournalSelectOption {
   value: string
   label: string
+  indent?: boolean
 }
 
 interface JournalSelectProps {
@@ -197,6 +198,7 @@ export function JournalSelect({
                       className={cn(
                         'group flex w-full cursor-pointer items-center justify-between gap-3 text-left transition-colors hover:bg-black/[0.03]',
                         isCompact ? 'px-3 py-2' : 'px-4 py-3',
+                        option.indent && (isCompact ? 'pl-6' : 'pl-8'),
                         index < options.length - 1 &&
                           'border-b border-[#EAE6DF]/80',
                       )}

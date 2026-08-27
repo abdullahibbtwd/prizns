@@ -55,12 +55,14 @@ import {
   listCmsSeries,
 } from '@/lib/cms-content-api'
 import {
-  editorSectionChoices,
   type ArticleFormValues,
   type ArticleSection,
   type BodyBlock,
 } from '@/lib/cms-types'
 import { createCmsTag, listCmsTags } from '@/lib/tags-api'
+import { listCmsCategories } from '@/lib/categories-api'
+import { categorySelectOptions, primaryCategoryId, slugsForCategory } from '@/lib/category-tree'
+import { sectionFromCategorySlugs } from '@/lib/category-section'
 import { ApiError } from '@/lib/api'
 import { useJournalLang } from '@/hooks/useJournalLang'
 import { pickLang } from '@/lib/pick-lang'
@@ -173,6 +175,7 @@ const schema = z.object({
   seoTitleBg: z.string(),
   seoDescriptionBg: z.string(),
   tagIds: z.array(z.string()),
+  categoryIds: z.array(z.string()),
   body: z.array(blockSchema).min(1),
   seriesMode: z.enum(['standalone', 'series']),
   seriesId: z.string(),
@@ -216,6 +219,7 @@ const emptyDefaults: ArticleFormValues = {
   seoTitleBg: '',
   seoDescriptionBg: '',
   tagIds: [],
+  categoryIds: [],
   body: [{ type: 'paragraph', textBg: '' }],
   seriesMode: 'standalone',
   seriesId: '',
@@ -347,6 +351,11 @@ export default function CmsStoryEditorPage() {
     queryFn: () => listCmsTags(),
   })
 
+  const categoriesQuery = useQuery({
+    queryKey: ['cms-categories'],
+    queryFn: listCmsCategories,
+  })
+
   useEffect(() => {
     const article = articleQuery.data
     if (!article) return
@@ -433,6 +442,7 @@ export default function CmsStoryEditorPage() {
       seoTitleBg: article.seoTitleBg ?? '',
       seoDescriptionBg: article.seoDescriptionBg ?? '',
       tagIds: article.tagIds ?? [],
+      categoryIds: article.categoryIds ?? [],
       body: syncBodyImagesWithGallery(withTeaser, galleryItems),
       seriesMode: article.series ? 'series' : 'standalone',
       seriesId: article.series?.id ?? '',
@@ -500,16 +510,16 @@ export default function CmsStoryEditorPage() {
     return () => sub.unsubscribe()
   }, [form])
 
-  const applySection = (next: ArticleSection) => {
+  const applySection = (next: ArticleSection, dirty = true) => {
     const nextProfile = getSectionProfile(next)
-    form.setValue('section', next, { shouldDirty: true })
+    form.setValue('section', next, { shouldDirty: dirty })
     form.setValue('categoryBg', nextProfile.defaultCategoryBg, {
-      shouldDirty: true,
+      shouldDirty: dirty,
     })
     if (!nextProfile.showSpeakerAudio) {
-      form.setValue('speakerBg', '', { shouldDirty: true })
-      form.setValue('audioDuration', '', { shouldDirty: true })
-      form.setValue('audioMediaId', '', { shouldDirty: true })
+      form.setValue('speakerBg', '', { shouldDirty: dirty })
+      form.setValue('audioDuration', '', { shouldDirty: dirty })
+      form.setValue('audioMediaId', '', { shouldDirty: dirty })
       revokeIfBlob(audioUrl)
       setPendingAudioFile(null)
       setAudioUrl('')
@@ -522,6 +532,30 @@ export default function CmsStoryEditorPage() {
       }
     }
   }
+
+  const applyCategory = (id: string, dirty = true) => {
+    const categories = categoriesQuery.data ?? []
+    const selected = categories.find((row) => row.id === id)
+    const nextSection = sectionFromCategorySlugs(
+      slugsForCategory(selected, categories),
+      form.getValues('section'),
+    )
+    applySection(nextSection, dirty)
+    form.setValue('categoryIds', id ? [id] : [], { shouldDirty: dirty })
+    if (selected) {
+      form.setValue('categoryBg', selected.nameBg, { shouldDirty: dirty })
+    }
+  }
+
+  useEffect(() => {
+    if (!isNew) return
+    if (form.getValues('categoryIds').length > 0) return
+    const human = (categoriesQuery.data ?? []).find(
+      (row) => row.slug === 'choveshki-istorii',
+    )
+    if (!human) return
+    applyCategory(human.id, false)
+  }, [categoriesQuery.data, form, isNew])
 
   const saveMutation = useMutation({
     mutationFn: async (values: ArticleFormValues) => {
@@ -585,6 +619,7 @@ export default function CmsStoryEditorPage() {
           seoTitleBg: values.seoTitleBg.trim() || null,
           seoDescriptionBg: values.seoDescriptionBg.trim() || null,
           tagIds: values.tagIds,
+          categoryIds: values.categoryIds,
           body: compactBody(
             syncBodyImagesWithGallery(
               values.body
@@ -1030,11 +1065,15 @@ export default function CmsStoryEditorPage() {
     form.watch('titleBg') || articleQuery.data?.titleBg,
   )
 
-  const sectionOptions = editorSectionChoices(section).map((item) => ({
-    value: item,
-    label: t(`cms.sections.${item}`),
-  }))
-
+  const categoryIds = form.watch('categoryIds')
+  const categoryOptions = categorySelectOptions(
+    categoriesQuery.data ?? [],
+    lang,
+  )
+  const selectedCategoryId = primaryCategoryId(
+    categoryIds,
+    categoriesQuery.data ?? [],
+  )
   const statusOptions = (
     ['DRAFT', 'REVIEW', 'SCHEDULED', 'PUBLISHED', 'ARCHIVED'] as const
   ).map((status) => ({
@@ -1154,13 +1193,13 @@ export default function CmsStoryEditorPage() {
               {t('cms.editor.sectionHint')}
             </h2>
             <JournalSelect
-              name="section"
+              name="category"
               variant="boxed"
-              label={t('cms.editor.section')}
-              placeholder={t('cms.editor.section')}
-              options={sectionOptions}
-              value={section}
-              onChange={(value) => applySection(value as ArticleSection)}
+              label={t('cms.editor.category')}
+              placeholder={t('cms.editor.category')}
+              options={categoryOptions}
+              value={selectedCategoryId}
+              onChange={(value) => applyCategory(value)}
             />
             <p className="text-xs text-stone-500">
               {t('cms.editor.description')}
@@ -2042,13 +2081,6 @@ export default function CmsStoryEditorPage() {
 
           <CmsCard className="space-y-3 p-5">
             <h3 className="text-sm font-semibold">{t('cms.editor.headlineMeta')}</h3>
-            <label className="block space-y-1 text-xs">
-              {t('cms.editor.category')}
-              <input
-                className="w-full border border-[#E8E4DC] bg-white px-2 py-2"
-                {...form.register('categoryBg')}
-              />
-            </label>
             {profile.showReadTime && (
             <label className="block space-y-1 text-xs">
               {profile.showVideoSource

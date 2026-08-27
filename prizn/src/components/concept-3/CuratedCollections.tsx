@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { BookOpen, ChevronRight } from 'lucide-react'
 import { ViewAllLink } from '@/components/concept-3/ViewAllLink'
+import { SectionLoading } from '@/components/concept-3/SectionLoading'
 import {
   articlePath,
   usePublicArticles,
@@ -15,6 +16,7 @@ interface CuratedCollectionsProps {
 export function CuratedCollections({ lang }: CuratedCollectionsProps) {
   const seriesQuery = usePublicSeries()
   const discoverQuery = usePublicArticles('discover')
+  const isLoading = seriesQuery.isLoading || discoverQuery.isLoading
 
   const seriesCards = (seriesQuery.data ?? []).map((series) => ({
     id: series.slug,
@@ -68,6 +70,9 @@ export function CuratedCollections({ lang }: CuratedCollectionsProps) {
           </div>
         </div>
 
+        {isLoading ? (
+          <SectionLoading lang={lang} count={3} cardClassName="h-[380px]" />
+        ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {collections.map((item, index) => {
             return (
@@ -113,6 +118,7 @@ export function CuratedCollections({ lang }: CuratedCollectionsProps) {
             )
           })}
         </div>
+        )}
       </div>
     </section>
   )

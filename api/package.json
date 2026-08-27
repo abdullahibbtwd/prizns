@@ -30,7 +30,8 @@
     "import:wordpress": "node dist/wordpress-import/import-wordpress.js",
     "import:wordpress:batch": "node dist/wordpress-import/import-wordpress.js --users",
     "import:wordpress:export": "ts-node --transpile-only src/wordpress-import/import-wordpress.ts --export=../wordpress-export",
-    "import:wordpress:package": "node dist/wordpress-import/import-wordpress.js --package=../wordpress-export --users"
+    "import:wordpress:package": "node dist/wordpress-import/import-wordpress.js --package=../wordpress-export --users",
+    "import:wordpress:merge": "node dist/wordpress-import/merge-wordpress-categories.js"
   },
   "prisma": {
     "seed": "node prisma/run-seed.cjs"

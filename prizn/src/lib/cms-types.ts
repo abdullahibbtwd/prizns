@@ -130,6 +130,15 @@ export type CmsArticle = {
   seoDescriptionBg?: string | null;
   tags?: CmsTag[];
   tagIds?: string[];
+  categories?: Array<{
+    id: string;
+    slug: string;
+    nameBg: string;
+    nameEn: string | null;
+    name: string;
+    parentId: string | null;
+  }>;
+  categoryIds?: string[];
   translationStatus: TranslationStatus;
   translationError?: string | null;
   sourceLang?: string | null;
@@ -259,6 +268,7 @@ export type ArticleFormValues = {
   section: ArticleSection;
   status: ArticleStatus;
   categoryBg: string;
+  categoryIds: string[];
   titleBg: string;
   subtitleBg: string;
   readTimeMinutes: number;

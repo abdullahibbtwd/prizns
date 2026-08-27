@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Clock, MapPin } from 'lucide-react'
 import { SponsoredBadge } from '@/components/concept-3/SponsoredBadge'
+import { SectionLoading } from '@/components/concept-3/SectionLoading'
 import {
   articlePath,
   preferApi,
@@ -13,8 +14,23 @@ interface FeaturedStoryCardProps {
 }
 
 export function FeaturedStoryCard({ lang }: FeaturedStoryCardProps) {
-  const { data } = usePublicArticles('featured')
+  const { data, isLoading } = usePublicArticles('featured')
   const apiStory = preferApi(data)[0]
+
+  if (isLoading) {
+    return (
+      <section id="featured-story" className="bg-[#FDFBF7] px-6 py-20 md:px-12 md:py-32">
+        <div className="mx-auto max-w-7xl">
+          <SectionLoading
+            lang={lang}
+            count={1}
+            cardClassName="min-h-[380px] sm:min-h-[480px] lg:min-h-[580px]"
+            gridClassName="grid grid-cols-1"
+          />
+        </div>
+      </section>
+    )
+  }
 
   if (!apiStory) return null
 

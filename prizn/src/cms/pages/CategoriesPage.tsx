@@ -34,6 +34,7 @@ import {
   type CmsCategory,
 } from '@/lib/categories-api'
 import { pickLang } from '@/lib/pick-lang'
+import { visibleCmsCategories } from '@/lib/category-tree'
 import { cn } from '@/lib/utils'
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50] as const
@@ -73,7 +74,7 @@ export default function CmsCategoriesPage() {
     queryFn: listCmsCategories,
   })
 
-  const categories = listQuery.data ?? []
+  const categories = visibleCmsCategories(listQuery.data ?? [])
   const roots = useMemo(
     () => categories.filter((item) => !item.parentId),
     [categories],

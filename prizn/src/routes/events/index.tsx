@@ -3,11 +3,15 @@ import { motion } from 'framer-motion'
 import { CalendarDays } from 'lucide-react'
 import { JournalShell } from '@/components/concept-3/JournalShell'
 import { ListingHeader } from '@/components/concept-3/ListingHeader'
+import { ListingFilters } from '@/components/concept-3/ListingFilters'
 import {
   articlePath,
   preferApi,
   usePublicArticles,
+  usePublicCategories,
 } from '@/lib/public-content'
+import { useListingFilters } from '@/lib/listing-filters'
+import { landingCategoryChoices } from '@/lib/category-tree'
 import type { CmsArticle } from '@/lib/cms-types'
 
 function toEventsCard(article: CmsArticle) {
@@ -26,7 +30,11 @@ function toEventsCard(article: CmsArticle) {
 }
 
 export default function EventsPage() {
-  const { data } = usePublicArticles('events')
+  const { category, setFilters } = useListingFilters()
+  const { data } = usePublicArticles('events', {
+    categorySlug: category || undefined,
+  })
+  const categoriesQuery = usePublicCategories()
 
   return (
     <JournalShell>
@@ -47,6 +55,22 @@ export default function EventsPage() {
               countLabel={
                 lang === 'bg' ? `${items.length} събития` : `${items.length} events`
               }
+            />
+
+            <ListingFilters
+              lang={lang}
+              category={{
+                value: category,
+                options: landingCategoryChoices(
+                  categoriesQuery.data ?? [],
+                  'events',
+                  lang,
+                ).map((item) => ({
+                  value: item.slug,
+                  label: item.label,
+                })),
+                onChange: (value) => setFilters({ category: value }),
+              }}
             />
 
             <div className="mx-auto max-w-7xl px-6 py-16 md:px-12 md:py-20">

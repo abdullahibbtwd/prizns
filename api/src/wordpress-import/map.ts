@@ -1,6 +1,11 @@
 import type { ArticleSection, ArticleStatus } from '@prisma/client';
 import { slugify } from '../common/slug.util';
 import { buildArticlePath } from '../articles/section.util';
+import { resolveCategoryPlacement } from '../categories/canonical-categories';
+import {
+  CATEGORY_SLUG_TO_SECTION,
+  sectionFromCategorySlugs,
+} from '../categories/category-section';
 import { decodeHtmlEntities, htmlToBlocks, stripHtml, toHttps } from './html';
 import type {
   MappedWpArticle,
@@ -11,40 +16,8 @@ import type {
   WpPost,
 } from './types';
 
-/** WP category slug → journal section (child slugs first). */
-export const WP_SLUG_TO_SECTION: Record<string, ArticleSection> = {
-  'mestni-legendi': 'sports',
-  predstoyashto: 'sports',
-  'sport-2': 'sports',
-  novini: 'news',
-  portreti: 'human_stories',
-  intervyuta: 'human_stories',
-  'ot-nashte-ora': 'human_stories',
-  'tvoyata-duma': 'voices',
-  'geroi-ot-arhivite-choveshki-istorii': 'human_stories',
-  'choveshki-istorii': 'human_stories',
-  'zdrave-ot-prirodata': 'traditions',
-  'obichai-i-poveria': 'traditions',
-  trapeza: 'traditions',
-  tradicii: 'traditions',
-  'istorichesko-nasledstvo': 'places',
-  'kulturni-sredishta': 'places',
-  otbivki: 'places',
-  'prirodno-bogatstvo': 'places',
-  'nashite-mesta': 'places',
-  vidin: 'places',
-  vratza: 'places',
-  montana: 'places',
-  'kauzi-sabitia': 'events',
-  'kultura-sabitia': 'events',
-  'kulturen-kalendar': 'events',
-  sabitia: 'events',
-  'digitalna-higiena': 'campaigns',
-  kampanii: 'campaigns',
-  opik: 'campaigns',
-  video: 'video',
-  biznes: 'news',
-};
+/** @deprecated Use CATEGORY_SLUG_TO_SECTION */
+export const WP_SLUG_TO_SECTION = CATEGORY_SLUG_TO_SECTION;
 
 const MONTHS_BG = [
   'януари',
@@ -127,11 +100,8 @@ export function tagTerms(post: WpPost): WpEmbeddedTerm[] {
 }
 
 export function pickSection(terms: WpEmbeddedTerm[]): ArticleSection {
-  for (const term of terms) {
-    const slug = term.slug?.trim();
-    if (slug && WP_SLUG_TO_SECTION[slug]) return WP_SLUG_TO_SECTION[slug];
-  }
-  return 'human_stories';
+  const placement = resolveCategoryPlacement(terms.map((term) => term.slug));
+  return sectionFromCategorySlugs(placement.categorySlugs);
 }
 
 function personFromYoast(post: WpPost): { name: string; slug: string; bio: string | null } | null {

@@ -120,6 +120,15 @@ export type PublicArticleDto = {
     nameEn: string | null;
     name: string;
   }>;
+  categories?: Array<{
+    id: string;
+    slug: string;
+    nameBg: string;
+    nameEn: string | null;
+    name: string;
+    parentId: string | null;
+  }>;
+  categoryIds?: string[];
   series?: {
     id: string;
     slug: string;

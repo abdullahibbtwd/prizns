@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ViewAllLink } from '@/components/concept-3/ViewAllLink'
+import { SectionLoading } from '@/components/concept-3/SectionLoading'
 import { preferApi, usePublicAuthors } from '@/lib/public-content'
 
 interface AuthorsSectionProps {
@@ -8,7 +9,7 @@ interface AuthorsSectionProps {
 }
 
 export function AuthorsSection({ lang }: AuthorsSectionProps) {
-  const { data } = usePublicAuthors()
+  const { data, isLoading } = usePublicAuthors()
   const authors = preferApi(
     data?.map((author) => ({
       ...author,
@@ -17,7 +18,7 @@ export function AuthorsSection({ lang }: AuthorsSectionProps) {
   )
   const featured = authors.slice(0, 8)
 
-  if (featured.length === 0) return null
+  if (!isLoading && featured.length === 0) return null
 
   return (
     <section id="authors" className="border-t border-[#EAE6DF] bg-[#FDFBF7] px-6 py-16 md:px-12 md:py-20">
@@ -34,6 +35,14 @@ export function AuthorsSection({ lang }: AuthorsSectionProps) {
           <ViewAllLink to="/authors" lang={lang} />
         </div>
 
+        {isLoading ? (
+          <SectionLoading
+            lang={lang}
+            count={4}
+            cardClassName="aspect-square max-w-28 mx-auto"
+            gridClassName="grid grid-cols-2 gap-x-6 gap-y-10 lg:grid-cols-4 lg:gap-x-10"
+          />
+        ) : (
         <div className="grid grid-cols-2 gap-x-6 gap-y-10 lg:grid-cols-4 lg:gap-x-10">
           {featured.map((author, index) => {
             const name = lang === 'bg' ? author.nameBg || author.name : author.name
@@ -77,6 +86,7 @@ export function AuthorsSection({ lang }: AuthorsSectionProps) {
             )
           })}
         </div>
+        )}
       </div>
     </section>
   )

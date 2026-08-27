@@ -9,6 +9,10 @@
  * Skip CMS category records:
  *   ... --package=/app/wordpress-export --users --skip-categories
  *
+ * After import, collapse WP city+topic tags onto the CMS tree:
+ *   docker compose exec api node dist/wordpress-import/merge-wordpress-categories.js --dry-run
+ *   docker compose exec api node dist/wordpress-import/merge-wordpress-categories.js
+ *
  * Live WP (only when the API can reach the site):
  *   node dist/wordpress-import/import-wordpress.js --users
  *
@@ -23,7 +27,13 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient, type ArticleSection } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import * as Minio from 'minio';
+import {
+  CATEGORY_PARENT,
+  HIDDEN_CMS_CATEGORY_SLUGS,
+  resolveCategoryPlacement,
+} from '../categories/canonical-categories';
 import { mapWpPost, parseWpPostsJson } from './map';
+import { attachLocationTags } from './location-tags';
 import {
   articleToExportJson,
   buildWordpressPackage,
@@ -668,20 +678,24 @@ async function syncCategories(
   prisma: PrismaClient,
   articleId: string,
   slugs: string[],
+  section?: ArticleSection,
 ) {
+  const placement = resolveCategoryPlacement(slugs, section);
   const categories = await prisma.category.findMany({
-    where: { slug: { in: slugs } },
+    where: { slug: { in: placement.categorySlugs } },
     select: { id: true },
   });
   await prisma.articleCategory.deleteMany({ where: { articleId } });
-  if (categories.length === 0) return;
-  await prisma.articleCategory.createMany({
-    data: categories.map((category) => ({
-      articleId,
-      categoryId: category.id,
-    })),
-    skipDuplicates: true,
-  });
+  if (categories.length > 0) {
+    await prisma.articleCategory.createMany({
+      data: categories.map((category) => ({
+        articleId,
+        categoryId: category.id,
+      })),
+      skipDuplicates: true,
+    });
+  }
+  await attachLocationTags(prisma, articleId, placement.locationSlugs);
 }
 
 async function syncTags(
@@ -801,7 +815,12 @@ async function saveArticle(
   }
 
   if (!opts.skipCategories) {
-    await syncCategories(prisma, row.id, mapped.categorySlugs);
+    await syncCategories(
+      prisma,
+      row.id,
+      mapped.categorySlugs,
+      mapped.section,
+    );
   }
   await syncTags(prisma, row.id, mapped.tagNames);
 
@@ -813,6 +832,7 @@ async function upsertPackageCategories(
   categories: PackagedCategory[],
 ) {
   for (const category of categories) {
+    if (HIDDEN_CMS_CATEGORY_SLUGS.has(category.slug)) continue;
     await prisma.category.upsert({
       where: { slug: category.slug },
       update: {},
@@ -822,6 +842,18 @@ async function upsertPackageCategories(
         sourceLang: 'bg',
         translationStatus: 'READY',
       },
+    });
+  }
+
+  const rows = await prisma.category.findMany({ select: { id: true, slug: true } });
+  const bySlug = new Map(rows.map((row) => [row.slug, row.id]));
+  for (const [childSlug, parentSlug] of Object.entries(CATEGORY_PARENT)) {
+    const childId = bySlug.get(childSlug);
+    const parentId = bySlug.get(parentSlug);
+    if (!childId || !parentId) continue;
+    await prisma.category.update({
+      where: { id: childId },
+      data: { parentId },
     });
   }
 }

@@ -1,5 +1,6 @@
 import { ArrowDown, Headphones, Radio } from 'lucide-react'
 import { ViewAllLink } from '@/components/concept-3/ViewAllLink'
+import { SectionLoading } from '@/components/concept-3/SectionLoading'
 import {
   VoicesPlayerGrid,
   toVoiceItem,
@@ -56,9 +57,12 @@ export function VoicesAudioSection({ lang }: VoicesAudioSectionProps) {
         </div>
 
         {isLoading ? (
-          <p className="font-sans text-sm text-white/50">
-            {lang === 'bg' ? 'Зареждане на записи…' : 'Loading recordings…'}
-          </p>
+          <SectionLoading
+            lang={lang}
+            count={3}
+            tone="dark"
+            cardClassName="h-36"
+          />
         ) : voices.length > 0 ? (
           <VoicesPlayerGrid lang={lang} voices={voices} />
         ) : null}

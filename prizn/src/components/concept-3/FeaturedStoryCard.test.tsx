@@ -30,6 +30,19 @@ describe('FeaturedStoryCard', () => {
     expect(container).toBeEmptyDOMElement()
   })
 
+  it('shows a loading skeleton while featured content is fetching', () => {
+    vi.mocked(usePublicArticles).mockReturnValue({
+      data: undefined,
+      isLoading: true,
+    } as never)
+    render(
+      <MemoryRouter>
+        <FeaturedStoryCard lang="en" />
+      </MemoryRouter>,
+    )
+    expect(screen.getByText('Loading…')).toBeInTheDocument()
+  })
+
   it('renders the first featured story', () => {
     vi.mocked(usePublicArticles).mockReturnValue({
       data: [

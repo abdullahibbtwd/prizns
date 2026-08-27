@@ -41,6 +41,25 @@ describe('ArticlesController', () => {
     expect(articles.listPublic).toHaveBeenCalled();
   });
 
+  it('passes search query and limit to listPublic', () => {
+    controller.listPublic(
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      'vidin',
+      '8',
+    );
+    expect(articles.listPublic).toHaveBeenCalledWith(
+      undefined,
+      undefined,
+      expect.objectContaining({ q: 'vidin', limit: 8 }),
+    );
+  });
+
   it('gets cms article by id', () => {
     controller.getCms('art-1');
     expect(articles.getCmsById).toHaveBeenCalledWith('art-1');

@@ -10,6 +10,7 @@ import {
   usePublicArticles,
 } from '@/lib/public-content'
 import { toPlaceCard } from '@/lib/section-cards'
+import { SectionLoading } from '@/components/concept-3/SectionLoading'
 
 interface OurPlacesSectionProps {
   lang: 'bg' | 'en'
@@ -17,7 +18,7 @@ interface OurPlacesSectionProps {
 
 export function OurPlacesSection({ lang }: OurPlacesSectionProps) {
   const navigate = useNavigate()
-  const { data } = usePublicArticles('places')
+  const { data, isLoading } = usePublicArticles('places')
   const places = preferApi(
     data?.map((article) => ({
       ...toPlaceCard(article),
@@ -53,7 +54,17 @@ export function OurPlacesSection({ lang }: OurPlacesSectionProps) {
         />
 
         <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
-          {places.map((place, index) => {
+          {isLoading ? (
+            <div className="md:col-span-2">
+              <SectionLoading
+                lang={lang}
+                count={2}
+                cardClassName="h-[480px] md:h-[540px]"
+                gridClassName="grid grid-cols-1 gap-8 md:grid-cols-2"
+              />
+            </div>
+          ) : (
+          places.map((place, index) => {
             return (
               <motion.div
                 key={place.id}
@@ -107,7 +118,8 @@ export function OurPlacesSection({ lang }: OurPlacesSectionProps) {
                 </Link>
               </motion.div>
             )
-          })}
+          })
+          )}
         </div>
       </div>
     </section>

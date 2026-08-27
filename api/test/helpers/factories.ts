@@ -56,6 +56,7 @@ export function buildArticleRow(overrides: Record<string, unknown> = {}) {
     galleryItems: [],
     seriesEpisodes: [],
     articleTags: [],
+    articleCategories: [],
     publishedAt: new Date('2026-08-01T00:00:00.000Z'),
     createdAt: new Date('2026-08-01T00:00:00.000Z'),
     updatedAt: new Date('2026-08-01T00:00:00.000Z'),

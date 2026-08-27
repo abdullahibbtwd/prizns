@@ -2,6 +2,7 @@ import { renderHook, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { describe, expect, it, vi } from 'vitest'
 import {
+  usePublicArticleSearch,
   usePublicArticles,
   usePublicAuthors,
   usePublicMedia,
@@ -55,9 +56,32 @@ describe('public content hooks', () => {
       location: undefined,
       topic: undefined,
       category: undefined,
+      categorySlug: undefined,
       hasAudio: true,
+      q: undefined,
+      limit: undefined,
     })
     expect(result.current.data).toHaveLength(1)
+  })
+
+  it('searches public articles when the query is at least two characters', async () => {
+    vi.mocked(articlesApi.listPublicArticles).mockResolvedValue([
+      { id: '1', slug: 'vidin', section: 'places' } as never,
+    ])
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+
+    const { result } = renderHook(() => usePublicArticleSearch('Vidin'), {
+      wrapper: wrapper(client),
+    })
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true)
+    })
+
+    expect(articlesApi.listPublicArticles).toHaveBeenCalledWith(undefined, {
+      q: 'Vidin',
+      limit: 12,
+    })
   })
 
   it('fetches public tags', async () => {

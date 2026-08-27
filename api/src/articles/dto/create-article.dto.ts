@@ -126,6 +126,12 @@ export class CreateArticleDto {
   @IsString({ each: true })
   tagIds?: string[];
 
+  /** CMS Category ids (hierarchical). Drives ArticleCategory + derived section. */
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  categoryIds?: string[];
+
   /** Block array validated lightly — shape enforced in service/CMS form. */
   @IsOptional()
   @IsArray()

@@ -3,6 +3,7 @@ import { api } from "@/lib/api";
 import { listPublicArticles, listPublicMedia } from "@/lib/articles-api";
 import type { CmsArticle } from "@/lib/cms-types";
 import { listPublicTags, type TagKind } from "@/lib/tags-api";
+import { listPublicCategories } from "@/lib/categories-api";
 
 export type PublicAuthor = {
   id: string;
@@ -85,7 +86,10 @@ export function usePublicArticles(
         location?: string
         topic?: string
         category?: string
+        categorySlug?: string
         hasAudio?: boolean
+        q?: string
+        limit?: number
       },
 ) {
   const filters =
@@ -98,7 +102,10 @@ export function usePublicArticles(
       filters?.location || "",
       filters?.topic || "",
       filters?.category || "",
+      filters?.categorySlug || "",
       filters?.hasAudio ? "audio" : "",
+      filters?.q?.trim() || "",
+      filters?.limit ?? "",
     ],
     queryFn: () =>
       listPublicArticles(section, {
@@ -106,8 +113,32 @@ export function usePublicArticles(
         location: filters?.location,
         topic: filters?.topic,
         category: filters?.category,
+        categorySlug: filters?.categorySlug,
         hasAudio: filters?.hasAudio,
+        q: filters?.q,
+        limit: filters?.limit,
       }),
+    enabled: (filters?.q?.trim().length ?? 0) === 0 || (filters?.q?.trim().length ?? 0) >= 2,
+    staleTime: 60_000,
+    retry: false,
+  });
+}
+
+export function usePublicArticleSearch(q: string) {
+  const trimmed = q.trim()
+  return useQuery({
+    queryKey: ["public-article-search", trimmed],
+    queryFn: () => listPublicArticles(undefined, { q: trimmed, limit: 12 }),
+    enabled: trimmed.length >= 2,
+    staleTime: 30_000,
+    retry: false,
+  })
+}
+
+export function usePublicCategories() {
+  return useQuery({
+    queryKey: ["public-categories"],
+    queryFn: listPublicCategories,
     staleTime: 60_000,
     retry: false,
   });

@@ -22,8 +22,9 @@ import {
 import { JournalSelect } from '@/components/ui/JournalSelect'
 import { useCmsConfirm } from '@/cms/components/CmsConfirmDialog'
 import { deleteCmsArticle, listCmsArticles, listCmsAuthors } from '@/lib/articles-api'
-import type { ArticleSection, ArticleStatus, CmsArticle } from '@/lib/cms-types'
-import { EDITOR_SECTIONS } from '@/lib/cms-types'
+import { listCmsCategories } from '@/lib/categories-api'
+import { categorySelectOptions } from '@/lib/category-tree'
+import type { ArticleStatus, CmsArticle } from '@/lib/cms-types'
 import { cn } from '@/lib/utils'
 import { useJournalLang } from '@/hooks/useJournalLang'
 import { pickLang } from '@/lib/pick-lang'
@@ -39,9 +40,16 @@ const filters: Array<'all' | ArticleStatus | 'sponsored'> = [
   'sponsored',
 ]
 
+function storyCategoryLabel(story: CmsArticle, lang: 'bg' | 'en') {
+  const linked =
+    story.categories?.find((row) => row.parentId) ?? story.categories?.[0]
+  if (linked) return lang === 'bg' ? linked.nameBg : linked.name
+  return story.categoryBg || getSectionLabel(story.section, lang)
+}
+
 const PAGE_SIZE_OPTIONS = [6, 9, 12, 24] as const
 const BASE_PATH = '/cms/stories'
-const ALL_SECTIONS = ''
+const ALL_CATEGORIES = ''
 const ALL_AUTHORS = ''
 
 export default function CmsStoriesPage() {
@@ -56,7 +64,7 @@ export default function CmsStoriesPage() {
       ? (statusParam as (typeof filters)[number])
       : 'all',
   )
-  const [section, setSection] = useState(ALL_SECTIONS)
+  const [categorySlug, setCategorySlug] = useState(ALL_CATEGORIES)
   const [authorId, setAuthorId] = useState(ALL_AUTHORS)
   const [query, setQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
@@ -71,11 +79,16 @@ export default function CmsStoriesPage() {
 
   useEffect(() => {
     setPage(1)
-  }, [filter, section, authorId, debouncedQuery, pageSize])
+  }, [filter, categorySlug, authorId, debouncedQuery, pageSize])
 
   const authorsQuery = useQuery({
     queryKey: ['cms-authors-options'],
     queryFn: () => listCmsAuthors(),
+  })
+
+  const categoriesQuery = useQuery({
+    queryKey: ['cms-categories'],
+    queryFn: listCmsCategories,
   })
 
   const articlesQuery = useQuery({
@@ -84,7 +97,7 @@ export default function CmsStoriesPage() {
       page,
       pageSize,
       filter,
-      section,
+      categorySlug,
       authorId,
       debouncedQuery,
     ],
@@ -93,7 +106,7 @@ export default function CmsStoriesPage() {
         page,
         pageSize,
         q: debouncedQuery || undefined,
-        section: section || undefined,
+        categorySlug: categorySlug || undefined,
         authorId: authorId || undefined,
         status:
           filter !== 'all' && filter !== 'sponsored'
@@ -117,7 +130,7 @@ export default function CmsStoriesPage() {
     if (
       !articlesQuery.data ||
       filter !== 'all' ||
-      section ||
+      categorySlug ||
       authorId ||
       debouncedQuery
     ) {
@@ -132,7 +145,7 @@ export default function CmsStoriesPage() {
     })
   }, [
     filter,
-    section,
+    categorySlug,
     authorId,
     debouncedQuery,
     articlesQuery.data,
@@ -150,15 +163,12 @@ export default function CmsStoriesPage() {
   const from = total === 0 ? 0 : (page - 1) * pageSize + 1
   const to = Math.min(page * pageSize, total)
 
-  const sectionOptions = useMemo(
+  const categoryOptions = useMemo(
     () => [
-      { value: ALL_SECTIONS, label: t('cms.stories.filterSectionAll') },
-      ...EDITOR_SECTIONS.map((item) => ({
-        value: item,
-        label: getSectionLabel(item, lang),
-      })),
+      { value: ALL_CATEGORIES, label: t('cms.stories.filterSectionAll') },
+      ...categorySelectOptions(categoriesQuery.data ?? [], lang, 'slug'),
     ],
-    [lang, t],
+    [categoriesQuery.data, lang, t],
   )
 
   const authorOptions = useMemo(
@@ -281,15 +291,13 @@ export default function CmsStoriesPage() {
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <JournalSelect
-            name="cms-stories-section"
+            name="cms-stories-category"
             variant="boxed"
             label={t('cms.stories.filterSection')}
             placeholder={t('cms.stories.filterSectionAll')}
-            options={sectionOptions}
-            value={section}
-            onChange={(value) =>
-              setSection(value as ArticleSection | typeof ALL_SECTIONS)
-            }
+            options={categoryOptions}
+            value={categorySlug}
+            onChange={(value) => setCategorySlug(value)}
           />
           <JournalSelect
             name="cms-stories-author"
@@ -353,7 +361,7 @@ export default function CmsStoriesPage() {
                 </div>
                 <div>
                   <p className="text-[11px] uppercase tracking-wider text-stone-500">
-                    {getSectionLabel(story.section, lang)}
+                    {storyCategoryLabel(story, lang)}
                   </p>
                   <h3 className="font-heading text-xl text-stone-900">
                     {pickLang(lang, story.title, story.titleBg)}
@@ -419,7 +427,7 @@ export default function CmsStoriesPage() {
                     {pickLang(lang, story.title, story.titleBg)}
                   </td>
                   <td className="px-4 py-3">
-                    {getSectionLabel(story.section, lang)}
+                    {storyCategoryLabel(story, lang)}
                   </td>
                   <td className="px-4 py-3">
                     <StatusPill status={story.status} />

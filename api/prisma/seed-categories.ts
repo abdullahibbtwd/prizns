@@ -8,9 +8,6 @@ type SeedCategory = {
 };
 
 const CATEGORIES: SeedCategory[] = [
-  { slug: 'biznes', nameBg: 'Бизнес', nameEn: 'Business' },
-  { slug: 'vidin', nameBg: 'Видин', nameEn: 'Vidin' },
-  { slug: 'vratza', nameBg: 'Враца', nameEn: 'Vratsa' },
   {
     slug: 'kampanii',
     nameBg: 'Кампании',
@@ -23,7 +20,6 @@ const CATEGORIES: SeedCategory[] = [
       },
     ],
   },
-  { slug: 'montana', nameBg: 'Монтана', nameEn: 'Montana' },
   {
     slug: 'nashite-mesta',
     nameBg: 'Нашите места',
@@ -122,7 +118,7 @@ const CATEGORIES: SeedCategory[] = [
     ],
   },
   { slug: 'video', nameBg: 'Видео', nameEn: 'Video' },
-  { slug: 'opik', nameBg: 'ОПИК', nameEn: 'OPIK' },
+  { slug: 'discover', nameBg: 'Открийте', nameEn: 'Discover' },
 ];
 
 export async function seedCategories(prisma: PrismaClient) {

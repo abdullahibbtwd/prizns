@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Maximize2, X, MapPin, Camera } from 'lucide-react'
 import { ViewAllLink } from '@/components/concept-3/ViewAllLink'
+import { SectionLoading } from '@/components/concept-3/SectionLoading'
 import { preferApi, usePublicMedia } from '@/lib/public-content'
 import { getSectionPublicLabel } from '@/lib/section-i18n'
 
@@ -32,7 +33,7 @@ function aspectForIndex(index: number): { aspect: string; span: string } {
 }
 
 export function PhotographyGallery({ lang }: PhotographyGalleryProps) {
-  const { data } = usePublicMedia('IMAGE')
+  const { data, isLoading } = usePublicMedia('IMAGE')
   const photos = preferApi(
     data?.map((item, index) => {
       const layout = aspectForIndex(index)
@@ -82,7 +83,9 @@ export function PhotographyGallery({ lang }: PhotographyGalleryProps) {
           </div>
         </div>
 
-        {photos.length === 0 ? (
+        {isLoading ? (
+          <SectionLoading lang={lang} count={6} cardClassName="aspect-square" />
+        ) : photos.length === 0 ? (
           <p className="text-center font-sans text-sm text-[#1A1A1A]/50">
             {lang === 'bg'
               ? 'Качете изображения от CMS → Медия библиотека.'

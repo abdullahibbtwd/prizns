@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
@@ -27,6 +28,7 @@ vi.mock('@/lib/public-content', async () => {
   return {
     ...actual,
     usePublicArticles: (...args: unknown[]) => usePublicArticles(...args),
+    usePublicCategories: () => ({ data: [] }),
   }
 })
 
@@ -35,10 +37,23 @@ vi.mock('@/components/concept-3/RegionMap', () => ({
 }))
 
 function renderSection(ui: React.ReactElement) {
-  return render(<MemoryRouter>{ui}</MemoryRouter>)
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
+  return render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter>{ui}</MemoryRouter>
+    </QueryClientProvider>,
+  )
 }
 
 describe('article grid sections', () => {
+  it('HumanStoriesSection shows loading skeletons while fetching', () => {
+    usePublicArticles.mockReturnValue({ data: undefined, isLoading: true })
+    renderSection(<HumanStoriesSection lang="en" />)
+    expect(screen.getByText('Loading…')).toBeInTheDocument()
+  })
+
   it('HumanStoriesSection renders story cards', () => {
     usePublicArticles.mockReturnValue({
       data: [

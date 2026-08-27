@@ -33,18 +33,24 @@ export class ArticlesController {
     @Query('location') location?: string,
     @Query('topic') topic?: string,
     @Query('category') category?: string,
+    @Query('categorySlug') categorySlug?: string,
     @Query('hasAudio') hasAudio?: string,
+    @Query('q') q?: string,
+    @Query('limit') limit?: string,
   ) {
     return this.articles.listPublic(section, series, {
       location,
       topic,
       category,
+      categorySlug,
       hasAudio:
         hasAudio === 'true' || hasAudio === '1'
           ? true
           : hasAudio === 'false' || hasAudio === '0'
             ? false
             : undefined,
+      q,
+      limit: limit ? Number(limit) : undefined,
     });
   }
 
@@ -91,6 +97,7 @@ export class ArticlesController {
     @Query('authorId') authorId?: string,
     @Query('q') q?: string,
     @Query('sponsored') sponsored?: string,
+    @Query('categorySlug') categorySlug?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
   ) {
@@ -99,6 +106,7 @@ export class ArticlesController {
       status,
       authorId,
       q,
+      categorySlug,
       sponsored:
         sponsored === 'true' || sponsored === '1'
           ? true

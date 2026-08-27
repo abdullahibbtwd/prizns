@@ -28,11 +28,13 @@ export function getPrimaryNavLinks(lang: JournalLang): JournalNavLink[] {
 }
 
 /**
- * Destinations after Shop. Sports and News are topic tags, not menu items.
- * Story of the Year / Archive / Discover / Voices stay reachable from the homepage.
+ * Destinations after the pillars. Discover matches the homepage section;
+ * Sport stays a listing page rather than a header item.
  */
 export function getFooterSecondaryLinks(lang: JournalLang): JournalNavLink[] {
   return [
+    { label: lang === 'bg' ? 'Открийте' : 'Discover', to: '/discover' },
+    { label: lang === 'bg' ? 'Спорт' : 'Sports', to: '/sports' },
     { label: lang === 'bg' ? 'Магазин' : 'Shop', to: '/shop' },
     { label: lang === 'bg' ? 'Автори' : 'Authors', to: '/authors' },
   ]

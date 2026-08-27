@@ -1,6 +1,9 @@
 import type { JournalLang } from '@/components/concept-3/JournalShell'
 import { JournalSelect } from '@/components/ui/JournalSelect'
 import type { JournalSelectOption } from '@/components/ui/JournalSelect'
+import type { LandingKey } from '@/lib/category-section'
+import { landingCategoryChoices } from '@/lib/category-tree'
+import { usePublicCategories } from '@/lib/public-content'
 
 export type ListingFilterField = {
   value: string
@@ -13,14 +16,23 @@ export function ListingFilters({
   location,
   topic,
   series,
+  category,
 }: {
   lang: JournalLang
   location?: ListingFilterField
   topic?: ListingFilterField
   series?: ListingFilterField
+  category?: ListingFilterField
 }) {
   const allLabel = lang === 'bg' ? 'Всички' : 'All'
   const fields = [
+    category
+      ? {
+          name: 'category',
+          label: lang === 'bg' ? 'Категория' : 'Category',
+          field: category,
+        }
+      : null,
     location
       ? {
           name: 'location',
@@ -48,7 +60,7 @@ export function ListingFilters({
 
   return (
     <div className="mx-auto max-w-7xl px-6 pt-8 md:px-12">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {fields.map((item) => (
           <div key={item.name} className="min-w-0">
             <p className="mb-1.5 font-sans text-[11px] uppercase tracking-[0.2em] text-[#1A1A1A]/45">
@@ -70,5 +82,34 @@ export function ListingFilters({
         ))}
       </div>
     </div>
+  )
+}
+
+export function LandingCategoryFilters({
+  lang,
+  landing,
+  category,
+  onChange,
+}: {
+  lang: JournalLang
+  landing: LandingKey
+  category: string
+  onChange: (value: string) => void
+}) {
+  const { data } = usePublicCategories()
+  const options = landingCategoryChoices(data ?? [], landing, lang)
+  if (options.length === 0) return null
+  return (
+    <ListingFilters
+      lang={lang}
+      category={{
+        value: category,
+        options: options.map((item) => ({
+          value: item.slug,
+          label: item.label,
+        })),
+        onChange,
+      }}
+    />
   )
 }

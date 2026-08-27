@@ -9,22 +9,26 @@ import {
   articlePath,
   preferApi,
   usePublicArticles,
+  usePublicCategories,
   usePublicSeries,
   usePublicTags,
 } from '@/lib/public-content'
 import { useListingFilters } from '@/lib/listing-filters'
+import { landingCategoryChoices } from '@/lib/category-tree'
 import { toTraditionCard } from '@/lib/section-cards'
 
 export default function TraditionsPage() {
-  const { location, topic, series, setFilters } = useListingFilters()
+  const { location, topic, series, category, setFilters } = useListingFilters()
   const { data } = usePublicArticles('traditions', {
     topic: topic || undefined,
     location: location || undefined,
     series: series || undefined,
+    categorySlug: category || undefined,
   })
   const topicsQuery = usePublicTags('TOPIC')
   const locationsQuery = usePublicTags('LOCATION')
   const seriesQuery = usePublicSeries()
+  const categoriesQuery = usePublicCategories()
 
   return (
     <JournalShell>
@@ -62,6 +66,18 @@ export default function TraditionsPage() {
 
             <ListingFilters
               lang={lang}
+              category={{
+                value: category,
+                options: landingCategoryChoices(
+                  categoriesQuery.data ?? [],
+                  'traditions',
+                  lang,
+                ).map((item) => ({
+                  value: item.slug,
+                  label: item.label,
+                })),
+                onChange: (value) => setFilters({ category: value }),
+              }}
               location={{
                 value: location,
                 options: (locationsQuery.data ?? []).map((tag) => ({

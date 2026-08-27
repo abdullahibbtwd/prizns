@@ -225,9 +225,12 @@ describe('articles-api', () => {
     await listPublicMedia('VIDEO')
     await listCmsMedia('IMAGE')
 
+    await listPublicArticles(undefined, { q: 'vidin', limit: 12 })
+
     expect(mocked.get).toHaveBeenCalledWith(
       '/articles?section=stories&series=voices&location=vidin&hasAudio=true',
     )
+    expect(mocked.get).toHaveBeenCalledWith('/articles?q=vidin&limit=12')
     expect(mocked.get).toHaveBeenCalledWith(
       '/articles/places/belogradchik?visitorKey=v1',
     )
