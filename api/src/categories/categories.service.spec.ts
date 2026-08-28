@@ -59,13 +59,6 @@ describe('CategoriesService', () => {
     expect(prisma.category.create).toHaveBeenCalled();
   });
 
-  it('rejects a missing parent', async () => {
-    prisma.category.findUnique = jest.fn().mockResolvedValue(null);
-    await expect(
-      service.create({ nameBg: 'News', parentId: 'missing' }),
-    ).rejects.toBeInstanceOf(BadRequestException);
-  });
-
   it('throws when category is missing', async () => {
     prisma.category.findUnique = jest.fn().mockResolvedValue(null);
     await expect(service.getById('missing')).rejects.toBeInstanceOf(

@@ -9,7 +9,7 @@
  * Skip CMS category records:
  *   ... --package=/app/wordpress-export --users --skip-categories
  *
- * After import, collapse WP city+topic tags onto the CMS tree:
+ * After import, flatten subcategories onto main categories:
  *   docker compose exec api node dist/wordpress-import/merge-wordpress-categories.js --dry-run
  *   docker compose exec api node dist/wordpress-import/merge-wordpress-categories.js
  *
@@ -833,6 +833,7 @@ async function upsertPackageCategories(
 ) {
   for (const category of categories) {
     if (HIDDEN_CMS_CATEGORY_SLUGS.has(category.slug)) continue;
+    if (CATEGORY_PARENT[category.slug]) continue;
     await prisma.category.upsert({
       where: { slug: category.slug },
       update: {},
@@ -842,18 +843,6 @@ async function upsertPackageCategories(
         sourceLang: 'bg',
         translationStatus: 'READY',
       },
-    });
-  }
-
-  const rows = await prisma.category.findMany({ select: { id: true, slug: true } });
-  const bySlug = new Map(rows.map((row) => [row.slug, row.id]));
-  for (const [childSlug, parentSlug] of Object.entries(CATEGORY_PARENT)) {
-    const childId = bySlug.get(childSlug);
-    const parentId = bySlug.get(parentSlug);
-    if (!childId || !parentId) continue;
-    await prisma.category.update({
-      where: { id: childId },
-      data: { parentId },
     });
   }
 }

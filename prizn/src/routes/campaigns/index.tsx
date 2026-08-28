@@ -2,13 +2,11 @@ import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { JournalShell } from '@/components/concept-3/JournalShell'
 import { ListingHeader } from '@/components/concept-3/ListingHeader'
-import { LandingCategoryFilters } from '@/components/concept-3/ListingFilters'
 import {
   articlePath,
   preferApi,
   usePublicArticles,
 } from '@/lib/public-content'
-import { useListingFilters } from '@/lib/listing-filters'
 import type { CmsArticle } from '@/lib/cms-types'
 
 function toCampaignsCard(article: CmsArticle) {
@@ -25,10 +23,7 @@ function toCampaignsCard(article: CmsArticle) {
 }
 
 export default function CampaignsPage() {
-  const { category, setFilters } = useListingFilters()
-  const { data } = usePublicArticles('campaigns', {
-    categorySlug: category || undefined,
-  })
+  const { data } = usePublicArticles('campaigns')
 
   return (
     <JournalShell>
@@ -49,13 +44,6 @@ export default function CampaignsPage() {
               countLabel={
                 lang === 'bg' ? `${items.length} кампании` : `${items.length} campaigns`
               }
-            />
-
-            <LandingCategoryFilters
-              lang={lang}
-              landing="campaigns"
-              category={category}
-              onChange={(value) => setFilters({ category: value })}
             />
 
             <div className="mx-auto max-w-7xl px-6 py-16 md:px-12 md:py-20">

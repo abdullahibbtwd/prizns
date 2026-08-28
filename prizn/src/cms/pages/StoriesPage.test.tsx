@@ -24,11 +24,16 @@ vi.mock('@/hooks/useJournalLang', () => ({
 const listCmsArticles = vi.fn()
 const listCmsAuthors = vi.fn()
 const deleteCmsArticle = vi.fn()
+const listCmsCategories = vi.fn()
 
 vi.mock('@/lib/articles-api', () => ({
   listCmsArticles: (...args: unknown[]) => listCmsArticles(...args),
   listCmsAuthors: (...args: unknown[]) => listCmsAuthors(...args),
   deleteCmsArticle: (...args: unknown[]) => deleteCmsArticle(...args),
+}))
+
+vi.mock('@/lib/categories-api', () => ({
+  listCmsCategories: (...args: unknown[]) => listCmsCategories(...args),
 }))
 
 describe('CmsStoriesPage', () => {
@@ -41,6 +46,62 @@ describe('CmsStoriesPage', () => {
 
   beforeEach(() => {
     listCmsAuthors.mockResolvedValue([])
+    listCmsCategories.mockResolvedValue([
+      {
+        id: 'cat-human',
+        slug: 'choveshki-istorii',
+        nameBg: 'Човешки истории',
+        nameEn: 'Human stories',
+        name: 'Human stories',
+        descriptionBg: null,
+        descriptionEn: null,
+        parentId: null,
+        parentName: null,
+        translationStatus: 'READY',
+        translationError: null,
+        sourceLang: 'bg',
+        childCount: 0,
+        articleCount: 4,
+        createdAt: '',
+        updatedAt: '',
+      },
+      {
+        id: 'cat-events',
+        slug: 'sabitia',
+        nameBg: 'Събития',
+        nameEn: 'Events',
+        name: 'Events',
+        descriptionBg: null,
+        descriptionEn: null,
+        parentId: null,
+        parentName: null,
+        translationStatus: 'READY',
+        translationError: null,
+        sourceLang: 'bg',
+        childCount: 0,
+        articleCount: 2,
+        createdAt: '',
+        updatedAt: '',
+      },
+      {
+        id: 'cat-vratza',
+        slug: 'vratza',
+        nameBg: 'Враца',
+        nameEn: 'Vratsa',
+        name: 'Vratsa',
+        descriptionBg: null,
+        descriptionEn: null,
+        parentId: null,
+        parentName: null,
+        translationStatus: 'READY',
+        translationError: null,
+        sourceLang: 'bg',
+        childCount: 0,
+        articleCount: 0,
+        createdAt: '',
+        updatedAt: '',
+      },
+    ])
     listCmsArticles.mockResolvedValue({
       items: [article],
       total: 1,
@@ -51,7 +112,7 @@ describe('CmsStoriesPage', () => {
     deleteCmsArticle.mockResolvedValue(undefined)
   })
 
-  it('omits sports and news from the section filter', async () => {
+  it('lists categories in the filter and hides leftover city topics', async () => {
     const user = userEvent.setup()
     renderPage(<CmsStoriesPage />)
     await screen.findByText('Draft story')
@@ -62,8 +123,7 @@ describe('CmsStoriesPage', () => {
 
     expect(screen.getByRole('option', { name: 'Human stories' })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: 'Events' })).toBeInTheDocument()
-    expect(screen.queryByRole('option', { name: 'Sports' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('option', { name: 'News' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: 'Vratsa' })).not.toBeInTheDocument()
   })
 
   it('switches to table view', async () => {

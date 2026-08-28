@@ -70,39 +70,9 @@ export class CategoriesService {
     return this.toDto(row);
   }
 
-  private async assertValidParent(parentId: string | undefined, selfId?: string) {
-    if (!parentId) return;
-    if (parentId === selfId) {
-      throw new BadRequestException('A category cannot be its own parent');
-    }
-    const parent = await this.prisma.category.findUnique({
-      where: { id: parentId },
-      select: { id: true, parentId: true },
-    });
-    if (!parent) throw new BadRequestException('Parent category not found');
-    if (parent.parentId) {
-      throw new BadRequestException('Subcategories cannot have children');
-    }
-    if (selfId) {
-      let cursor: { id: string; parentId: string | null } | null = parent;
-      const seen = new Set<string>();
-      while (cursor?.parentId) {
-        if (cursor.parentId === selfId || seen.has(cursor.parentId)) {
-          throw new BadRequestException('Cannot create a circular category tree');
-        }
-        seen.add(cursor.id);
-        cursor = await this.prisma.category.findUnique({
-          where: { id: cursor.parentId },
-          select: { id: true, parentId: true },
-        });
-      }
-    }
-  }
-
   async create(dto: CreateCategoryDto) {
     const nameBg = dto.nameBg.trim();
     const descriptionBg = dto.descriptionBg?.trim() || null;
-    await this.assertValidParent(dto.parentId || undefined);
 
     const slugSource = dto.slug?.trim() || nameBg;
     const slug = await ensureUniqueSlug(slugSource, async (candidate) => {
@@ -118,7 +88,7 @@ export class CategoriesService {
         slug,
         nameBg,
         descriptionBg,
-        parentId: dto.parentId?.trim() || null,
+        parentId: null,
         translationStatus: TranslationStatus.PENDING,
       },
       select: categorySelect,
@@ -132,13 +102,6 @@ export class CategoriesService {
       select: categorySelect,
     });
     if (!existing) throw new NotFoundException('Category not found');
-
-    const parentId =
-      dto.parentId === undefined ? existing.parentId : dto.parentId.trim() || null;
-    if (parentId && existing._count.children > 0) {
-      throw new BadRequestException('Move or remove subcategories first');
-    }
-    await this.assertValidParent(parentId || undefined, id);
 
     const nameChanged =
       dto.nameBg !== undefined && dto.nameBg.trim() !== existing.nameBg;
@@ -171,7 +134,7 @@ export class CategoriesService {
         slug,
         nameBg,
         descriptionBg,
-        parentId,
+        parentId: null,
         nameEn: dto.nameEn === undefined ? undefined : dto.nameEn.trim() || null,
         descriptionEn:
           dto.descriptionEn === undefined

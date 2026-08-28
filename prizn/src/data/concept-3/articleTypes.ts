@@ -82,6 +82,7 @@ export interface JournalArticle {
   authorBg: string
   /** Optional link to `/authors/:slug` */
   authorSlug?: string
+  authorImage?: string
   /** For voices: spoken by */
   speaker?: string
   speakerBg?: string

@@ -14,7 +14,7 @@ interface FeaturedStoryCardProps {
 }
 
 export function FeaturedStoryCard({ lang }: FeaturedStoryCardProps) {
-  const { data, isLoading } = usePublicArticles('featured')
+  const { data, isLoading } = usePublicArticles('featured', { limit: 1 })
   const apiStory = preferApi(data)[0]
 
   if (isLoading) {

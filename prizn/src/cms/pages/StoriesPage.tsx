@@ -41,8 +41,7 @@ const filters: Array<'all' | ArticleStatus | 'sponsored'> = [
 ]
 
 function storyCategoryLabel(story: CmsArticle, lang: 'bg' | 'en') {
-  const linked =
-    story.categories?.find((row) => row.parentId) ?? story.categories?.[0]
+  const linked = story.categories?.[0]
   if (linked) return lang === 'bg' ? linked.nameBg : linked.name
   return story.categoryBg || getSectionLabel(story.section, lang)
 }

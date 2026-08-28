@@ -1,5 +1,6 @@
 import {
   buildArticlePath,
+  isFeaturedFlagQuery,
   toPrismaSection,
   toPrismaSectionFilter,
   toPublicSection,
@@ -20,6 +21,11 @@ describe('section.util', () => {
       in: ['featured', 'human_stories'],
     });
     expect(toPrismaSectionFilter(undefined)).toBeUndefined();
+  });
+
+  it('treats public featured list as a checkbox query, not a section', () => {
+    expect(isFeaturedFlagQuery('featured')).toBe(true);
+    expect(isFeaturedFlagQuery('stories')).toBe(false);
   });
 
   it('maps prisma section to public slug', () => {

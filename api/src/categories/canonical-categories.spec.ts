@@ -5,12 +5,12 @@ import {
 } from './canonical-categories';
 
 describe('resolveCategoryPlacement', () => {
-  it('keeps the topic child and turns the city into a location tag', () => {
+  it('folds a subcategory into the main pillar and turns the city into a location tag', () => {
     expect(
       resolveCategoryPlacement(['kulturen-kalendar', 'vratza']),
     ).toEqual({
-      primarySlug: 'kulturen-kalendar',
-      categorySlugs: ['kulturen-kalendar'],
+      primarySlug: 'sabitia',
+      categorySlugs: ['sabitia'],
       locationSlugs: ['vratza'],
     });
   });
@@ -18,18 +18,25 @@ describe('resolveCategoryPlacement', () => {
   it('does not let a city win over a topic when the city is listed first', () => {
     expect(
       resolveCategoryPlacement(['vidin', 'portreti']).primarySlug,
-    ).toBe('portreti');
+    ).toBe('choveshki-istorii');
   });
 
-  it('prefers the child that matches the article section', () => {
+  it('prefers the pillar that matches the article section', () => {
     expect(
       resolveCategoryPlacement(['mestni-legendi', 'portreti'], 'sports')
         .primarySlug,
-    ).toBe('mestni-legendi');
+    ).toBe('sport-2');
     expect(
       resolveCategoryPlacement(['mestni-legendi', 'portreti'], 'human_stories')
         .primarySlug,
-    ).toBe('portreti');
+    ).toBe('choveshki-istorii');
+  });
+
+  it('keeps News and Voices as their own categories', () => {
+    expect(resolveCategoryPlacement(['novini']).primarySlug).toBe('novini');
+    expect(resolveCategoryPlacement(['tvoyata-duma']).primarySlug).toBe(
+      'tvoyata-duma',
+    );
   });
 
   it('keeps a city as the category when default merge is off', () => {
@@ -90,7 +97,7 @@ describe('resolveCategoryPlacement', () => {
       resolveCategoryPlacement(['intervyuta', 'vidin'], undefined, {
         alsoLinkCities: true,
       }).categorySlugs,
-    ).toEqual(['intervyuta', 'vidin']);
+    ).toEqual(['choveshki-istorii', 'vidin']);
   });
 });
 

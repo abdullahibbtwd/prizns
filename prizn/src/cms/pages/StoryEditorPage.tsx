@@ -388,8 +388,11 @@ export default function CmsStoryEditorPage() {
         ? article.audioDuration
         : article.readTimeBg,
     )
-    const section = (
+    const rawSection =
       article.section === 'human_stories' ? 'human-stories' : article.section
+    const isLegacyFeaturedSection = rawSection === 'featured'
+    const section = (
+      isLegacyFeaturedSection ? 'human-stories' : rawSection
     ) as ArticleFormValues['section']
     const mappedBody =
       article.bodyRaw && article.bodyRaw.length > 0
@@ -434,7 +437,7 @@ export default function CmsStoryEditorPage() {
       audioMediaId: article.audioMediaId ?? '',
       videoUrl: article.videoUrl ?? '',
       videoMediaId: article.videoMediaId ?? '',
-      featured: article.featured,
+      featured: Boolean(article.featured) || isLegacyFeaturedSection,
       sponsored: article.sponsored,
       sourced: Boolean(article.sourced),
       sponsorName: article.sponsorName ?? '',
@@ -537,7 +540,7 @@ export default function CmsStoryEditorPage() {
     const categories = categoriesQuery.data ?? []
     const selected = categories.find((row) => row.id === id)
     const nextSection = sectionFromCategorySlugs(
-      slugsForCategory(selected, categories),
+      slugsForCategory(selected),
       form.getValues('section'),
     )
     applySection(nextSection, dirty)
@@ -586,7 +589,8 @@ export default function CmsStoryEditorPage() {
         const durationSeconds =
           values.readTimeUnit === 'hours' ? minutes * 3600 : minutes * 60
         const payload = {
-          section: values.section,
+          section:
+            values.section === 'featured' ? 'human-stories' : values.section,
           status: values.status,
           categoryBg: values.categoryBg,
           titleBg: values.titleBg,
@@ -609,7 +613,7 @@ export default function CmsStoryEditorPage() {
           audioMediaId,
           videoUrl,
           videoMediaId,
-          featured: values.featured,
+          featured: values.featured || values.section === 'featured',
           sponsored: values.sponsored,
           sourced: values.sourced,
           sponsorName: values.sponsored
@@ -2017,6 +2021,7 @@ export default function CmsStoryEditorPage() {
                 })
               }
               label={t('cms.editor.featured')}
+              description={t('cms.editor.featuredHint')}
             />
             <CmsCheckbox
               checked={form.watch('sponsored')}

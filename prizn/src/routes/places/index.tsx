@@ -10,26 +10,22 @@ import {
   articlePath,
   preferApi,
   usePublicArticles,
-  usePublicCategories,
   usePublicSeries,
   usePublicTags,
 } from '@/lib/public-content'
 import { useListingFilters } from '@/lib/listing-filters'
-import { landingCategoryChoices } from '@/lib/category-tree'
 import { toPlaceCard } from '@/lib/section-cards'
 
 export default function PlacesPage() {
-  const { location, topic, series, category, setFilters } = useListingFilters()
+  const { location, topic, series, setFilters } = useListingFilters()
   const { data } = usePublicArticles('places', {
     location: location || undefined,
     topic: topic || undefined,
     series: series || undefined,
-    categorySlug: category || undefined,
   })
   const locationsQuery = usePublicTags('LOCATION')
   const topicsQuery = usePublicTags('TOPIC')
   const seriesQuery = usePublicSeries()
-  const categoriesQuery = usePublicCategories()
 
   return (
     <JournalShell>
@@ -65,18 +61,6 @@ export default function PlacesPage() {
 
             <ListingFilters
               lang={lang}
-              category={{
-                value: category,
-                options: landingCategoryChoices(
-                  categoriesQuery.data ?? [],
-                  'places',
-                  lang,
-                ).map((item) => ({
-                  value: item.slug,
-                  label: item.label,
-                })),
-                onChange: (value) => setFilters({ category: value }),
-              }}
               location={{
                 value: location,
                 options: (locationsQuery.data ?? []).map((tag) => ({

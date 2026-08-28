@@ -1,9 +1,9 @@
 /**
- * Collapse imported WordPress category links onto the CMS tree.
+ * Flatten subcategories onto main categories, then drop WordPress leftovers.
  *
- * WordPress tagged most posts with a topic AND a city. This keeps one CMS
- * category (the topic from Categories / the Stories dropdown) and turns
- * Vidin / Vratsa / Montana into location tags for the map filter.
+ * 1. Merge every subcategory into its pillar (Human stories, Our places, …).
+ *    News and Voices stay as their own roots (different public sections).
+ * 2. WordPress city / OPIK / Business leftovers → main category + location tags.
  *
  * Dry run (no writes):
  *   node dist/wordpress-import/merge-wordpress-categories.js --dry-run
@@ -11,11 +11,10 @@
  * Apply on the API container:
  *   docker compose exec api node dist/wordpress-import/merge-wordpress-categories.js
  *
- * Default mapping (no flags needed):
+ * Default leftover mapping (no flags needed):
  *   Vidin / Vratsa / Montana → Our places (cities stay as location tags)
  *   OPIK → Campaigns
  *   Business → Human stories (those stories get the sponsored badge)
- * Then those leftover category records are deleted so they leave the CMS dropdown.
  *
  * Override or add mappings:
  *   ... --merge=video:choveshki-istorii
@@ -31,7 +30,6 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient, type ArticleSection } from '@prisma/client';
 import { buildArticlePath } from '../articles/section.util';
 import {
-  CATEGORY_PARENT,
   DEFAULT_CATEGORY_MERGE,
   HIDDEN_CMS_CATEGORY_SLUGS,
   isLocationCategorySlug,
@@ -39,6 +37,7 @@ import {
   resolveCategoryPlacement,
   shouldMarkSponsored,
 } from '../categories/canonical-categories';
+import { flattenCategoryTree } from '../categories/flatten-categories';
 import { sectionFromCategorySlugs } from '../categories/category-section';
 import { attachLocationTags } from './location-tags';
 
@@ -68,25 +67,6 @@ function parseFlags(argv: string[]): Flags {
   return flags as Flags;
 }
 
-async function restoreCategoryTree(prisma: PrismaClient) {
-  const rows = await prisma.category.findMany({
-    select: { id: true, slug: true },
-  });
-  const bySlug = new Map(rows.map((row) => [row.slug, row.id]));
-  let updated = 0;
-  for (const [childSlug, parentSlug] of Object.entries(CATEGORY_PARENT)) {
-    const childId = bySlug.get(childSlug);
-    const parentId = bySlug.get(parentSlug);
-    if (!childId || !parentId) continue;
-    await prisma.category.update({
-      where: { id: childId },
-      data: { parentId },
-    });
-    updated += 1;
-  }
-  return updated;
-}
-
 async function main() {
   const flags = parseFlags(process.argv.slice(2));
   const dryRun = Boolean(flags['dry-run']);
@@ -108,18 +88,16 @@ async function main() {
   });
 
   try {
+    const flattened = await flattenCategoryTree(prisma, { dryRun });
+    console.log(
+      `${dryRun ? '[dry-run] ' : ''}flatten subcategories: merged ${flattened.merged}, promoted ${flattened.promoted}, relinked ${flattened.relinked}`,
+    );
+
     const categories = await prisma.category.findMany({
       select: { id: true, slug: true, nameBg: true, parentId: true },
     });
     const bySlug = new Map(categories.map((row) => [row.slug, row]));
     const byId = new Map(categories.map((row) => [row.id, row]));
-
-    if (!dryRun) {
-      const restored = await restoreCategoryTree(prisma);
-      console.log(`Restored parent/child links on ${restored} categor${restored === 1 ? 'y' : 'ies'}.`);
-    } else {
-      console.log('[dry-run] would restore CMS parent/child links from the seed tree.');
-    }
 
     const articles = await prisma.article.findMany({
       select: {

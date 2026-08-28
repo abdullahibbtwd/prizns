@@ -85,6 +85,7 @@ export type CmsArticle = {
   author: string;
   authorBg: string;
   authorSlug?: string;
+  authorImage?: string;
   authorId?: string | null;
   speaker?: string;
   speakerBg?: string;
@@ -300,7 +301,6 @@ export type ArticleFormValues = {
 
 export const ARTICLE_SECTIONS: ArticleSection[] = [
   "human-stories",
-  "featured",
   "places",
   "traditions",
   "discover",

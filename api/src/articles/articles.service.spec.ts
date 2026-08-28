@@ -104,6 +104,24 @@ describe('ArticlesService', () => {
     expect(items[0]?.titleBg).toBe('История');
   });
 
+  it('lists the latest story marked Featured, from any section', async () => {
+    await service.listPublic('featured');
+    expect(prisma.article.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        take: 1,
+        orderBy: [{ publishedAt: 'desc' }, { updatedAt: 'desc' }],
+        where: expect.objectContaining({
+          status: ArticleStatus.PUBLISHED,
+          featured: true,
+        }),
+      }),
+    );
+    const { where } = (prisma.article.findMany as jest.Mock).mock.calls[0][0] as {
+      where: { section?: unknown };
+    };
+    expect(where.section).toBeUndefined();
+  });
+
   it('gets public article by section and slug', async () => {
     const row = await service.getPublicBySectionSlug(
       'stories',
@@ -126,6 +144,19 @@ describe('ArticlesService', () => {
     prisma.article.findFirst = jest.fn().mockResolvedValue(article);
     const dto = await service.getPublicBySectionSlug('stories', 'test-story');
     expect(dto.sourced).toBe(true);
+  });
+
+  it('maps the author portrait onto the public article dto', async () => {
+    article.author = {
+      slug: 'albena-nikolova',
+      nameBg: 'Албена Николова',
+      nameEn: 'Albena Nikolova',
+      imageUrl: 'https://cdn.example/albena.jpg',
+    };
+    prisma.article.findFirst = jest.fn().mockResolvedValue(article);
+    const dto = await service.getPublicBySectionSlug('stories', 'test-story');
+    expect(dto.authorSlug).toBe('albena-nikolova');
+    expect(dto.authorImage).toBe('https://cdn.example/albena.jpg');
   });
 
   it('creates a draft article', async () => {

@@ -448,6 +448,8 @@ const cmsBg = {
     section: 'Секция',
     status: 'Статус',
     featured: 'Избрана',
+    featuredHint:
+      'Показва се във водещия разказ на началната страница. Ако са отбелязани няколко истории, се показва най-новата публикувана — от която и да е категория. Историята остава в своята секция.',
     sponsored: 'Спонсорирана',
     sourced: 'Проверена / с източници',
     sponsorName: 'Спонсор',
@@ -792,7 +794,7 @@ const cmsBg = {
   categories: {
     title: 'Категории',
     description:
-      'Йерархия на категории и подкатегории. Имената се превеждат автоматично на български и английски.',
+      'Една категория на секция — без подкатегории. Имената се превеждат автоматично на български и английски.',
     badge: '{{count}} категории',
     createTitle: 'Добавяне на категория',
     createParent: 'Категория',
@@ -1634,6 +1636,8 @@ const cmsEn = {
     section: 'Section',
     status: 'Status',
     featured: 'Featured',
+    featuredHint:
+      'Shows on the homepage Featured Editorial. If several stories are marked, the latest published one is used — from any category. The story stays in its section.',
     sponsored: 'Sponsored',
     sourced: 'Sourced / verified',
     sponsorName: 'Sponsor name',
@@ -1977,7 +1981,7 @@ const cmsEn = {
   categories: {
     title: 'Categories',
     description:
-      'A hierarchy of categories and subcategories. Names are translated automatically into Bulgarian and English.',
+      'One category per section — no subcategories. Names are translated automatically into Bulgarian and English.',
     badge: '{{count}} categories',
     createTitle: 'Add category',
     createParent: 'Category',

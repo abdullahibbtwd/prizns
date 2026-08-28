@@ -10,7 +10,6 @@ import {
   usePublicArticles,
 } from '@/lib/public-content'
 import { toHumanStoryCard } from '@/lib/section-cards'
-import { LandingCategoryChips } from '@/components/concept-3/LandingCategoryChips'
 import { SectionLoading } from '@/components/concept-3/SectionLoading'
 
 interface HumanStoriesSectionProps {
@@ -47,7 +46,6 @@ export function HumanStoriesSection({ lang }: HumanStoriesSectionProps) {
             <ViewAllLink to="/stories" lang={lang} />
           </div>
         </div>
-        <LandingCategoryChips lang={lang} landing="stories" className="mb-10" />
 
         {isLoading ? (
           <SectionLoading lang={lang} count={3} />

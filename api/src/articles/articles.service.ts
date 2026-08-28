@@ -21,6 +21,7 @@ import { CreateArticleDto } from './dto/create-article.dto';
 import { UpdateArticleDto } from './dto/update-article.dto';
 import {
   buildArticlePath,
+  isFeaturedFlagQuery,
   toPrismaSection,
   toPrismaSectionFilter,
   toPublicSection,
@@ -559,6 +560,7 @@ export class ArticlesService {
       author: article.author?.nameEn ?? article.author?.nameBg ?? '',
       authorBg: article.author?.nameBg ?? '',
       authorSlug: article.author?.slug,
+      authorImage: article.author?.imageUrl?.trim() || undefined,
       speaker: article.speakerEn ?? article.speakerBg ?? undefined,
       speakerBg: article.speakerBg ?? undefined,
       date: article.dateEn ?? article.dateBg,
@@ -662,9 +664,14 @@ export class ArticlesService {
     const where: Prisma.ArticleWhereInput = {
       status: ArticleStatus.PUBLISHED,
     };
-    const sectionFilter = toPrismaSectionFilter(section);
-    if (sectionFilter) {
-      where.section = sectionFilter;
+    const featuredFlag = isFeaturedFlagQuery(section);
+    if (featuredFlag) {
+      where.featured = true;
+    } else {
+      const sectionFilter = toPrismaSectionFilter(section);
+      if (sectionFilter) {
+        where.section = sectionFilter;
+      }
     }
     if (filters?.hasAudio === true) {
       where.audioMediaId = { not: null };
@@ -721,8 +728,11 @@ export class ArticlesService {
     }
 
     const take =
-      q || filters?.limit
-        ? Math.min(50, Math.max(1, Number(filters?.limit) || 24))
+      q || filters?.limit || featuredFlag
+        ? Math.min(
+            50,
+            Math.max(1, Number(filters?.limit) || (featuredFlag ? 1 : 24)),
+          )
         : undefined;
 
     const rows = await this.prisma.article.findMany({

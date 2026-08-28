@@ -13,28 +13,24 @@ import {
   articlePath,
   preferApi,
   usePublicArticles,
-  usePublicCategories,
   usePublicSeries,
   usePublicTags,
 } from '@/lib/public-content'
 import { useListingFilters } from '@/lib/listing-filters'
-import { landingCategoryChoices } from '@/lib/category-tree'
 import { toHumanStoryCard } from '@/lib/section-cards'
 
 export default function StoriesPage() {
   const { t } = useTranslation()
-  const { location, topic, series, category, setFilters } = useListingFilters()
+  const { location, topic, series, setFilters } = useListingFilters()
 
   const { data } = usePublicArticles('stories', {
     series: series || undefined,
     topic: topic || undefined,
     location: location || undefined,
-    categorySlug: category || undefined,
   })
   const seriesQuery = usePublicSeries()
   const topicsQuery = usePublicTags('TOPIC')
   const locationsQuery = usePublicTags('LOCATION')
-  const categoriesQuery = usePublicCategories()
 
   const stories = preferApi(
     data?.map((article) => ({
@@ -73,18 +69,6 @@ export default function StoriesPage() {
 
           <ListingFilters
             lang={lang}
-            category={{
-              value: category,
-              options: landingCategoryChoices(
-                categoriesQuery.data ?? [],
-                'stories',
-                lang,
-              ).map((item) => ({
-                value: item.slug,
-                label: item.label,
-              })),
-              onChange: (value) => setFilters({ category: value }),
-            }}
             location={{
               value: location,
               options: (locationsQuery.data ?? []).map((tag) => ({

@@ -2,8 +2,10 @@ import type { ArticleSection } from '@prisma/client';
 import { CATEGORY_SLUG_TO_SECTION } from './category-section';
 
 /**
- * Child slug → parent slug. Keep in sync with `api/prisma/seed-categories.ts`.
- * This is the CMS tree shown on Categories / the Stories dropdown.
+ * Legacy child slug → main category slug.
+ * Kept so WordPress import / flatten can fold old subcategories into the pillar.
+ * News (`novini`) and Voices (`tvoyata-duma`) stay as their own roots — they
+ * belong to a different public section than their old parent.
  */
 export const CATEGORY_PARENT: Record<string, string> = {
   'digitalna-higiena': 'kampanii',
@@ -12,7 +14,6 @@ export const CATEGORY_PARENT: Record<string, string> = {
   otbivki: 'nashite-mesta',
   'prirodno-bogatstvo': 'nashite-mesta',
   'mestni-legendi': 'sport-2',
-  novini: 'sport-2',
   predstoyashto: 'sport-2',
   'kauzi-sabitia': 'sabitia',
   'kultura-sabitia': 'sabitia',
@@ -24,7 +25,6 @@ export const CATEGORY_PARENT: Record<string, string> = {
   intervyuta: 'choveshki-istorii',
   'ot-nashte-ora': 'choveshki-istorii',
   portreti: 'choveshki-istorii',
-  'tvoyata-duma': 'choveshki-istorii',
 };
 
 export const ROOT_CATEGORY_SLUGS = [
@@ -36,6 +36,8 @@ export const ROOT_CATEGORY_SLUGS = [
   'choveshki-istorii',
   'video',
   'discover',
+  'novini',
+  'tvoyata-duma',
 ] as const;
 
 /** WordPress leftover slugs → the CMS dropdown category they belong under. */
@@ -67,10 +69,7 @@ export const LOCATION_CATEGORY_NAMES: Record<
   montana: { nameBg: 'Монтана', nameEn: 'Montana' },
 };
 
-export const CANONICAL_CATEGORY_SLUGS = new Set<string>([
-  ...ROOT_CATEGORY_SLUGS,
-  ...Object.keys(CATEGORY_PARENT),
-]);
+export const CANONICAL_CATEGORY_SLUGS = new Set<string>([...ROOT_CATEGORY_SLUGS]);
 
 export type CategoryPlacement = {
   categorySlugs: string[];
@@ -117,17 +116,20 @@ function applyMerge(slug: string, merge: Record<string, string>): string {
   return current;
 }
 
-function scoreSlug(slug: string, section?: ArticleSection): number {
-  const isChild = Boolean(CATEGORY_PARENT[slug]);
+function scoreSlug(
+  slug: string,
+  section: ArticleSection | undefined,
+  fromCity: Set<string>,
+): number {
   const mappedSection = CATEGORY_SLUG_TO_SECTION[slug];
-  let score = isChild ? 20 : 10;
+  let score = fromCity.has(slug) ? 0 : 10;
   if (section && mappedSection === section) score += 5;
   return score;
 }
 
 /**
- * Collapse WordPress multi-tags onto the CMS tree: one topic category,
- * cities become location tags (the public map / place filter).
+ * Collapse WordPress multi-tags onto one main category.
+ * Old subcategory slugs fold into their pillar. Cities become location tags.
  */
 export function resolveCategoryPlacement(
   slugs: Array<string | null | undefined>,
@@ -135,6 +137,7 @@ export function resolveCategoryPlacement(
   opts: ResolvePlacementOptions = {},
 ): CategoryPlacement {
   const merge = {
+    ...CATEGORY_PARENT,
     ...(opts.noDefaultMerge ? {} : DEFAULT_CATEGORY_MERGE),
     ...(opts.merge ?? {}),
   };
@@ -142,6 +145,7 @@ export function resolveCategoryPlacement(
   const locationSeen = new Set<LocationCategorySlug>();
   const topicSlugs: string[] = [];
   const topicSeen = new Set<string>();
+  const fromCity = new Set<string>();
 
   for (const raw of slugs) {
     const key = raw?.trim();
@@ -157,10 +161,11 @@ export function resolveCategoryPlacement(
     if (topicSeen.has(mapped)) continue;
     topicSeen.add(mapped);
     topicSlugs.push(mapped);
+    if (isLocationCategorySlug(key)) fromCity.add(mapped);
   }
 
   const ranked = topicSlugs.slice().sort((a, b) => {
-    const diff = scoreSlug(b, section) - scoreSlug(a, section);
+    const diff = scoreSlug(b, section, fromCity) - scoreSlug(a, section, fromCity);
     if (diff !== 0) return diff;
     return topicSlugs.indexOf(a) - topicSlugs.indexOf(b);
   });

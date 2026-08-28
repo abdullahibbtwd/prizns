@@ -286,4 +286,35 @@ describe('ArticlePage', () => {
       'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
     )
   })
+
+  it('shows the author portrait next to the byline', async () => {
+    getPublicArticle.mockResolvedValue(
+      buildCmsArticle({
+        section: 'stories',
+        slug: 'village-life',
+        path: '/stories/village-life',
+        title: 'Village life',
+        titleBg: 'Селски живот',
+        author: 'Maya Ilieva',
+        authorBg: 'Мая Илиева',
+        authorSlug: 'maya-ilieva',
+        authorImage: 'https://cdn.example/maya.jpg',
+        body: [
+          {
+            type: 'paragraph',
+            text: 'First paragraph of the story.',
+            textBg: 'Първи параграф.',
+          },
+        ],
+      }),
+    )
+
+    renderArticle()
+    const byline = await screen.findByRole('link', { name: /Maya Ilieva/ })
+    expect(byline).toHaveAttribute('href', '/authors/maya-ilieva')
+    expect(byline.querySelector('img')).toHaveAttribute(
+      'src',
+      'https://cdn.example/maya.jpg',
+    )
+  })
 })

@@ -1,9 +1,6 @@
 import type { JournalLang } from '@/components/concept-3/JournalShell'
 import { JournalSelect } from '@/components/ui/JournalSelect'
 import type { JournalSelectOption } from '@/components/ui/JournalSelect'
-import type { LandingKey } from '@/lib/category-section'
-import { landingCategoryChoices } from '@/lib/category-tree'
-import { usePublicCategories } from '@/lib/public-content'
 
 export type ListingFilterField = {
   value: string
@@ -16,23 +13,14 @@ export function ListingFilters({
   location,
   topic,
   series,
-  category,
 }: {
   lang: JournalLang
   location?: ListingFilterField
   topic?: ListingFilterField
   series?: ListingFilterField
-  category?: ListingFilterField
 }) {
   const allLabel = lang === 'bg' ? 'Всички' : 'All'
   const fields = [
-    category
-      ? {
-          name: 'category',
-          label: lang === 'bg' ? 'Категория' : 'Category',
-          field: category,
-        }
-      : null,
     location
       ? {
           name: 'location',
@@ -82,34 +70,5 @@ export function ListingFilters({
         ))}
       </div>
     </div>
-  )
-}
-
-export function LandingCategoryFilters({
-  lang,
-  landing,
-  category,
-  onChange,
-}: {
-  lang: JournalLang
-  landing: LandingKey
-  category: string
-  onChange: (value: string) => void
-}) {
-  const { data } = usePublicCategories()
-  const options = landingCategoryChoices(data ?? [], landing, lang)
-  if (options.length === 0) return null
-  return (
-    <ListingFilters
-      lang={lang}
-      category={{
-        value: category,
-        options: options.map((item) => ({
-          value: item.slug,
-          label: item.label,
-        })),
-        onChange,
-      }}
-    />
   )
 }

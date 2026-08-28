@@ -58,6 +58,7 @@ export type PublicArticleDto = {
   author: string;
   authorBg: string;
   authorSlug?: string;
+  authorImage?: string;
   speaker?: string;
   speakerBg?: string;
   date: string;

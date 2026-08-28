@@ -44,6 +44,11 @@ export function toPrismaSection(section: string): ArticleSection {
   return normalized as ArticleSection;
 }
 
+/** Public list `section=featured` uses the Featured checkbox, not ArticleSection.featured. */
+export function isFeaturedFlagQuery(section?: string): boolean {
+  return section === 'featured';
+}
+
 /** Sections filter for public list/detail (stories maps to both featured + human_stories). */
 export function toPrismaSectionFilter(
   section?: string,

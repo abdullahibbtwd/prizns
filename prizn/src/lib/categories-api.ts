@@ -32,7 +32,6 @@ export function createCmsCategory(body: {
   nameBg: string
   slug?: string
   descriptionBg?: string
-  parentId?: string
 }) {
   return api.post<CmsCategory>('/cms/categories', body)
 }
@@ -43,7 +42,6 @@ export function updateCmsCategory(
     nameBg: string
     slug: string
     descriptionBg: string
-    parentId: string | null
     nameEn: string
     descriptionEn: string
   }>,

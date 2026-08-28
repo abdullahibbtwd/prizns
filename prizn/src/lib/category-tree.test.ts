@@ -42,6 +42,6 @@ describe('visibleCmsCategories', () => {
     ])
     expect(
       categorySelectOptions(rows, 'en', 'slug').map((row) => row.value),
-    ).toEqual(['choveshki-istorii', 'portreti', 'video'])
+    ).toEqual(['choveshki-istorii', 'video'])
   })
 })

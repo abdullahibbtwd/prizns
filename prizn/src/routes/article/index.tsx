@@ -88,6 +88,7 @@ function toJournalArticle(api: CmsArticle): JournalArticle {
     author: api.author,
     authorBg: api.authorBg,
     authorSlug: api.authorSlug,
+    authorImage: api.authorImage,
     speaker: api.speaker,
     speakerBg: api.speakerBg,
     date: api.date,
@@ -367,6 +368,13 @@ function ArticleContent({
   const [hasRelated, setHasRelated] = useState(initialHasRelated)
   const [saved, setSaved] = useState(false)
   const author = getAuthorForArticle(article)
+  const authorName = author
+    ? pick(lang, author.name, author.nameBg)
+    : pick(lang, article.author, article.authorBg)
+  const authorPath =
+    author?.path ??
+    (article.authorSlug ? `/authors/${article.authorSlug}` : undefined)
+  const authorPhoto = (article.authorImage || author?.image || '').trim()
   const articleId = article.sourceId
 
   useEffect(() => {
@@ -607,24 +615,48 @@ function ArticleContent({
           {pick(lang, article.subtitle, article.subtitleBg)}
         </p>
 
-        <div className="mb-8 text-center">
-          <p className="mb-1 font-sans text-xs uppercase tracking-[0.2em] text-[#1A1A1A]/40">
-            {article.speaker ? (
-              `${t('voice')}${pick(lang, article.speaker, article.speakerBg ?? article.speaker)}`
-            ) : author ? (
-              <>
+        <div className="mb-8 flex flex-col items-center text-center">
+          {article.speaker ? (
+            <p className="mb-1 font-sans text-xs uppercase tracking-[0.2em] text-[#1A1A1A]/40">
+              {`${t('voice')}${pick(lang, article.speaker, article.speakerBg ?? article.speaker)}`}
+            </p>
+          ) : authorName && authorPath ? (
+            <Link
+              to={authorPath}
+              className="group mb-1 flex items-center justify-center gap-2.5"
+            >
+              {authorPhoto ? (
+                <img
+                  src={authorPhoto}
+                  alt=""
+                  className="size-9 rounded-full object-cover ring-1 ring-[#EAE6DF]"
+                />
+              ) : null}
+              <span className="font-sans text-xs uppercase tracking-[0.2em] text-[#1A1A1A]/40">
                 {t('wordsBy')}
-                <Link
-                  to={author.path}
-                  className="cursor-pointer text-[#0C2686] transition-colors hover:text-[#1A1A1A]"
-                >
-                  {pick(lang, author.name, author.nameBg)}
-                </Link>
-              </>
-            ) : (
-              pick(lang, `Words by ${article.author}`, `Текст: ${article.authorBg}`)
-            )}
-          </p>
+                <span className="text-[#0C2686] transition-colors group-hover:text-[#1A1A1A]">
+                  {authorName}
+                </span>
+              </span>
+            </Link>
+          ) : authorName ? (
+            <div className="mb-1 flex items-center justify-center gap-2.5">
+              {authorPhoto ? (
+                <img
+                  src={authorPhoto}
+                  alt=""
+                  className="size-9 rounded-full object-cover ring-1 ring-[#EAE6DF]"
+                />
+              ) : null}
+              <p className="font-sans text-xs uppercase tracking-[0.2em] text-[#1A1A1A]/40">
+                {pick(
+                  lang,
+                  `Words by ${article.author}`,
+                  `Текст: ${article.authorBg}`,
+                )}
+              </p>
+            </div>
+          ) : null}
           <p className="font-sans text-xs font-light text-[#1A1A1A]/60">
             {`${t('published')}${pick(lang, article.date, article.dateBg)}`}
           </p>

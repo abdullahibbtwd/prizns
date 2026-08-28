@@ -63,6 +63,7 @@ describe('FeaturedStoryCard', () => {
         <FeaturedStoryCard lang="en" />
       </MemoryRouter>,
     )
+    expect(usePublicArticles).toHaveBeenCalledWith('featured', { limit: 1 })
     expect(screen.getByText('Featured Editorial')).toBeInTheDocument()
     expect(screen.getByText('Featured place')).toBeInTheDocument()
     expect(screen.getAllByText('Sponsored by Partner')).toHaveLength(2)

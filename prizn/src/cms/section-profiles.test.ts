@@ -22,10 +22,12 @@ describe('getSectionProfile', () => {
     expect(profile.defaultCategoryBg).toBeTruthy()
   })
 
-  it('hides sports and news from the editor dropdown unless already selected', () => {
+  it('hides sports, news, and featured from the editor dropdown unless already selected', () => {
     expect(editorSectionChoices()).not.toContain('sports')
     expect(editorSectionChoices()).not.toContain('news')
+    expect(editorSectionChoices()).not.toContain('featured')
     expect(editorSectionChoices('sports')).toContain('sports')
+    expect(editorSectionChoices('featured')).toContain('featured')
     expect(editorSectionChoices('human-stories')).not.toContain('news')
   })
 })

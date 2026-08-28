@@ -3,13 +3,11 @@ import { motion } from 'framer-motion'
 import { MapPin } from 'lucide-react'
 import { JournalShell } from '@/components/concept-3/JournalShell'
 import { ListingHeader } from '@/components/concept-3/ListingHeader'
-import { LandingCategoryFilters } from '@/components/concept-3/ListingFilters'
 import {
   articlePath,
   preferApi,
   usePublicArticles,
 } from '@/lib/public-content'
-import { useListingFilters } from '@/lib/listing-filters'
 import type { CmsArticle } from '@/lib/cms-types'
 
 function toNewsCard(article: CmsArticle) {
@@ -30,10 +28,7 @@ function toNewsCard(article: CmsArticle) {
 }
 
 export default function NewsPage() {
-  const { category, setFilters } = useListingFilters()
-  const { data } = usePublicArticles('news', {
-    categorySlug: category || undefined,
-  })
+  const { data } = usePublicArticles('news')
 
   return (
     <JournalShell>
@@ -54,13 +49,6 @@ export default function NewsPage() {
               countLabel={
                 lang === 'bg' ? `${items.length} материала` : `${items.length} pieces`
               }
-            />
-
-            <LandingCategoryFilters
-              lang={lang}
-              landing="news"
-              category={category}
-              onChange={(value) => setFilters({ category: value })}
             />
 
             <div className="mx-auto max-w-7xl px-6 py-16 md:px-12 md:py-20">

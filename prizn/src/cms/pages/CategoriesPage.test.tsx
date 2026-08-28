@@ -30,8 +30,8 @@ describe('CmsCategoriesPage', () => {
         nameEn: 'Our places',
         descriptionBg: null,
         parentId: null,
-        articleCount: 0,
-        childCount: 1,
+        articleCount: 22,
+        childCount: 0,
       },
       {
         id: 'cat-2',
@@ -49,28 +49,14 @@ describe('CmsCategoriesPage', () => {
     deleteCmsCategory.mockResolvedValue(undefined)
   })
 
-  it('lists parent categories and hides slugs until expanded', async () => {
+  it('lists main categories and hides leftover subcategories', async () => {
     renderPage(<CmsCategoriesPage />)
     expect(await screen.findByText('Our places')).toBeInTheDocument()
     expect(screen.queryByText('Detours')).not.toBeInTheDocument()
-    expect(screen.queryByText('/otbivki')).not.toBeInTheDocument()
-    expect(screen.queryByText('/nashite-mesta')).not.toBeInTheDocument()
+    expect(screen.queryByText('cms.categories.createChild')).not.toBeInTheDocument()
   })
 
-  it('shows subcategories after expanding a parent', async () => {
-    const user = userEvent.setup()
-    renderPage(<CmsCategoriesPage />)
-    await screen.findByText('Our places')
-
-    await user.click(
-      screen.getByRole('button', {
-        name: /cms.categories.expand:Our places/,
-      }),
-    )
-    expect(await screen.findByText('Detours')).toBeInTheDocument()
-  })
-
-  it('creates a parent category', async () => {
+  it('creates a category', async () => {
     const user = userEvent.setup()
     renderPage(<CmsCategoriesPage />)
     await screen.findByText('Our places')
@@ -87,32 +73,6 @@ describe('CmsCategoriesPage', () => {
       expect(createCmsCategory).toHaveBeenCalledWith({
         nameBg: 'Бизнес',
         descriptionBg: undefined,
-        parentId: undefined,
-      })
-    })
-  })
-
-  it('creates a subcategory under a parent', async () => {
-    const user = userEvent.setup()
-    renderPage(<CmsCategoriesPage />)
-    await screen.findByText('Our places')
-
-    await user.click(screen.getByText('cms.categories.createChild'))
-    await user.type(
-      screen.getByPlaceholderText('cms.categories.namePlaceholder'),
-      'Отбивки',
-    )
-    await user.click(screen.getByText('cms.categories.noParent'))
-    await user.click(screen.getByRole('option', { name: 'Our places' }))
-    await user.click(
-      screen.getByRole('button', { name: 'cms.categories.addChild' }),
-    )
-
-    await waitFor(() => {
-      expect(createCmsCategory).toHaveBeenCalledWith({
-        nameBg: 'Отбивки',
-        descriptionBg: undefined,
-        parentId: 'cat-1',
       })
     })
   })
@@ -158,7 +118,7 @@ describe('CmsCategoriesPage', () => {
     })
   })
 
-  it('paginates parent categories to page 2', async () => {
+  it('paginates categories to page 2', async () => {
     const user = userEvent.setup()
     listCmsCategories.mockResolvedValue(
       Array.from({ length: 21 }, (_, i) => ({
