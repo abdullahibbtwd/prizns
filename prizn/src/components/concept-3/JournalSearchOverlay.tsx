@@ -4,17 +4,13 @@ import { Search, X } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { Logo } from '@/components/Logo'
 import type { JournalLang } from '@/components/concept-3/JournalShell'
-import { articlePath, usePublicArticleSearch } from '@/lib/public-content'
+import {
+  articlePath,
+  usePopularStories,
+  usePublicArticleSearch,
+} from '@/lib/public-content'
 import { pickLang } from '@/lib/pick-lang'
 import { getSectionLabel } from '@/lib/section-i18n'
-
-const SUGGESTIONS = [
-  'Белоградчик',
-  'Чипровски килими',
-  'Дунавски рибари',
-  'Магията на кваса',
-  'Вършец минерални извори',
-]
 
 export function JournalSearchOverlay({
   lang,
@@ -45,7 +41,9 @@ export function JournalSearchOverlay({
   }, [onClose])
 
   const searchQuery = usePublicArticleSearch(debounced)
+  const popularQuery = usePopularStories(5)
   const results = searchQuery.data ?? []
+  const popular = popularQuery.data ?? []
   const canSearch = debounced.length >= 2
 
   return (
@@ -90,21 +88,26 @@ export function JournalSearchOverlay({
           />
         </div>
 
-        <div className="mt-8 flex flex-wrap items-center justify-center gap-2">
-          <span className="mr-2 text-xs uppercase tracking-widest text-[#1A1A1A]/50">
-            {lang === 'bg' ? 'Популярни:' : 'Popular:'}
-          </span>
-          {SUGGESTIONS.map((item) => (
-            <button
-              key={item}
-              type="button"
-              onClick={() => setQuery(item)}
-              className="rounded-full bg-black/5 px-3 py-1 font-sans text-xs text-[#1A1A1A]/70 hover:text-[#0C2686] hover:underline"
-            >
-              {item}
-            </button>
-          ))}
-        </div>
+        {popular.length > 0 ? (
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-2">
+            <span className="mr-2 text-xs uppercase tracking-widest text-[#1A1A1A]/50">
+              {lang === 'bg' ? 'Популярни:' : 'Popular:'}
+            </span>
+            {popular.map((story) => {
+              const title = pickLang(lang, story.title, story.titleBg)
+              return (
+                <Link
+                  key={story.id}
+                  to={articlePath(story)}
+                  onClick={onClose}
+                  className="rounded-full bg-black/5 px-3 py-1 font-sans text-xs text-[#1A1A1A]/70 hover:text-[#0C2686] hover:underline"
+                >
+                  {title}
+                </Link>
+              )
+            })}
+          </div>
+        ) : null}
 
         <div className="mt-10 min-h-0 flex-1 overflow-y-auto">
           {!canSearch ? (

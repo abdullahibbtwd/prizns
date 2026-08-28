@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { buildCmsArticle } from '@/test/factories'
 import { JournalSearchOverlay } from './JournalSearchOverlay'
 
@@ -17,6 +17,7 @@ vi.mock('framer-motion', () => ({
 }))
 
 const usePublicArticleSearch = vi.fn()
+const usePopularStories = vi.fn()
 
 vi.mock('@/lib/public-content', async () => {
   const actual = await vi.importActual<typeof import('@/lib/public-content')>(
@@ -26,6 +27,7 @@ vi.mock('@/lib/public-content', async () => {
     ...actual,
     usePublicArticleSearch: (...args: unknown[]) =>
       usePublicArticleSearch(...args),
+    usePopularStories: (...args: unknown[]) => usePopularStories(...args),
   }
 })
 
@@ -38,6 +40,10 @@ function renderOverlay() {
 }
 
 describe('JournalSearchOverlay', () => {
+  beforeEach(() => {
+    usePopularStories.mockReturnValue({ data: [], isFetching: false })
+  })
+
   it('asks for at least two characters before searching', () => {
     usePublicArticleSearch.mockReturnValue({ data: [], isFetching: false })
     renderOverlay()
@@ -91,5 +97,39 @@ describe('JournalSearchOverlay', () => {
     await waitFor(() => {
       expect(screen.getByText('No stories for “zzzz”.')).toBeInTheDocument()
     })
+  })
+
+  it('links popular chips to the most visited stories', () => {
+    usePublicArticleSearch.mockReturnValue({ data: [], isFetching: false })
+    usePopularStories.mockReturnValue({
+      data: [
+        {
+          id: 'a1',
+          slug: 'belogradchik',
+          path: '/places/belogradchik',
+          section: 'places',
+          title: 'Belogradchik',
+          titleBg: 'Белоградчик',
+        },
+        {
+          id: 'a2',
+          slug: 'kilims',
+          path: '/traditions/kilims',
+          section: 'traditions',
+          title: 'Chiprovtsi kilims',
+          titleBg: 'Чипровски килими',
+        },
+      ],
+      isFetching: false,
+    })
+    renderOverlay()
+    expect(screen.getByText('Popular:')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Belogradchik' })).toHaveAttribute(
+      'href',
+      '/places/belogradchik',
+    )
+    expect(
+      screen.getByRole('link', { name: 'Chiprovtsi kilims' }),
+    ).toHaveAttribute('href', '/traditions/kilims')
   })
 })

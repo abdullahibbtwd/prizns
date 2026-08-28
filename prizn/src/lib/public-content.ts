@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { listPublicArticles, listPublicMedia } from "@/lib/articles-api";
+import { listPopularStories } from "@/lib/analytics-api";
 import type { CmsArticle } from "@/lib/cms-types";
 import { listPublicTags, type TagKind } from "@/lib/tags-api";
 import { listPublicCategories } from "@/lib/categories-api";
@@ -131,6 +132,15 @@ export function usePublicArticleSearch(q: string) {
     queryFn: () => listPublicArticles(undefined, { q: trimmed, limit: 12 }),
     enabled: trimmed.length >= 2,
     staleTime: 30_000,
+    retry: false,
+  })
+}
+
+export function usePopularStories(limit = 5) {
+  return useQuery({
+    queryKey: ["popular-stories", limit],
+    queryFn: () => listPopularStories(limit),
+    staleTime: 5 * 60_000,
     retry: false,
   })
 }

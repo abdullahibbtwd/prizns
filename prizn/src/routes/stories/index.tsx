@@ -8,29 +8,21 @@ import { ListingHeader } from '@/components/concept-3/ListingHeader'
 import { EpisodeBadge } from '@/components/concept-3/EpisodeBadge'
 import { SponsoredBadge } from '@/components/concept-3/SponsoredBadge'
 import { RegionMap } from '@/components/concept-3/RegionMap'
-import { ListingFilters } from '@/components/concept-3/ListingFilters'
 import {
   articlePath,
   preferApi,
   usePublicArticles,
-  usePublicSeries,
-  usePublicTags,
 } from '@/lib/public-content'
 import { useListingFilters } from '@/lib/listing-filters'
 import { toHumanStoryCard } from '@/lib/section-cards'
 
 export default function StoriesPage() {
   const { t } = useTranslation()
-  const { location, topic, series, setFilters } = useListingFilters()
+  const { location, setFilters } = useListingFilters()
 
   const { data } = usePublicArticles('stories', {
-    series: series || undefined,
-    topic: topic || undefined,
     location: location || undefined,
   })
-  const seriesQuery = usePublicSeries()
-  const topicsQuery = usePublicTags('TOPIC')
-  const locationsQuery = usePublicTags('LOCATION')
 
   const stories = preferApi(
     data?.map((article) => ({
@@ -67,40 +59,12 @@ export default function StoriesPage() {
             onSelect={(slug) => setFilters({ location: slug })}
           />
 
-          <ListingFilters
-            lang={lang}
-            location={{
-              value: location,
-              options: (locationsQuery.data ?? []).map((tag) => ({
-                value: tag.slug,
-                label: lang === 'bg' ? tag.nameBg : tag.name,
-              })),
-              onChange: (value) => setFilters({ location: value }),
-            }}
-            topic={{
-              value: topic,
-              options: (topicsQuery.data ?? []).map((tag) => ({
-                value: tag.slug,
-                label: lang === 'bg' ? tag.nameBg : tag.name,
-              })),
-              onChange: (value) => setFilters({ topic: value }),
-            }}
-            series={{
-              value: series,
-              options: (seriesQuery.data ?? []).map((item) => ({
-                value: item.slug,
-                label: lang === 'bg' ? item.titleBg : item.title || item.titleBg,
-              })),
-              onChange: (value) => setFilters({ series: value }),
-            }}
-          />
-
           <div className="mx-auto max-w-7xl px-6 py-16 md:px-12 md:py-20">
             {stories.length === 0 ? (
               <p className="text-center font-sans text-sm text-[#1A1A1A]/55">
                 {lang === 'bg'
-                  ? 'Няма истории с тези филтри.'
-                  : 'No stories match these filters.'}
+                  ? 'Няма публикувани истории.'
+                  : 'No published stories yet.'}
               </p>
             ) : (
               <div className="grid grid-cols-1 gap-10 md:grid-cols-2 lg:grid-cols-3">

@@ -1,4 +1,5 @@
 import { api } from '@/lib/api'
+import type { ArticleSection } from '@/lib/cms-types'
 
 export type AnalyticsRange = 'today' | 'week' | 'month'
 
@@ -75,4 +76,17 @@ export function getAnalyticsSummary(range: AnalyticsRange = 'today') {
 
 export function sendAnalyticsBeacon(body: BeaconPayload) {
   return api.post<BeaconResponse>('/analytics/beacon', body)
+}
+
+export type PopularStory = {
+  id: string
+  slug: string
+  path: string
+  section: ArticleSection
+  title: string
+  titleBg: string
+}
+
+export function listPopularStories(limit = 5) {
+  return api.get<PopularStory[]>(`/analytics/popular?limit=${limit}`)
 }

@@ -102,7 +102,7 @@ import {
   listCmsSubmissions,
   updateCmsSubmission,
 } from '@/lib/submissions-api'
-import { getAnalyticsSummary, sendAnalyticsBeacon } from '@/lib/analytics-api'
+import { getAnalyticsSummary, listPopularStories, sendAnalyticsBeacon } from '@/lib/analytics-api'
 import { fetchRegionalContext, suggestCmsAi, askArchive } from '@/lib/ai-api'
 import {
   getCmsDigestPreview,
@@ -494,6 +494,7 @@ describe('cms dashboard / users / digest / social / community / content', () => 
     await listCmsDigestHistory()
     await sendCmsDigest({ seriesId: 'ser-1' })
     await getAnalyticsSummary('week')
+    await listPopularStories(5)
     await sendAnalyticsBeacon({
       visitorKey: 'v',
       event: 'pageview',
@@ -511,6 +512,7 @@ describe('cms dashboard / users / digest / social / community / content', () => 
       '/cms/digest/preview?seriesId=ser-1',
     )
     expect(mocked.get).toHaveBeenCalledWith('/cms/analytics/summary?range=week')
+    expect(mocked.get).toHaveBeenCalledWith('/analytics/popular?limit=5')
     expect(mocked.get).toHaveBeenCalledWith('/cms/dashboard/search?q=vidin')
     expect(mocked.get).toHaveBeenCalledWith('/cms/seo/overview')
     expect(mocked.post).toHaveBeenCalledWith('/archive/ask', {

@@ -30,6 +30,12 @@ describe('AnalyticsService', () => {
         ]),
         groupBy: jest.fn().mockResolvedValue([]),
       },
+      articleReaction: {
+        groupBy: jest.fn().mockResolvedValue([]),
+      },
+      article: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
       analyticsClick: {
         create: jest.fn().mockResolvedValue({ id: 'clk-1' }),
         findMany: jest.fn().mockResolvedValue([]),
@@ -99,5 +105,55 @@ describe('AnalyticsService', () => {
     });
     expect(result).toEqual({ sessionId: 'sess-1', ignored: true });
     expect(prisma.analyticsClick.create).not.toHaveBeenCalled();
+  });
+
+  it('ranks popular stories by visits, then relates', async () => {
+    prisma.pageView.groupBy.mockResolvedValue([
+      { articleId: 'a1', _count: { _all: 40 } },
+      { articleId: 'draft', _count: { _all: 99 } },
+    ]);
+    prisma.articleReaction.groupBy.mockResolvedValue([
+      { articleId: 'a2', _count: { _all: 12 } },
+    ]);
+    prisma.article.findMany.mockImplementation(async (args: { where?: { id?: { in?: string[]; notIn?: string[] } } }) => {
+      if (args.where?.id && 'in' in args.where.id) {
+        return [
+          {
+            id: 'a1',
+            slug: 'belogradchik',
+            path: '/places/belogradchik',
+            section: 'places',
+            titleBg: 'Белоградчик',
+            titleEn: 'Belogradchik',
+          },
+          {
+            id: 'a2',
+            slug: 'kilims',
+            path: '/traditions/kilims',
+            section: 'traditions',
+            titleBg: 'Чипровски килими',
+            titleEn: null,
+          },
+        ];
+      }
+      return [
+        {
+          id: 'a3',
+          slug: 'fishers',
+          path: null,
+          section: 'human_stories',
+          titleBg: 'Дунавски рибари',
+          titleEn: null,
+        },
+      ];
+    });
+
+    const stories = await service.popularStories(5);
+    expect(stories.map((row) => row.id)).toEqual(['a1', 'a2', 'a3']);
+    expect(stories[0]).toMatchObject({
+      title: 'Belogradchik',
+      path: '/places/belogradchik',
+    });
+    expect(stories[2].path).toBe('/stories/fishers');
   });
 });

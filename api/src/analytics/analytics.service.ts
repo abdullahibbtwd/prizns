@@ -1,8 +1,22 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { AnalyticsClickKind, Prisma } from '@prisma/client';
+import { AnalyticsClickKind, ArticleStatus, Prisma } from '@prisma/client';
 import { checkRateLimit } from '../common/rate-limit';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  buildArticlePath,
+  toPublicSection,
+  type PublicSection,
+} from '../articles/section.util';
 import { AnalyticsBeaconDto } from './dto/beacon.dto';
+
+export type PopularStory = {
+  id: string;
+  slug: string;
+  path: string;
+  section: PublicSection;
+  title: string;
+  titleBg: string;
+};
 
 export type AnalyticsRange = 'today' | 'week' | 'month';
 
@@ -419,5 +433,94 @@ export class AnalyticsService {
         views: Number(row.views),
       })),
     };
+  }
+
+  /** Top published stories for the public search overlay: visits, then relates, then newest. */
+  async popularStories(limit = 5): Promise<PopularStory[]> {
+    const take = Math.min(10, Math.max(1, Math.floor(Number(limit)) || 5));
+    const { start, end } = rangeWindow('month');
+
+    const [topViews, topRelates] = await Promise.all([
+      this.prisma.pageView.groupBy({
+        by: ['articleId'],
+        where: {
+          startedAt: { gte: start, lt: end },
+          articleId: { not: null },
+        },
+        _count: { _all: true },
+        orderBy: { _count: { articleId: 'desc' } },
+        take: take * 4,
+      }),
+      this.prisma.articleReaction.groupBy({
+        by: ['articleId'],
+        where: { kind: 'RELATE' },
+        _count: { _all: true },
+        orderBy: { _count: { articleId: 'desc' } },
+        take: take * 4,
+      }),
+    ]);
+
+    const orderedIds: string[] = [];
+    const seen = new Set<string>();
+    for (const row of topViews) {
+      if (row.articleId && !seen.has(row.articleId)) {
+        seen.add(row.articleId);
+        orderedIds.push(row.articleId);
+      }
+    }
+    for (const row of topRelates) {
+      if (!seen.has(row.articleId)) {
+        seen.add(row.articleId);
+        orderedIds.push(row.articleId);
+      }
+    }
+
+    const publishedSelect = {
+      id: true,
+      slug: true,
+      path: true,
+      section: true,
+      titleBg: true,
+      titleEn: true,
+    } as const;
+
+    const ranked = orderedIds.length
+      ? await this.prisma.article.findMany({
+          where: {
+            id: { in: orderedIds },
+            status: ArticleStatus.PUBLISHED,
+          },
+          select: publishedSelect,
+        })
+      : [];
+    const rankedMap = new Map(ranked.map((article) => [article.id, article]));
+    const picked = orderedIds
+      .map((id) => rankedMap.get(id))
+      .filter((article): article is (typeof ranked)[number] => Boolean(article))
+      .slice(0, take);
+
+    if (picked.length < take) {
+      const more = await this.prisma.article.findMany({
+        where: {
+          status: ArticleStatus.PUBLISHED,
+          id: { notIn: picked.map((article) => article.id) },
+        },
+        orderBy: { publishedAt: 'desc' },
+        take: take - picked.length,
+        select: publishedSelect,
+      });
+      picked.push(...more);
+    }
+
+    return picked.map((article) => ({
+      id: article.id,
+      slug: article.slug,
+      path: article.path
+        ? normalizePath(article.path)
+        : buildArticlePath(article.section, article.slug),
+      section: toPublicSection(article.section),
+      title: article.titleEn || article.titleBg,
+      titleBg: article.titleBg,
+    }));
   }
 }

@@ -42,8 +42,6 @@ vi.mock('react-i18next', () => ({
 }))
 
 const usePublicArticles = vi.fn()
-const usePublicSeries = vi.fn()
-const usePublicTags = vi.fn()
 
 vi.mock('@/lib/public-content', async () => {
   const actual = await vi.importActual<typeof import('@/lib/public-content')>(
@@ -52,8 +50,6 @@ vi.mock('@/lib/public-content', async () => {
   return {
     ...actual,
     usePublicArticles: (...args: unknown[]) => usePublicArticles(...args),
-    usePublicSeries: (...args: unknown[]) => usePublicSeries(...args),
-    usePublicTags: (...args: unknown[]) => usePublicTags(...args),
   }
 })
 
@@ -76,8 +72,6 @@ describe('StoriesPage', () => {
         }),
       ],
     })
-    usePublicSeries.mockReturnValue({ data: [] })
-    usePublicTags.mockReturnValue({ data: [] })
   })
 
   it('lists human stories from the API', () => {
@@ -87,11 +81,17 @@ describe('StoriesPage', () => {
     expect(screen.getByText('1 stories')).toBeInTheDocument()
   })
 
+  it('does not render location, topic, or series dropdowns', () => {
+    renderPage(<StoriesPage />, { route: '/stories' })
+    expect(screen.queryByText('Location')).not.toBeInTheDocument()
+    expect(screen.queryByText('Topic')).not.toBeInTheDocument()
+    expect(screen.queryByText('Series')).not.toBeInTheDocument()
+  })
+
   it('reads location from the URL', () => {
     renderPage(<StoriesPage />, { route: '/stories?location=vidin&topic=test' })
-    expect(usePublicArticles).toHaveBeenCalledWith(
-      'stories',
-      expect.objectContaining({ location: 'vidin', topic: 'test' }),
-    )
+    expect(usePublicArticles).toHaveBeenCalledWith('stories', {
+      location: 'vidin',
+    })
   })
 })

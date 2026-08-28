@@ -2,6 +2,7 @@ import { renderHook, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { describe, expect, it, vi } from 'vitest'
 import {
+  usePopularStories,
   usePublicArticleSearch,
   usePublicArticles,
   usePublicAuthors,
@@ -11,6 +12,7 @@ import {
 } from './public-content'
 import * as articlesApi from './articles-api'
 import * as tagsApi from './tags-api'
+import * as analyticsApi from './analytics-api'
 
 vi.mock('./articles-api', () => ({
   listPublicArticles: vi.fn(),
@@ -19,6 +21,10 @@ vi.mock('./articles-api', () => ({
 
 vi.mock('./tags-api', () => ({
   listPublicTags: vi.fn(),
+}))
+
+vi.mock('./analytics-api', () => ({
+  listPopularStories: vi.fn(),
 }))
 
 vi.mock('./api', () => ({
@@ -138,6 +144,28 @@ describe('public content hooks', () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
     expect(articlesApi.listPublicMedia).toHaveBeenCalledWith('IMAGE')
+  })
+
+  it('fetches popular stories from analytics', async () => {
+    vi.mocked(analyticsApi.listPopularStories).mockResolvedValue([
+      {
+        id: 'a1',
+        slug: 'belogradchik',
+        path: '/places/belogradchik',
+        section: 'places',
+        title: 'Belogradchik',
+        titleBg: 'Белоградчик',
+      },
+    ])
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+
+    const { result } = renderHook(() => usePopularStories(5), {
+      wrapper: wrapper(client),
+    })
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(analyticsApi.listPopularStories).toHaveBeenCalledWith(5)
+    expect(result.current.data).toHaveLength(1)
   })
 })
 
