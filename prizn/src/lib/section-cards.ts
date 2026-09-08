@@ -3,6 +3,7 @@ import type {
   BodyBlock,
   CmsArticle,
 } from '@/lib/cms-types'
+import { richTextToPlain } from '@/lib/rich-text'
 
 /** Listing card shapes matching `journalContent` cards in content.ts */
 
@@ -61,7 +62,7 @@ function firstParagraphBg(body?: BodyBlock[] | CmsArticle['body']): string {
   if (!body?.length) return ''
   const first = body[0] as { type?: string; textBg?: string; text?: string }
   if (first.type === 'paragraph') {
-    return first.textBg || first.text || ''
+    return richTextToPlain(first.textBg || first.text || '')
   }
   return ''
 }

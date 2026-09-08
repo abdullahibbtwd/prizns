@@ -147,4 +147,31 @@ describe('article body inline images', () => {
       'paragraph',
     ]);
   });
+
+  it('maps a stored collage to public images with layout', () => {
+    expect(
+      storedBlockToPublic(
+        {
+          type: 'collage',
+          layout: 'top',
+          captionBg: 'Дворът',
+          captionEn: 'The yard',
+          items: [
+            { mediaId: 'g1', captionBg: 'One' },
+            { mediaId: 'g2', captionBg: 'Two' },
+          ],
+        },
+        gallery,
+      ),
+    ).toEqual({
+      type: 'collage',
+      layout: 'top',
+      caption: 'The yard',
+      captionBg: 'Дворът',
+      images: [
+        { url: 'https://cdn.example/one.jpg', text: 'One', textBg: 'One' },
+        { url: 'https://cdn.example/two.jpg', text: 'Two', textBg: 'Two' },
+      ],
+    });
+  });
 });

@@ -133,6 +133,39 @@
     margin: 0;
     padding: 0;
   }
+  .article-body a,
+  .rich-text a {
+    color: #0C2686;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .article-body strong,
+  .rich-text strong {
+    font-weight: 600;
+  }
+  .article-body em,
+  .rich-text em {
+    font-style: italic;
+  }
+  .article-body ul,
+  .article-body ol,
+  .rich-text ul,
+  .rich-text ol {
+    margin: 0.35em 0;
+    padding-left: 1.25rem;
+  }
+  .article-body ul,
+  .rich-text ul {
+    list-style: disc;
+  }
+  .article-body ol,
+  .rich-text ol {
+    list-style: decimal;
+  }
+  .article-body li,
+  .rich-text li {
+    margin: 0.2em 0;
+  }
 }
 
 @layer utilities {
@@ -191,7 +224,8 @@
   .article-print p,
   .article-print blockquote,
   .article-print aside,
-  .article-print figure {
+  .article-print figure,
+  .article-print .article-collage {
     break-inside: avoid;
     page-break-inside: avoid;
   }

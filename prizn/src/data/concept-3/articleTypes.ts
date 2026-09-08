@@ -56,6 +56,13 @@ export type ArticleBlock =
       text: string
       textBg: string
     }
+  | {
+      type: 'collage'
+      layout: string
+      caption: string
+      captionBg: string
+      images: Array<{ url: string; text: string; textBg: string }>
+    }
 
 export interface JournalArticle {
   /** Matches / links from cards later, e.g. "walnut-keeper-varbovo" */

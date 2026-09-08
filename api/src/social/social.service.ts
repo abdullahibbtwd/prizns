@@ -373,6 +373,18 @@ ${bodyText || '(empty)'}`
     }
   }
 
+  private stripRichText(value: string): string {
+    return value
+      .replace(/<br\s*\/?>/gi, ' ')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/\s+/g, ' ')
+      .trim()
+  }
+
   private bodyPlain(body: unknown): string {
     if (!Array.isArray(body)) return ''
     return body
@@ -380,7 +392,7 @@ ${bodyText || '(empty)'}`
         if (!block || typeof block !== 'object') return ''
         const b = block as { type?: string; textBg?: string }
         if (b.type === 'paragraph' || b.type === 'pullquote') {
-          return (b.textBg || '').trim()
+          return this.stripRichText(b.textBg || '')
         }
         return ''
       })

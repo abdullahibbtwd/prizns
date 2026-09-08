@@ -33,6 +33,8 @@ import {
   articleHeroSlides,
 } from '@/components/concept-3/ArticleHeroGallery'
 import { ImageLightbox } from '@/components/concept-3/ImageLightbox'
+import { ArticleImageCollage } from '@/components/concept-3/ArticleImageCollage'
+import { RichText } from '@/components/RichText'
 import {
   getPublicArticle,
   listRelatedArticles,
@@ -140,35 +142,79 @@ function ArticleBlocks({
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
   const fallbackAlt = pick(lang, article.title, article.titleBg)
   const slides = article.body.flatMap((block) => {
-    if (block.type !== 'image' || !block.url) return []
-    const caption = pick(lang, block.text, block.textBg).trim()
-    return [{ url: block.url, alt: caption || fallbackAlt, caption }]
+    if (block.type === 'image' && block.url) {
+      const caption = pick(lang, block.text, block.textBg).trim()
+      return [{ url: block.url, alt: caption || fallbackAlt, caption }]
+    }
+    if (block.type === 'collage') {
+      return block.images.map((image) => {
+        const caption = pick(lang, image.text, image.textBg).trim()
+        return { url: image.url, alt: caption || fallbackAlt, caption }
+      })
+    }
+    return []
   })
   const imageSlot = new Map<number, number>()
+  const collageSlot = new Map<string, number>()
   let imageOrdinal = 0
   article.body.forEach((block, index) => {
     if (block.type === 'image' && block.url) {
       imageSlot.set(index, imageOrdinal)
       imageOrdinal += 1
     }
+    if (block.type === 'collage') {
+      block.images.forEach((_, itemIndex) => {
+        collageSlot.set(`${index}:${itemIndex}`, imageOrdinal)
+        imageOrdinal += 1
+      })
+    }
   })
 
   return (
     <>
       <div className="article-body space-y-8 font-sans text-base md:text-lg text-[#1A1A1A]/80 font-light leading-relaxed">
-        {article.body.map((block, index) => (
-          <ArticleBlockView
-            key={`${block.type}-${index}`}
-            block={block}
-            lang={lang}
-            openLabel={t('viewFullPhoto')}
-            onOpenImage={
-              imageSlot.has(index)
-                ? () => setLightboxIndex(imageSlot.get(index) ?? 0)
-                : undefined
-            }
-          />
-        ))}
+        {article.body.map((block, index) => {
+          if (block.type === 'collage') {
+            return (
+              <ArticleImageCollage
+                key={`collage-block-${index}`}
+                layout={block.layout}
+                openLabel={t('viewFullPhoto')}
+                onOpenImage={(itemIndex) =>
+                  setLightboxIndex(
+                    collageSlot.get(`${index}:${itemIndex}`) ?? 0,
+                  )
+                }
+                items={block.images.map((image, itemIndex) => {
+                  const caption = pick(
+                    lang,
+                    image.text,
+                    image.textBg,
+                  ).trim()
+                  return {
+                    block: { type: 'image' as const, url: image.url, text: image.text, textBg: image.textBg },
+                    index: itemIndex,
+                    caption,
+                    alt: caption || fallbackAlt,
+                  }
+                })}
+              />
+            )
+          }
+          return (
+            <ArticleBlockView
+              key={`${block.type}-${index}`}
+              block={block}
+              lang={lang}
+              openLabel={t('viewFullPhoto')}
+              onOpenImage={
+                imageSlot.has(index)
+                  ? () => setLightboxIndex(imageSlot.get(index) ?? 0)
+                  : undefined
+              }
+            />
+          )
+        })}
       </div>
       <ImageLightbox
         open={lightboxIndex !== null}
@@ -250,16 +296,16 @@ function ArticleBlockView({
   }
 
   if (block.type === 'paragraph') {
-    return <p>{pick(lang, block.text, block.textBg)}</p>
+    return <RichText as="p" html={pick(lang, block.text, block.textBg)} />
   }
 
   if (block.type === 'pullquote') {
     const cite = pick(lang, block.cite, block.citeBg).trim()
     return (
       <blockquote className="my-10 border-l-2 border-[#0C2686] bg-[#0C2686]/5 px-6 py-6 md:px-8 rounded-r-xl">
-        <p className="font-sans text-base md:text-lg font-light italic leading-relaxed text-[#1A1A1A]/80">
-          “{pick(lang, block.text, block.textBg)}”
-        </p>
+        <div className="font-sans text-base md:text-lg font-light italic leading-relaxed text-[#1A1A1A]/80">
+          “<RichText as="span" html={pick(lang, block.text, block.textBg)} />”
+        </div>
         {cite ? (
           <cite className="mt-3 block font-sans text-xs uppercase tracking-widest text-[#0C2686] not-italic">
             — {cite}
@@ -275,20 +321,26 @@ function ArticleBlockView({
         <span className="mb-2 block font-sans text-[11px] font-medium uppercase tracking-[0.22em] text-[#0C2686]">
           {pick(lang, block.label, block.labelBg)}
         </span>
-        {pick(lang, block.text, block.textBg).trim() ? (
-          <p className="font-sans text-sm md:text-base font-light leading-relaxed text-[#1A1A1A]/75">
-            {pick(lang, block.text, block.textBg)}
-          </p>
-        ) : null}
+        <RichText
+          as="p"
+          className="font-sans text-sm md:text-base font-light leading-relaxed text-[#1A1A1A]/75"
+          html={pick(lang, block.text, block.textBg)}
+        />
       </aside>
     )
   }
 
-  return (
-    <p className="text-center font-sans text-xs uppercase tracking-[0.18em] text-[#1A1A1A]/45">
-      {pick(lang, block.text, block.textBg)}
-    </p>
-  )
+  if (block.type === 'caption') {
+    return (
+      <RichText
+        as="p"
+        className="text-center font-sans text-xs uppercase tracking-[0.18em] text-[#1A1A1A]/45"
+        html={pick(lang, block.text, block.textBg)}
+      />
+    )
+  }
+
+  return null
 }
 
 function RelatedStrip({

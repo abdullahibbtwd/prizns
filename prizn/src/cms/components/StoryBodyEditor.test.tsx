@@ -40,6 +40,7 @@ function EditorHarness({
       remove={() => undefined}
       move={() => undefined}
       onAddImages={async () => undefined}
+      replaceBody={(next) => form.setValue('body', next)}
     />
   )
 }
@@ -61,7 +62,7 @@ describe('StoryBodyEditor', () => {
 
     await user.click(screen.getByRole('button', { name: 'cms.editor.note' }))
 
-    expect(screen.getByDisplayValue('Village morning.')).not.toHaveClass('italic')
+    expect(screen.getByText('Village morning.')).toBeInTheDocument()
     const types = screen.getAllByRole('button', {
       name: 'cms.editor.changeBlockType',
     })
@@ -78,7 +79,7 @@ describe('StoryBodyEditor', () => {
       screen.getByRole('button', { name: 'cms.editor.changeBlockType' }),
     )
     await user.click(screen.getByRole('option', { name: 'cms.editor.pullquote' }))
-    expect(screen.getByDisplayValue('Village morning.')).toHaveClass('italic')
+    expect(screen.getByText('Village morning.').closest('[contenteditable]')).toHaveClass('italic')
   })
 
   it('shows a drag handle on paragraphs and images', () => {
@@ -118,7 +119,7 @@ describe('StoryBodyEditor', () => {
     )
 
     expect(screen.queryByTestId('drag-block-1')).not.toBeInTheDocument()
-    expect(screen.getByDisplayValue('Lead.')).toBeInTheDocument()
+    expect(screen.getByText('Lead.')).toBeInTheDocument()
   })
 
   it('hides the hero video from the article body', () => {
@@ -144,7 +145,7 @@ describe('StoryBodyEditor', () => {
     )
 
     expect(screen.queryByTestId('drag-block-1')).not.toBeInTheDocument()
-    expect(screen.getByDisplayValue('Lead.')).toBeInTheDocument()
+    expect(screen.getByText('Lead.')).toBeInTheDocument()
   })
 
   it('shows an extra video in the article body', () => {
@@ -173,5 +174,64 @@ describe('StoryBodyEditor', () => {
     expect(screen.getByTestId('drag-block-1')).toBeInTheDocument()
     expect(screen.getByText('cms.editor.videoMedia')).toBeInTheDocument()
     expect(screen.getByDisplayValue('Clip')).toBeInTheDocument()
+  })
+
+  it('shows bold italic link and list on a focused paragraph', async () => {
+    const user = userEvent.setup()
+    renderPage(<EditorHarness />)
+    await user.click(screen.getByText('Village morning.'))
+    expect(screen.getByTestId('rich-toolbar-0')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'cms.editor.formatBold' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    )
+    expect(screen.getByRole('button', { name: 'cms.editor.formatItalic' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    )
+    expect(screen.getByRole('button', { name: 'cms.editor.formatLink' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    )
+    expect(screen.getByRole('button', { name: 'cms.editor.formatList' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    )
+  })
+
+  it('lets the editor mark extra photos and preview a collage layout', async () => {
+    const user = userEvent.setup()
+    renderPage(
+      <EditorHarness
+        gallery={[
+          { id: 'hero', url: 'https://example.com/hero.jpg' },
+          { id: 'a', url: 'https://example.com/a.jpg' },
+          { id: 'b', url: 'https://example.com/b.jpg' },
+        ]}
+        body={[
+          { type: 'paragraph', textBg: 'Lead.' },
+          {
+            type: 'image',
+            mediaId: 'a',
+            url: 'https://example.com/a.jpg',
+            captionBg: '',
+          },
+          {
+            type: 'image',
+            mediaId: 'b',
+            url: 'https://example.com/b.jpg',
+            captionBg: '',
+          },
+        ]}
+      />,
+    )
+
+    await user.click(screen.getByTestId('collage-select-1'))
+    await user.click(screen.getByTestId('collage-select-2'))
+    await user.click(screen.getAllByRole('button', { name: 'cms.editor.collageCreate' })[0]!)
+
+    expect(screen.getByTestId('story-collage-editor')).toBeInTheDocument()
+    expect(screen.getByTestId('collage-layout-default')).toBeInTheDocument()
+    expect(screen.getByTestId('collage-layout-wide')).toBeInTheDocument()
   })
 })

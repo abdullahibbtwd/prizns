@@ -72,7 +72,7 @@ describe('story editor schedule helpers', () => {
     ).toBe(false)
   })
 
-  it('keeps Publish disabled while the saved story is still live', () => {
+  it('keeps Publish available for dirty edits on a live story', () => {
     expect(
       editorActionDisabled({
         action: 'PUBLISHED',
@@ -81,6 +81,19 @@ describe('story editor schedule helpers', () => {
         dirty: true,
         busy: false,
         isNew: false,
+      }),
+    ).toBe(false)
+  })
+
+  it('disables every action while a save is in flight', () => {
+    expect(
+      editorActionDisabled({
+        action: 'PUBLISHED',
+        savedStatus: 'DRAFT',
+        selectedStatus: 'DRAFT',
+        dirty: true,
+        busy: true,
+        isNew: true,
       }),
     ).toBe(true)
   })

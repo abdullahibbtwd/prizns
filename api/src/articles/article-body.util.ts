@@ -35,6 +35,29 @@ export function storedBlockToPublic(
       textBg: block.captionBg ?? '',
     };
   }
+  if (block.type === 'collage') {
+    const images = block.items
+      .map((item) => {
+        const url = item.mediaId
+          ? gallery.find((entry) => entry.id === item.mediaId)?.url ||
+            item.url?.trim() ||
+            ''
+          : item.url?.trim() || '';
+        if (!url) return null;
+        const caption = item.captionEn ?? item.captionBg ?? '';
+        return { url, text: caption, textBg: item.captionBg ?? '' };
+      })
+      .filter((item): item is NonNullable<typeof item> => Boolean(item));
+    if (images.length < 2) return null;
+    const caption = block.captionEn ?? block.captionBg ?? '';
+    return {
+      type: 'collage',
+      layout: block.layout || 'default',
+      caption,
+      captionBg: block.captionBg ?? '',
+      images,
+    };
+  }
   if (block.type === 'pullquote') {
     return {
       type: 'pullquote',
@@ -137,12 +160,11 @@ export function publicBodyWithInlineImages(
     .filter((block): block is PublicArticleBlock => Boolean(block));
 
   const usedUrls = new Set(
-    mapped
-      .filter(
-        (block): block is Extract<PublicArticleBlock, { type: 'image' }> =>
-          block.type === 'image',
-      )
-      .map((block) => block.url),
+    mapped.flatMap((block) => {
+      if (block.type === 'image') return [block.url]
+      if (block.type === 'collage') return block.images.map((item) => item.url)
+      return []
+    }),
   );
 
   if (usedUrls.size > 0) {

@@ -352,6 +352,31 @@ export class ArticlesService {
         };
       }
 
+      if (block.type === 'collage' && prev.type === 'collage') {
+        const captionSame = (block.captionBg ?? '') === (prev.captionBg ?? '');
+        const layoutSame = (block.layout ?? '') === (prev.layout ?? '');
+        const itemsSame =
+          JSON.stringify(block.items) === JSON.stringify(prev.items);
+        if (!captionSame || !layoutSame || !itemsSame) bgChanged = true;
+        return {
+          type: 'collage' as const,
+          layout: block.layout || 'default',
+          captionBg: block.captionBg ?? '',
+          captionEn: captionSame ? prev.captionEn : null,
+          items: block.items.map((item, itemIndex) => {
+            const prevItem = prev.items[itemIndex];
+            const itemCaptionSame =
+              (item.captionBg ?? '') === (prevItem?.captionBg ?? '');
+            return {
+              mediaId: item.mediaId,
+              url: item.url,
+              captionBg: item.captionBg ?? '',
+              captionEn: itemCaptionSame ? prevItem?.captionEn ?? null : null,
+            };
+          }),
+        };
+      }
+
       bgChanged = true;
       return block;
     });

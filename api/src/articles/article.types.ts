@@ -36,6 +36,18 @@ export type StoredArticleBlock =
       url?: string;
       captionBg: string;
       captionEn?: string | null;
+    }
+  | {
+      type: 'collage';
+      layout: string;
+      captionBg: string;
+      captionEn?: string | null;
+      items: Array<{
+        mediaId?: string;
+        url?: string;
+        captionBg: string;
+        captionEn?: string | null;
+      }>;
     };
 
 /** Public JournalArticle-shaped response for the reader. */
@@ -92,6 +104,13 @@ export type PublicArticleDto = {
     | { type: 'caption'; text: string; textBg: string }
     | { type: 'image'; url: string; text: string; textBg: string }
     | { type: 'video'; url: string; text: string; textBg: string }
+    | {
+        type: 'collage';
+        layout: string;
+        caption: string;
+        captionBg: string;
+        images: Array<{ url: string; text: string; textBg: string }>;
+      }
   >;
   endLabel: string;
   endLabelBg: string;

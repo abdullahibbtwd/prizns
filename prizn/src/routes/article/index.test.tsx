@@ -144,6 +144,31 @@ describe('ArticlePage', () => {
     })
   })
 
+  it('renders bold, italic, links, and lists from paragraph html', async () => {
+    getPublicArticle.mockResolvedValue(
+      buildCmsArticle({
+        section: 'stories',
+        slug: 'village-life',
+        path: '/stories/village-life',
+        title: 'Village life',
+        titleBg: 'Селски живот',
+        image: 'https://cdn.example/hero.jpg',
+        body: [
+          {
+            type: 'paragraph',
+            text: 'Hello <strong>world</strong> and <a href="https://prizn.bg">Prizn</a>.',
+            textBg: 'Здравей <strong>свят</strong> и <a href="https://prizn.bg">Призн</a>.',
+          },
+        ],
+      }),
+    )
+    renderArticle()
+    await screen.findByRole('heading', { name: 'Village life' })
+    expect(screen.getByText('world').closest('strong')).toBeTruthy()
+    const link = screen.getByRole('link', { name: 'Prizn' })
+    expect(link).toHaveAttribute('href', 'https://prizn.bg')
+  })
+
   it('places extra photos in the story body instead of the hero slider', async () => {
     getPublicArticle.mockResolvedValue(
       buildCmsArticle({
@@ -195,6 +220,100 @@ describe('ArticlePage', () => {
     ).toBe(true)
   })
 
+  it('keeps consecutive extra photos as full-width figures unless the editor made a collage', async () => {
+    getPublicArticle.mockResolvedValue(
+      buildCmsArticle({
+        section: 'stories',
+        slug: 'village-life',
+        path: '/stories/village-life',
+        title: 'Village life',
+        titleBg: 'Селски живот',
+        image: 'https://cdn.example/hero.jpg',
+        body: [
+          {
+            type: 'paragraph',
+            text: 'First paragraph of the story.',
+            textBg: 'Първи параграф.',
+          },
+          {
+            type: 'image',
+            url: 'https://cdn.example/one.jpg',
+            text: 'Yard',
+            textBg: 'Двор',
+          },
+          {
+            type: 'image',
+            url: 'https://cdn.example/two.jpg',
+            text: 'Gate',
+            textBg: 'Порта',
+          },
+          {
+            type: 'image',
+            url: 'https://cdn.example/three.jpg',
+            text: 'Well',
+            textBg: 'Кладенец',
+          },
+        ],
+      }),
+    )
+
+    renderArticle()
+    await screen.findByRole('heading', { name: 'Village life' })
+    expect(screen.queryByTestId('article-collage')).not.toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'Yard' })).toHaveAttribute(
+      'src',
+      'https://cdn.example/one.jpg',
+    )
+    expect(screen.getByRole('img', { name: 'Gate' })).toHaveAttribute(
+      'src',
+      'https://cdn.example/two.jpg',
+    )
+    expect(screen.getByRole('img', { name: 'Well' })).toHaveAttribute(
+      'src',
+      'https://cdn.example/three.jpg',
+    )
+    fireEvent.click(screen.getByRole('img', { name: 'Gate' }).closest('button')!)
+    expect(screen.getByRole('dialog', { name: 'Gate' })).toBeInTheDocument()
+  })
+
+  it('renders an editor-made collage with the chosen layout', async () => {
+    getPublicArticle.mockResolvedValue(
+      buildCmsArticle({
+        section: 'stories',
+        slug: 'village-life',
+        path: '/stories/village-life',
+        title: 'Village life',
+        titleBg: 'Селски живот',
+        image: 'https://cdn.example/hero.jpg',
+        body: [
+          {
+            type: 'paragraph',
+            text: 'First paragraph of the story.',
+            textBg: 'Първи параграф.',
+          },
+          {
+            type: 'collage',
+            layout: 'row',
+            caption: 'Yard',
+            captionBg: 'Двор',
+            images: [
+              { url: 'https://cdn.example/one.jpg', text: 'One', textBg: 'Едно' },
+              { url: 'https://cdn.example/two.jpg', text: 'Two', textBg: 'Две' },
+            ],
+          },
+        ],
+      }),
+    )
+
+    renderArticle()
+    await screen.findByRole('heading', { name: 'Village life' })
+    expect(screen.getByTestId('article-collage')).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'One' })).toHaveAttribute(
+      'src',
+      'https://cdn.example/one.jpg',
+    )
+  })
+
   it('renders quotes in body type without a drop-cap heading', async () => {
     getPublicArticle.mockResolvedValue(
       buildCmsArticle({
@@ -221,9 +340,10 @@ describe('ArticlePage', () => {
     )
 
     renderArticle()
-    const quote = await screen.findByText('“we stayed for the harvest.”')
-    expect(quote.className).toMatch(/font-sans/)
-    expect(quote.className).not.toMatch(/font-heading/)
+    const quote = await screen.findByText('we stayed for the harvest.')
+    const wrap = quote.closest('blockquote')?.querySelector('div')
+    expect(wrap?.className).toMatch(/font-sans/)
+    expect(wrap?.className).not.toMatch(/font-heading/)
   })
 
   it('keeps the hero photo when a story also has a video', async () => {

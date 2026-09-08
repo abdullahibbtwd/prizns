@@ -5,10 +5,13 @@ import {
   draftPlainTextForAi,
   emptyTextBlock,
   estimateReadMinutes,
+  groupImagesIntoCollage,
   nextBodyMoveIndex,
+  remapBodyMediaIds,
   splitPastedParagraphs,
   syncBodyImagesWithGallery,
   toolbarTypeAction,
+  ungroupCollage,
 } from './story-editor-body'
 
 describe('splitPastedParagraphs', () => {
@@ -237,5 +240,100 @@ describe('nextBodyMoveIndex', () => {
     expect(nextBodyMoveIndex(4, 2, 1)).toEqual({ from: 4, to: 2 })
     expect(nextBodyMoveIndex(3, 0, 1)).toEqual({ from: 3, to: 1 })
     expect(nextBodyMoveIndex(2, 2, 1)).toBeNull()
+  })
+})
+
+describe('remapBodyMediaIds', () => {
+  it('rewrites collage item ids so first publish keeps the collage', () => {
+    const remapped = remapBodyMediaIds(
+      [
+        { type: 'paragraph', textBg: 'Lead.' },
+        {
+          type: 'collage',
+          layout: 'row',
+          captionBg: '',
+          items: [
+            { mediaId: 'local-a', url: 'blob:a', captionBg: 'One' },
+            { mediaId: 'local-b', url: 'blob:b', captionBg: 'Two' },
+          ],
+        },
+      ],
+      new Map([
+        ['local-a', 'id-a'],
+        ['local-b', 'id-b'],
+      ]),
+    )
+    expect(remapped[1]).toMatchObject({
+      type: 'collage',
+      items: [
+        { mediaId: 'id-a', captionBg: 'One' },
+        { mediaId: 'id-b', captionBg: 'Two' },
+      ],
+    })
+    expect(
+      syncBodyImagesWithGallery(remapped, [
+        { id: 'hero', url: '/hero.jpg' },
+        { id: 'id-a', url: '/a.jpg' },
+        { id: 'id-b', url: '/b.jpg' },
+      ]),
+    ).toMatchObject([
+      { type: 'paragraph', textBg: 'Lead.' },
+      {
+        type: 'collage',
+        items: [{ mediaId: 'id-a' }, { mediaId: 'id-b' }],
+      },
+    ])
+  })
+})
+
+describe('groupImagesIntoCollage', () => {
+  const body = [
+    { type: 'paragraph' as const, textBg: 'Lead.' },
+    { type: 'image' as const, mediaId: 'a', url: '/a.jpg', captionBg: 'One' },
+    { type: 'image' as const, mediaId: 'b', url: '/b.jpg', captionBg: 'Two' },
+    { type: 'image' as const, mediaId: 'c', url: '/c.jpg', captionBg: 'Three' },
+  ]
+
+  it('turns marked extra photos into one collage block', () => {
+    const grouped = groupImagesIntoCollage(body, [1, 3], 'row')
+    expect(grouped).toHaveLength(3)
+    expect(grouped[1]).toMatchObject({
+      type: 'collage',
+      layout: 'row',
+      items: [
+        { mediaId: 'a', url: '/a.jpg' },
+        { mediaId: 'c', url: '/c.jpg' },
+      ],
+    })
+    expect(grouped[2]).toMatchObject({ type: 'image', mediaId: 'b' })
+  })
+
+  it('ungroups a collage back into extra photos', () => {
+    const grouped = groupImagesIntoCollage(body, [1, 2])
+    expect(ungroupCollage(grouped, 1).filter((block) => block.type === 'image')).toHaveLength(3)
+  })
+
+  it('keeps collage extras out of the leftover gallery sync', () => {
+    const grouped = groupImagesIntoCollage(body, [1, 2])
+    expect(
+      syncBodyImagesWithGallery(grouped, [
+        { id: 'hero', url: '/hero.jpg' },
+        { id: 'a', url: '/a.jpg' },
+        { id: 'b', url: '/b.jpg' },
+        { id: 'c', url: '/c.jpg' },
+      ]),
+    ).toEqual([
+      { type: 'paragraph', textBg: 'Lead.' },
+      {
+        type: 'collage',
+        layout: 'default',
+        captionBg: '',
+        items: [
+          { mediaId: 'a', url: '/a.jpg', captionBg: 'One' },
+          { mediaId: 'b', url: '/b.jpg', captionBg: 'Two' },
+        ],
+      },
+      { type: 'image', mediaId: 'c', url: '/c.jpg', captionBg: 'Three' },
+    ])
   })
 })

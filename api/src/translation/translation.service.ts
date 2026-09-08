@@ -522,6 +522,11 @@ export class TranslationService {
         if (block.textBg) out.push(block.textBg)
       } else if (block.type === 'image' || block.type === 'video') {
         if (block.captionBg) out.push(block.captionBg)
+      } else if (block.type === 'collage') {
+        if (block.captionBg) out.push(block.captionBg)
+        for (const item of block.items) {
+          if (item.captionBg) out.push(item.captionBg)
+        }
       } else if (block.textBg) {
         out.push(block.textBg)
       }
@@ -553,6 +558,25 @@ export class TranslationService {
           ...block,
           captionBg: caption.bg,
           captionEn: caption.en,
+        }
+      }
+      if (block.type === 'collage') {
+        const caption = block.captionBg
+          ? this.pair(map, block.captionBg, sourceLang)
+          : { bg: block.captionBg ?? '', en: block.captionEn ?? '' }
+        return {
+          ...block,
+          captionBg: caption.bg,
+          captionEn: caption.en,
+          items: block.items.map((item) => {
+            if (!item.captionBg) return item
+            const itemCaption = this.pair(map, item.captionBg, sourceLang)
+            return {
+              ...item,
+              captionBg: itemCaption.bg,
+              captionEn: itemCaption.en,
+            }
+          }),
         }
       }
       const text = this.pair(map, block.textBg, sourceLang)

@@ -38,7 +38,9 @@ import { CmsTagPicker } from '@/cms/components/CmsMultiSelect'
 import { AiAssistantPanel } from '@/cms/components/AiAssistantPanel'
 import { NarrationPanel } from '@/cms/components/NarrationPanel'
 import { StoryBodyEditor } from '@/cms/components/StoryBodyEditor'
+import { StoryRichTextField } from '@/cms/components/StoryRichTextField'
 import { StoryGalleryThumbs } from '@/cms/components/StoryGalleryThumbs'
+import { useImageFileDrop } from '@/cms/hooks/useImageFileDrop'
 import { JournalSelect } from '@/components/ui/JournalSelect'
 import { arrayMove } from '@dnd-kit/sortable'
 import {
@@ -79,11 +81,22 @@ import {
   type EditorSaveAction,
 } from '@/cms/pages/story-editor-actions'
 import {
+  AUTOSAVE_IDLE_MS,
+  autosaveStatus,
+  clearStoryDraft,
+  readStoryDraft,
+  serializeStoryDraft,
+  shouldAutosaveDraft,
+  shouldRestoreStoryDraft,
+  writeStoryDraft,
+} from '@/cms/pages/story-editor-autosave'
+import {
   estimateReadMinutes,
   splitPastedParagraphs,
   toFormBodyBlock,
   compactBody,
   draftPlainTextForAi,
+  remapBodyMediaIds,
   syncBodyImagesWithGallery,
 } from '@/cms/pages/story-editor-body'
 import {
@@ -132,6 +145,18 @@ const blockSchema = z.discriminatedUnion('type', [
     mediaId: z.string().optional(),
     url: z.string().optional(),
     captionBg: z.string(),
+  }),
+  z.object({
+    type: z.literal('collage'),
+    layout: z.string(),
+    captionBg: z.string(),
+    items: z.array(
+      z.object({
+        mediaId: z.string().optional(),
+        url: z.string().optional(),
+        captionBg: z.string(),
+      }),
+    ),
   }),
 ])
 
@@ -319,6 +344,28 @@ export default function CmsStoryEditorPage() {
   const [mediaSaving, setMediaSaving] = useState(false)
   const [mediaPreparing, setMediaPreparing] = useState(false)
   const [readTimeManual, setReadTimeManual] = useState(() => !isNew)
+  const [savingAction, setSavingAction] = useState<EditorSaveAction | null>(null)
+  const savingLock = useRef(false)
+  const queuedStatus = useRef<EditorSaveAction | null>(null)
+  const restoredDraft = useRef(false)
+  const lastSavedSnapshot = useRef('')
+  const createdIdRef = useRef<string | null>(isNew ? null : id ?? null)
+  const silentSave = useRef(false)
+  const persistSilentDraftRef = useRef<() => Promise<void>>(async () => {})
+  const scheduleAutosaveRef = useRef<() => void>(() => {})
+  const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  )
+  const localBackupTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  )
+  const editorDirtyRef = useRef(false)
+  const editorBusyRef = useRef(false)
+  const hydratedArticleId = useRef<string | null>(null)
+  const submitStatusRef = useRef<(next: EditorSaveAction) => void>(() => undefined)
+  const [autosaveState, setAutosaveState] = useState<
+    'idle' | 'saving' | 'saved' | 'error'
+  >('idle')
 
   const articleQuery = useQuery({
     queryKey: ['cms-article', id],
@@ -355,15 +402,6 @@ export default function CmsStoryEditorPage() {
     queryKey: ['cms-categories'],
     queryFn: listCmsCategories,
   })
-
-  useEffect(() => {
-    const article = articleQuery.data
-    if (!article) return
-    setAudioUrl(article.audioUrl ?? '')
-    setGallery(
-      mergeBodyVideosIntoGallery(mergeLoadedMedia(article), article.bodyRaw),
-    )
-  }, [articleQuery.data])
 
   const defaults = useMemo<ArticleFormValues>(() => {
     const article = articleQuery.data
@@ -454,15 +492,33 @@ export default function CmsStoryEditorPage() {
 
   const form = useForm<ArticleFormValues>({
     resolver: zodResolver(schema) as never,
-    values: defaults,
-    defaultValues: emptyDefaults,
-    resetOptions: { keepDirtyValues: true },
+    defaultValues:
+      isNew && querySeriesId
+        ? { ...emptyDefaults, seriesMode: 'series', seriesId: querySeriesId }
+        : emptyDefaults,
   })
 
   const { fields, insert, update, remove, replace, move } = useFieldArray({
     control: form.control,
     name: 'body',
   })
+
+  useEffect(() => {
+    hydratedArticleId.current = null
+  }, [id])
+
+  useEffect(() => {
+    if (isNew) return
+    const article = articleQuery.data
+    if (!article) return
+    if (hydratedArticleId.current === article.id) return
+    hydratedArticleId.current = article.id
+    form.reset(defaults)
+    setAudioUrl(article.audioUrl ?? '')
+    setGallery(
+      mergeBodyVideosIntoGallery(mergeLoadedMedia(article), article.bodyRaw),
+    )
+  }, [articleQuery.data, defaults, form, isNew])
 
   const section = form.watch('section')
   const seriesMode = form.watch('seriesMode')
@@ -473,6 +529,14 @@ export default function CmsStoryEditorPage() {
   const profile = getSectionProfile(section)
   const bodyBlocks = form.watch('body')
   const estimatedMinutes = estimateReadMinutes(bodyBlocks)
+  const mediaBusy = mediaSaving || mediaPreparing || posterBusy
+  const editorDirty =
+    isDirty ||
+    Boolean(pendingAudioFile) ||
+    gallery.some((item) => Boolean(item.file))
+  const editorBusy = mediaBusy || savingAction !== null
+  editorDirtyRef.current = editorDirty
+  editorBusyRef.current = editorBusy
 
   useEffect(() => {
     if (readTimeManual || profile.showVideoSource) return
@@ -561,8 +625,11 @@ export default function CmsStoryEditorPage() {
   }, [categoriesQuery.data, form, isNew])
 
   const saveMutation = useMutation({
-    mutationFn: async (values: ArticleFormValues) => {
-      setMediaSaving(true)
+    mutationFn: async (raw: ArticleFormValues & { silent?: boolean }) => {
+      const { silent, ...values } = raw
+      const existingId =
+        createdIdRef.current || (id && id !== 'new' ? id : null)
+      if (!silent && !silentSave.current) setMediaSaving(true)
       try {
         const credit = values.photoCreditBg
 
@@ -626,51 +693,7 @@ export default function CmsStoryEditorPage() {
           categoryIds: values.categoryIds,
           body: compactBody(
             syncBodyImagesWithGallery(
-              values.body
-                .map((block) => {
-                  if (block.type !== 'image' && block.type !== 'video') {
-                    return block
-                  }
-                  const mediaId =
-                    (block.mediaId && idMap.get(block.mediaId)) || block.mediaId
-                  if (block.type === 'image') {
-                    if (
-                      !mediaId ||
-                      mediaId.startsWith('local-') ||
-                      mediaId.startsWith('embed-')
-                    ) {
-                      return null
-                    }
-                    return {
-                      type: 'image' as const,
-                      mediaId,
-                      captionBg: block.captionBg ?? '',
-                    }
-                  }
-                  if (mediaId?.startsWith('local-')) return null
-                  const url = block.url?.startsWith('blob:')
-                    ? undefined
-                    : block.url
-                  if (mediaId?.startsWith('embed-')) {
-                    if (!url) return null
-                    return {
-                      type: 'video' as const,
-                      mediaId,
-                      url,
-                      captionBg: block.captionBg ?? '',
-                    }
-                  }
-                  if (!mediaId && !url) return null
-                  return {
-                    type: 'video' as const,
-                    mediaId: mediaId || undefined,
-                    url,
-                    captionBg: block.captionBg ?? '',
-                  }
-                })
-                .filter((block): block is NonNullable<typeof block> =>
-                  Boolean(block),
-                ),
+              remapBodyMediaIds(values.body, idMap),
               gallery.map((item) => ({
                 id: idMap.get(item.id) || item.id,
                 url: item.url,
@@ -683,13 +706,35 @@ export default function CmsStoryEditorPage() {
               ? values.seriesId
               : null,
         }
-        if (isNew) return createCmsArticle(payload)
-        return updateCmsArticle(id!, payload)
+        if (existingId) return updateCmsArticle(existingId, payload)
+        const created = await createCmsArticle(payload)
+        createdIdRef.current = created.id
+        return created
       } finally {
         setMediaSaving(false)
       }
     },
-    onSuccess: async (article) => {
+    onSuccess: async (article, variables) => {
+      lastSavedSnapshot.current = serializeStoryDraft(variables)
+      clearStoryDraft('new')
+      clearStoryDraft(article.id)
+      createdIdRef.current = article.id
+
+      const silent = Boolean(variables.silent) || silentSave.current
+      if (silent) {
+        queryClient.setQueryData(['cms-article', article.id], article)
+        void queryClient.invalidateQueries({ queryKey: ['cms-articles'] })
+        void queryClient.invalidateQueries({ queryKey: ['cms-articles-count'] })
+        if (window.location.pathname.endsWith('/stories/new')) {
+          window.history.replaceState(
+            window.history.state,
+            '',
+            `${basePath}/${article.id}`,
+          )
+        }
+        return
+      }
+
       // Drop local blob previews; reload saved remote URLs from the article.
       for (const item of gallery) {
         revokeIfBlob(item.url)
@@ -713,6 +758,9 @@ export default function CmsStoryEditorPage() {
       await queryClient.invalidateQueries({ queryKey: ['cms-articles'] })
       await queryClient.invalidateQueries({ queryKey: ['cms-articles-count'] })
       await queryClient.invalidateQueries({ queryKey: ['cms-series'] })
+      await queryClient.invalidateQueries({ queryKey: ['public-articles'] })
+      await queryClient.invalidateQueries({ queryKey: ['public-article'] })
+      await queryClient.invalidateQueries({ queryKey: ['popular-stories'] })
       if (article.series?.id) {
         await queryClient.invalidateQueries({
           queryKey: ['cms-series-item', article.series.id],
@@ -786,8 +834,8 @@ export default function CmsStoryEditorPage() {
   }
 
   /** Local preview only — MinIO upload happens on Save/Publish. */
-  const pickImages = async (files: FileList | null) => {
-    if (!files?.length) return
+  const pickImages = async (files: FileList | File[] | null) => {
+    if (!files || files.length === 0) return
     setMediaPreparing(true)
     try {
       const list = Array.from(files)
@@ -805,6 +853,11 @@ export default function CmsStoryEditorPage() {
       setMediaPreparing(false)
     }
   }
+
+  const imageDrop = useImageFileDrop({
+    disabled: mediaSaving || mediaPreparing || posterBusy,
+    onImages: pickImages,
+  })
 
   const applyPastedParagraphs = (index: number, pasted: string) => {
     const chunks = splitPastedParagraphs(pasted)
@@ -1031,7 +1084,15 @@ export default function CmsStoryEditorPage() {
   }
 
   const onSubmit = form.handleSubmit(async (values) => {
-    await saveMutation.mutateAsync(values)
+    if (savingLock.current) return
+    savingLock.current = true
+    setSavingAction((values.status as EditorSaveAction) || 'DRAFT')
+    try {
+      await saveMutation.mutateAsync(values)
+    } finally {
+      savingLock.current = false
+      setSavingAction(null)
+    }
   })
 
   const submitStatus = (next: EditorSaveAction) => {
@@ -1044,10 +1105,158 @@ export default function CmsStoryEditorPage() {
       }
       if (isScheduleDueNow(at)) statusToSave = 'PUBLISHED'
     }
-    void form.handleSubmit((values) =>
-      saveMutation.mutateAsync({ ...values, status: statusToSave }),
+    if (saveMutation.isPending || savingLock.current) {
+      queuedStatus.current = statusToSave
+      setSavingAction(statusToSave)
+      return
+    }
+    savingLock.current = true
+    setSavingAction(statusToSave)
+    void form.handleSubmit(
+      async (values) => {
+        try {
+          await saveMutation.mutateAsync({ ...values, status: statusToSave })
+        } finally {
+          savingLock.current = false
+          setSavingAction(null)
+          const queued = queuedStatus.current
+          queuedStatus.current = null
+          if (queued) submitStatusRef.current(queued)
+        }
+      },
+      () => {
+        savingLock.current = false
+        setSavingAction(null)
+      },
     )()
   }
+  submitStatusRef.current = submitStatus
+
+  const persistSilentDraft = async () => {
+    if (savingLock.current || saveMutation.isPending || editorBusyRef.current) {
+      return
+    }
+    const values = form.getValues()
+    if (
+      !shouldAutosaveDraft({
+        dirty: true,
+        title: values.titleBg,
+        status: values.status,
+        busy: false,
+      })
+    ) {
+      return
+    }
+    const snapshot = serializeStoryDraft(values)
+    if (snapshot === lastSavedSnapshot.current) return
+    savingLock.current = true
+    silentSave.current = true
+    setAutosaveState('saving')
+    try {
+      await saveMutation.mutateAsync({
+        ...values,
+        status: autosaveStatus(values.status),
+        silent: true,
+      })
+      setAutosaveState('saved')
+    } catch {
+      writeStoryDraft(isNew ? 'new' : id!, values)
+      setAutosaveState('error')
+    } finally {
+      silentSave.current = false
+      savingLock.current = false
+      const queued = queuedStatus.current
+      queuedStatus.current = null
+      if (queued) submitStatusRef.current(queued)
+      else if (
+        serializeStoryDraft(form.getValues()) !== lastSavedSnapshot.current
+      ) {
+        scheduleAutosaveRef.current()
+      }
+    }
+  }
+  persistSilentDraftRef.current = persistSilentDraft
+
+  scheduleAutosaveRef.current = () => {
+    window.clearTimeout(autosaveTimerRef.current)
+    const values = form.getValues()
+    if (
+      !shouldAutosaveDraft({
+        dirty: true,
+        title: values.titleBg,
+        status: values.status,
+        busy: editorBusyRef.current || savingLock.current,
+      })
+    ) {
+      return
+    }
+    autosaveTimerRef.current = window.setTimeout(() => {
+      void persistSilentDraftRef.current()
+    }, AUTOSAVE_IDLE_MS)
+  }
+
+  const draftKey = isNew ? 'new' : id!
+
+  useEffect(() => {
+    if (restoredDraft.current) return
+    if (!isNew && !articleQuery.data) return
+    const backup = readStoryDraft(draftKey)
+    if (
+      !shouldRestoreStoryDraft(
+        backup,
+        isNew ? null : articleQuery.data?.updatedAt,
+      )
+    ) {
+      restoredDraft.current = true
+      lastSavedSnapshot.current = serializeStoryDraft(form.getValues())
+      return
+    }
+    const next = backup!.values
+    form.setValue('titleBg', next.titleBg, { shouldDirty: true })
+    form.setValue('subtitleBg', next.subtitleBg, { shouldDirty: true })
+    form.setValue('body', next.body, { shouldDirty: true })
+    form.setValue('locationBg', next.locationBg, { shouldDirty: true })
+    form.setValue('behindStoryBg', next.behindStoryBg, { shouldDirty: true })
+    form.setValue('seoTitleBg', next.seoTitleBg, { shouldDirty: true })
+    form.setValue('seoDescriptionBg', next.seoDescriptionBg, { shouldDirty: true })
+    restoredDraft.current = true
+  }, [articleQuery.data, draftKey, form, isNew])
+
+  useEffect(() => {
+    const sub = form.watch((_values, info) => {
+      if (info.type && info.type !== 'change') return
+      if (
+        info.name === 'galleryMediaIds' ||
+        info.name === 'readTimeMinutes' ||
+        info.name === 'readTimeUnit'
+      ) {
+        return
+      }
+      if (editorDirtyRef.current) {
+        window.clearTimeout(localBackupTimerRef.current)
+        localBackupTimerRef.current = window.setTimeout(() => {
+          writeStoryDraft(draftKey, form.getValues())
+        }, 400)
+      }
+      scheduleAutosaveRef.current()
+    })
+    return () => {
+      sub.unsubscribe()
+      window.clearTimeout(localBackupTimerRef.current)
+      window.clearTimeout(autosaveTimerRef.current)
+    }
+  }, [draftKey, form])
+
+  useEffect(() => {
+    const onLeave = (event: BeforeUnloadEvent) => {
+      if (!editorDirty) return
+      writeStoryDraft(draftKey, form.getValues())
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', onLeave)
+    return () => window.removeEventListener('beforeunload', onLeave)
+  }, [draftKey, editorDirty, form])
 
   if (!isNew && articleQuery.isLoading) {
     return (
@@ -1090,12 +1299,6 @@ export default function CmsStoryEditorPage() {
     label: pickLang(lang, author.nameEn ?? author.nameBg, author.nameBg),
   }))
 
-  const mediaBusy = mediaSaving || mediaPreparing || posterBusy
-  const editorDirty =
-    isDirty ||
-    Boolean(pendingAudioFile) ||
-    gallery.some((item) => Boolean(item.file))
-  const editorBusy = saveMutation.isPending || mediaBusy
   const savedStatus = articleQuery.data?.status
   const thirdAction: EditorSaveAction =
     status === 'SCHEDULED' || status === 'ARCHIVED' ? status : 'PUBLISHED'
@@ -1140,29 +1343,68 @@ export default function CmsStoryEditorPage() {
           {articleQuery.data?.translationStatus && (
             <StatusPill status={articleQuery.data.translationStatus} />
           )}
+          {autosaveState === 'saving' ? (
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-stone-500">
+              {t('cms.editor.autosaveSaving')}
+            </span>
+          ) : autosaveState === 'saved' ? (
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-stone-500">
+              {t('cms.editor.autosaveSaved')}
+            </span>
+          ) : autosaveState === 'error' ? (
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-rose-700">
+              {t('cms.editor.autosaveFailed')}
+            </span>
+          ) : null}
           <EditorActionButton
             type="button"
             primary={status === 'REVIEW'}
             onClick={() => submitStatus('REVIEW')}
             disabled={actionDisabled('REVIEW')}
+            aria-busy={savingAction === 'REVIEW'}
           >
-            {t('cms.editor.review')}
+            {savingAction === 'REVIEW' ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                {t('cms.editor.saving')}
+              </>
+            ) : (
+              t('cms.editor.review')
+            )}
           </EditorActionButton>
           <EditorActionButton
             type="button"
             primary={status === 'DRAFT'}
             onClick={() => submitStatus('DRAFT')}
             disabled={actionDisabled('DRAFT')}
+            aria-busy={savingAction === 'DRAFT'}
           >
-            <Save className="size-4" /> {t('cms.editor.saveDraft')}
+            {savingAction === 'DRAFT' ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                {t('cms.editor.saving')}
+              </>
+            ) : (
+              <>
+                <Save className="size-4" /> {t('cms.editor.saveDraft')}
+              </>
+            )}
           </EditorActionButton>
           <EditorActionButton
             type="button"
             primary={status === thirdAction}
             onClick={() => submitStatus(thirdAction)}
             disabled={actionDisabled(thirdAction)}
+            aria-busy={savingAction === thirdAction}
           >
-            {thirdAction === 'SCHEDULED' ? (
+            {savingAction === thirdAction ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                {thirdAction === 'PUBLISHED'
+                  ? t('cms.editor.publishingNow')
+                  : t('cms.editor.saving')}
+              </>
+            ) : thirdAction === 'SCHEDULED' ? (
               <>
                 <Clock className="size-4" /> {t('cms.editor.schedule')}
               </>
@@ -1189,6 +1431,8 @@ export default function CmsStoryEditorPage() {
 
       <form
         onSubmit={onSubmit}
+        onInput={() => scheduleAutosaveRef.current()}
+        onKeyUp={() => scheduleAutosaveRef.current()}
         className="grid grid-cols-1 gap-8 overflow-x-hidden xl:grid-cols-[minmax(0,1fr)_320px]"
       >
         <div className="min-w-0 space-y-6 overflow-x-hidden">
@@ -1376,6 +1620,20 @@ export default function CmsStoryEditorPage() {
             </CmsCard>
           ) : null}
 
+          <div
+            className="relative space-y-6"
+            data-testid="story-media-dropzone"
+            {...imageDrop.props}
+          >
+            {imageDrop.active ? (
+              <div className="pointer-events-none absolute inset-0 z-30 flex items-start justify-center rounded-2xl border-2 border-dashed border-[#0C2686] bg-[#0C2686]/10 pt-10">
+                <p className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-[#0C2686] shadow-md">
+                  {gallery.length === 0
+                    ? t('cms.editor.dropImagesHero')
+                    : t('cms.editor.dropImagesAdd')}
+                </p>
+              </div>
+            ) : null}
           <CmsCard className="space-y-4 p-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-1 rounded-xl border border-[#E8E4DC] bg-[#FAF8F3] p-1">
@@ -1496,7 +1754,10 @@ export default function CmsStoryEditorPage() {
                   <span className="text-sm font-medium text-stone-600">
                     {mediaBusy
                       ? t('cms.editor.preparingMedia')
-                      : t('cms.editor.addImages')}
+                      : t('cms.editor.dropImages')}
+                  </span>
+                  <span className="text-[11px] text-stone-400">
+                    {t('cms.editor.dropImagesHero')}
                   </span>
                   <input
                     type="file"
@@ -1703,38 +1964,36 @@ export default function CmsStoryEditorPage() {
                 <span className="text-xs font-semibold uppercase tracking-wider text-stone-500">
                   {t(`cms.editor.${profile.teaserKey}`)}
                 </span>
-                <textarea
-                  rows={3}
-                  className="w-full border border-[#E8E4DC] bg-[#FAF8F3] px-3 py-2 text-sm outline-none focus:border-[#0C2686]"
-                  value={
-                    form.watch('body.0.type') === 'paragraph'
-                      ? form.watch('body.0.textBg')
-                      : ''
-                  }
-                  onChange={(e) => {
-                    if (form.getValues('body.0.type') !== 'paragraph') {
-                      replace(
-                        ensureTeaserParagraph(form.getValues('body')).map(
-                          (block, i) =>
-                            i === 0
-                              ? {
-                                  type: 'paragraph' as const,
-                                  textBg: e.target.value,
-                                }
-                              : block,
-                        ),
-                      )
-                      return
+                <div className="border border-[#E8E4DC] bg-[#FAF8F3] px-3 py-2">
+                  <StoryRichTextField
+                    index={0}
+                    splitOnEnter={false}
+                    value={
+                      form.watch('body.0.type') === 'paragraph'
+                        ? form.watch('body.0.textBg')
+                        : ''
                     }
-                    form.setValue('body.0.textBg', e.target.value, {
-                      shouldDirty: true,
-                    })
-                  }}
-                  onPaste={(e) => {
-                    const pasted = e.clipboardData.getData('text')
-                    if (applyPastedParagraphs(0, pasted)) e.preventDefault()
-                  }}
-                />
+                    placeholder={t('cms.editor.writePlaceholder')}
+                    onChange={(html) => {
+                      if (form.getValues('body.0.type') !== 'paragraph') {
+                        replace(
+                          ensureTeaserParagraph(form.getValues('body')).map(
+                            (block, i) =>
+                              i === 0
+                                ? { type: 'paragraph' as const, textBg: html }
+                                : block,
+                          ),
+                        )
+                        return
+                      }
+                      form.setValue('body.0.textBg', html, { shouldDirty: true })
+                    }}
+                    onFocus={() => undefined}
+                    onPasteChunks={(chunks) => {
+                      applyPastedParagraphs(0, chunks.join('\n\n'))
+                    }}
+                  />
+                </div>
                 <span className="block text-[11px] text-stone-500">
                   {t('cms.editor.teaserHint')}
                 </span>
@@ -1756,8 +2015,10 @@ export default function CmsStoryEditorPage() {
               remove={remove}
               move={move}
               onAddImages={pickInlineImages}
+              replaceBody={replace}
             />
           </CmsCard>
+          </div>
         </div>
 
         <div className="space-y-6">

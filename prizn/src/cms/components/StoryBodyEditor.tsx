@@ -1,7 +1,9 @@
-import { useLayoutEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent, type ReactNode } from 'react'
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import type { UseFormReturn } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
-import { Film, GripVertical, ImagePlus, Trash2 } from 'lucide-react'
+import { Film, GripVertical, ImagePlus, LayoutGrid, Trash2 } from 'lucide-react'
+import { StoryRichTextField } from '@/cms/components/StoryRichTextField'
+import { sanitizeRichText } from '@/lib/rich-text'
 import {
   DndContext,
   KeyboardSensor,
@@ -20,18 +22,21 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { GhostButton } from '@/cms/components/CmsUI'
+import { StoryCollageEditor } from '@/cms/components/StoryCollageEditor'
 import { JournalSelect } from '@/components/ui/JournalSelect'
 import {
   convertBodyBlock,
   emptyTextBlock,
+  groupImagesIntoCollage,
   nextBodyMoveIndex,
-  splitPastedParagraphs,
-  splitTextAt,
+  setCollageLayout,
   toolbarTypeAction,
+  ungroupCollage,
   type TextBlockType,
 } from '@/cms/pages/story-editor-body'
 import type { ArticleFormValues, BodyBlock } from '@/lib/cms-types'
 import { cn } from '@/lib/utils'
+import { COLLAGE_MAX, COLLAGE_MIN } from '@/lib/article-image-collage'
 import { getRemotePosterUrl, resolveVideoPlayback } from '@/lib/video-playback'
 
 const MARK_TYPES: TextBlockType[] = [
@@ -53,6 +58,7 @@ export function StoryBodyEditor({
   remove,
   move,
   onAddImages,
+  replaceBody,
 }: {
   form: UseFormReturn<ArticleFormValues>
   fields: Array<{ id: string }>
@@ -63,12 +69,14 @@ export function StoryBodyEditor({
   remove: (index: number) => void
   move: (from: number, to: number) => void
   onAddImages: (files: File[], afterIndex: number) => Promise<void>
+  replaceBody: (next: BodyBlock[]) => void
 }) {
   const { t } = useTranslation()
   const rootRef = useRef<HTMLDivElement>(null)
   const imageInputRef = useRef<HTMLInputElement>(null)
   const pendingFocus = useRef<number | null>(null)
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null)
+  const [selected, setSelected] = useState<number[]>([])
 
   const minIndex = hideFirstParagraph ? 1 : 0
   const heroId = gallery[0]?.id
@@ -98,13 +106,17 @@ export function StoryBodyEditor({
     const index = pendingFocus.current
     if (index == null) return
     pendingFocus.current = null
-    const el = rootRef.current?.querySelector<HTMLTextAreaElement>(
+    const el = rootRef.current?.querySelector<HTMLElement>(
       `[data-body-index="${index}"]`,
     )
     el?.focus()
-    if (el) {
-      const pos = 0
-      el.setSelectionRange(pos, pos)
+    if (el && window.getSelection) {
+      const range = document.createRange()
+      range.selectNodeContents(el)
+      range.collapse(true)
+      const sel = window.getSelection()
+      sel?.removeAllRanges()
+      sel?.addRange(range)
     }
   }, [fields])
 
@@ -152,32 +164,12 @@ export function StoryBodyEditor({
     setFocusedIndex(next)
   }
 
-  const onTextKeyDown = (
-    event: KeyboardEvent<HTMLTextAreaElement>,
-    index: number,
-    type: BodyBlock['type'],
-  ) => {
-    const el = event.currentTarget
-    if (event.key === 'Enter' && !event.shiftKey) {
-      event.preventDefault()
-      const { before, after } = splitTextAt(
-        el.value,
-        el.selectionStart,
-        el.selectionEnd,
-      )
-      if (type === 'paragraph' || type === 'caption') {
-        form.setValue(`body.${index}.textBg`, before, { shouldDirty: true })
-      } else if (type === 'pullquote' || type === 'note') {
-        form.setValue(`body.${index}.textBg`, before, { shouldDirty: true })
-      }
-      insertParagraphAfter(index, after)
-      return
-    }
-    if (event.key !== 'Backspace') return
-    if (el.selectionStart !== 0 || el.selectionEnd !== 0) return
-    if (el.value.trim()) return
+  const onRichSplit = (index: number, afterHtml: string) => {
+    insertParagraphAfter(index, afterHtml)
+  }
+
+  const onRichEmptyBackspace = (index: number) => {
     if (fields.length <= minIndex + 1) return
-    event.preventDefault()
     const prev = index - 1
     remove(index)
     if (prev >= minIndex) {
@@ -186,18 +178,15 @@ export function StoryBodyEditor({
     }
   }
 
-  const onTextPaste = (
-    event: ClipboardEvent<HTMLTextAreaElement>,
-    index: number,
-    type: BodyBlock['type'],
-  ) => {
-    if (type !== 'paragraph' && type !== 'caption') return
-    const chunks = splitPastedParagraphs(event.clipboardData.getData('text'))
-    if (chunks.length <= 1) return
-    event.preventDefault()
-    form.setValue(`body.${index}.textBg`, chunks[0]!, { shouldDirty: true })
+  const onRichPasteChunks = (index: number, chunks: string[]) => {
+    form.setValue(`body.${index}.textBg`, sanitizeRichText(chunks[0] ?? ''), {
+      shouldDirty: true,
+    })
     for (let i = 1; i < chunks.length; i += 1) {
-      insert(index + i, { type: 'paragraph', textBg: chunks[i]! })
+      insert(index + i, {
+        type: 'paragraph',
+        textBg: sanitizeRichText(chunks[i]!),
+      })
     }
     pendingFocus.current = index + chunks.length - 1
   }
@@ -211,7 +200,33 @@ export function StoryBodyEditor({
     if (!next) return
     move(next.from, next.to)
     setFocusedIndex(next.to)
+    setSelected([])
   }
+
+  const toggleSelected = (index: number) => {
+    setSelected((prev) =>
+      prev.includes(index) ? prev.filter((item) => item !== index) : [...prev, index],
+    )
+  }
+
+  const createCollageFromSelection = () => {
+    if (selected.length < COLLAGE_MIN || selected.length > COLLAGE_MAX) return
+    const next = groupImagesIntoCollage(form.getValues('body'), selected)
+    replaceBody(next)
+    setSelected([])
+  }
+
+  const applyCollageLayout = (index: number, layout: string) => {
+    replaceBody(setCollageLayout(form.getValues('body'), index, layout))
+  }
+
+  const splitCollage = (index: number) => {
+    replaceBody(ungroupCollage(form.getValues('body'), index))
+    setSelected([])
+  }
+
+  const canCollage =
+    selected.length >= COLLAGE_MIN && selected.length <= COLLAGE_MAX
 
   return (
     <div className="space-y-3">
@@ -240,6 +255,14 @@ export function StoryBodyEditor({
         >
           <ImagePlus className="size-3.5" /> {t('cms.editor.insertImage')}
         </GhostButton>
+        <GhostButton
+          type="button"
+          className="px-3 py-1.5 text-xs"
+          disabled={!canCollage}
+          onClick={createCollageFromSelection}
+        >
+          <LayoutGrid className="size-3.5" /> {t('cms.editor.collageCreate')}
+        </GhostButton>
         <input
           ref={imageInputRef}
           type="file"
@@ -256,6 +279,35 @@ export function StoryBodyEditor({
       </div>
 
       <p className="text-[11px] text-stone-500">{t('cms.editor.bodyEditorHint')}</p>
+      {selected.length > 0 ? (
+        <div
+          className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#0C2686]/20 bg-[#0C2686]/5 px-3 py-2"
+          data-testid="collage-selection-bar"
+        >
+          <span className="text-xs font-medium text-[#0C2686]">
+            {t('cms.editor.collageSelected', { count: selected.length })}
+          </span>
+          <div className="flex gap-2">
+            <GhostButton
+              type="button"
+              className="px-3 py-1.5 text-xs"
+              onClick={() => setSelected([])}
+            >
+              {t('cms.editor.cancel')}
+            </GhostButton>
+            <GhostButton
+              type="button"
+              className="border-[#0C2686] bg-[#0C2686] px-3 py-1.5 text-xs text-white hover:bg-[#0C2686]"
+              disabled={!canCollage}
+              onClick={createCollageFromSelection}
+            >
+              <LayoutGrid className="size-3.5" /> {t('cms.editor.collageCreate')}
+            </GhostButton>
+          </div>
+        </div>
+      ) : (
+        <p className="text-[11px] text-stone-400">{t('cms.editor.collageHint')}</p>
+      )}
 
       <div ref={rootRef} className="rounded-xl border border-[#E8E4DC] bg-white">
         <DndContext
@@ -301,11 +353,13 @@ export function StoryBodyEditor({
                   {(dragListeners) => (
                     <>
                       <div className="mb-1 flex min-w-0 flex-1 items-center justify-between">
-                        {type === 'image' || type === 'video' ? (
-                          <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#0C2686]/70">
+                        {type === 'image' || type === 'video' || type === 'collage' ? (
+                          <span className="inline-flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#0C2686]/70">
                             {type === 'video'
                               ? t('cms.editor.videoMedia')
-                              : t('cms.editor.image')}
+                              : type === 'collage'
+                                ? t('cms.editor.collageGroup')
+                                : t('cms.editor.image')}
                           </span>
                         ) : (
                           <JournalSelect
@@ -340,22 +394,64 @@ export function StoryBodyEditor({
                         </button>
                       </div>
 
-                      {type === 'image' || type === 'video' ? (
+                      {type === 'collage' ? (
+                        <StoryCollageEditor
+                          items={(form.watch(`body.${index}.items`) ?? []).map(
+                            (item) => ({
+                              ...item,
+                              url:
+                                item.url ||
+                                gallery.find((entry) => entry.id === item.mediaId)
+                                  ?.url,
+                            }),
+                          )}
+                          layout={form.watch(`body.${index}.layout`) || 'default'}
+                          captionBg={form.watch(`body.${index}.captionBg`) ?? ''}
+                          onLayoutChange={(layout) =>
+                            applyCollageLayout(index, layout)
+                          }
+                          onCaptionChange={(caption) => {
+                            const current = form.getValues(`body.${index}`)
+                            if (current.type !== 'collage') return
+                            update(index, { ...current, captionBg: caption })
+                          }}
+                          onUngroup={() => splitCollage(index)}
+                          onFocus={() => setFocusedIndex(index)}
+                        />
+                      ) : type === 'image' || type === 'video' ? (
                         <>
                           {mediaUrl ? (
-                            <div
-                              className="mb-2 cursor-grab touch-none active:cursor-grabbing"
-                              {...dragListeners}
-                            >
-                              {type === 'video' ? (
-                                <BodyVideoPreview url={mediaUrl} />
-                              ) : (
-                                <img
-                                  src={mediaUrl}
-                                  alt=""
-                                  className="pointer-events-none max-h-56 w-full rounded-md object-cover"
-                                />
-                              )}
+                            <div className="mb-2 flex items-start gap-2">
+                              {type === 'image' ? (
+                                <label className="mt-2 inline-flex shrink-0 items-center">
+                                  <input
+                                    type="checkbox"
+                                    data-testid={`collage-select-${index}`}
+                                    checked={selected.includes(index)}
+                                    onChange={() => toggleSelected(index)}
+                                    className="size-4 rounded border-[#E8E4DC] text-[#0C2686]"
+                                    aria-label={t('cms.editor.collageMark')}
+                                  />
+                                </label>
+                              ) : null}
+                              <div
+                                className="min-w-0 flex-1 cursor-grab touch-none active:cursor-grabbing"
+                                {...dragListeners}
+                              >
+                                {type === 'video' ? (
+                                  <BodyVideoPreview url={mediaUrl} />
+                                ) : (
+                                  <img
+                                    src={mediaUrl}
+                                    alt=""
+                                    className={cn(
+                                      'pointer-events-none max-h-56 w-full rounded-md object-cover',
+                                      selected.includes(index) &&
+                                        'ring-2 ring-[#0C2686] ring-offset-2',
+                                    )}
+                                  />
+                                )}
+                              </div>
                             </div>
                           ) : null}
                           <input
@@ -379,21 +475,31 @@ export function StoryBodyEditor({
                               onFocus={() => setFocusedIndex(index)}
                             />
                           )}
-                          <AutoGrowTextarea
-                            form={form}
+                          <StoryRichTextField
                             index={index}
-                            type={type}
+                            value={form.watch(`body.${index}.textBg`) ?? ''}
                             placeholder={
                               type === 'paragraph'
                                 ? t('cms.editor.writePlaceholder')
                                 : t('cms.editor.textBg')
                             }
-                            onFocus={() => setFocusedIndex(index)}
-                            onKeyDown={(event) =>
-                              onTextKeyDown(event, index, type)
+                            className={
+                              type === 'pullquote'
+                                ? 'border-l-2 border-[#0C2686] pl-3 font-heading text-base italic'
+                                : type === 'caption'
+                                  ? 'text-center text-xs uppercase tracking-wider text-stone-500'
+                                  : undefined
                             }
-                            onPaste={(event) =>
-                              onTextPaste(event, index, type)
+                            onChange={(html) =>
+                              form.setValue(`body.${index}.textBg`, html, {
+                                shouldDirty: true,
+                              })
+                            }
+                            onFocus={() => setFocusedIndex(index)}
+                            onSplit={(after) => onRichSplit(index, after)}
+                            onEmptyBackspace={() => onRichEmptyBackspace(index)}
+                            onPasteChunks={(chunks) =>
+                              onRichPasteChunks(index, chunks)
                             }
                           />
                           {type === 'pullquote' && (
@@ -453,14 +559,18 @@ function SortableBodyRow({
         'group relative flex gap-2 border-b border-[#E8E4DC] px-3 py-3 last:border-b-0',
         focused && 'bg-[#FAF8F3]',
         isDragging && 'z-10 bg-white shadow-md',
-        type === 'image' || type === 'video' ? 'bg-[#FAF8F3]/80' : undefined,
+        type === 'image' || type === 'video' || type === 'collage'
+          ? 'bg-[#FAF8F3]/80'
+          : undefined,
       )}
     >
       <button
         type="button"
         className={cn(
           'mt-1 shrink-0 cursor-grab touch-none text-stone-300 hover:text-stone-600 active:cursor-grabbing',
-          type === 'image' || type === 'video' ? 'text-stone-500' : undefined,
+          type === 'image' || type === 'video' || type === 'collage'
+            ? 'text-stone-500'
+            : undefined,
         )}
         aria-label={dragLabel}
         data-testid={`drag-block-${index}`}
@@ -471,56 +581,6 @@ function SortableBodyRow({
       </button>
       <div className="min-w-0 flex-1">{children(listeners)}</div>
     </div>
-  )
-}
-
-function AutoGrowTextarea({
-  form,
-  index,
-  type,
-  placeholder,
-  onFocus,
-  onKeyDown,
-  onPaste,
-}: {
-  form: UseFormReturn<ArticleFormValues>
-  index: number
-  type: BodyBlock['type']
-  placeholder: string
-  onFocus: () => void
-  onKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => void
-  onPaste: (event: ClipboardEvent<HTMLTextAreaElement>) => void
-}) {
-  const registered = form.register(`body.${index}.textBg`)
-  return (
-    <textarea
-      data-body-index={index}
-      rows={2}
-      placeholder={placeholder}
-      className={cn(
-        'w-full resize-none bg-transparent text-sm leading-relaxed outline-none',
-        type === 'pullquote' &&
-          'border-l-2 border-[#0C2686] pl-3 font-heading text-base italic',
-        type === 'caption' &&
-          'text-center text-xs uppercase tracking-wider text-stone-500',
-      )}
-      {...registered}
-      ref={(el) => {
-        registered.ref(el)
-        if (el) {
-          el.style.height = 'auto'
-          el.style.height = `${Math.max(el.scrollHeight, 40)}px`
-        }
-      }}
-      onFocus={onFocus}
-      onKeyDown={onKeyDown}
-      onPaste={onPaste}
-      onInput={(event) => {
-        const el = event.currentTarget
-        el.style.height = 'auto'
-        el.style.height = `${Math.max(el.scrollHeight, 40)}px`
-      }}
-    />
   )
 }
 

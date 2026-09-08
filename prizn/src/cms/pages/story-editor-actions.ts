@@ -57,10 +57,12 @@ export function editorActionDisabled(opts: {
 }): boolean {
   if (opts.busy) return true
   if (opts.action === 'PUBLISHED') {
+    // Live + unchanged: nothing to publish. Dirty edits can publish in one step.
     return (
       !opts.isNew &&
       opts.savedStatus === 'PUBLISHED' &&
-      opts.selectedStatus === 'PUBLISHED'
+      opts.selectedStatus === 'PUBLISHED' &&
+      !opts.dirty
     )
   }
   if (opts.isNew || opts.dirty) return false

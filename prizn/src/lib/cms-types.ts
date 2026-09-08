@@ -62,6 +62,18 @@ export type BodyBlock =
       url?: string;
       captionBg: string;
       captionEn?: string | null;
+    }
+  | {
+      type: "collage";
+      layout: string;
+      captionBg: string;
+      captionEn?: string | null;
+      items: Array<{
+        mediaId?: string;
+        url?: string;
+        captionBg: string;
+        captionEn?: string | null;
+      }>;
     };
 
 export type CmsArticle = {

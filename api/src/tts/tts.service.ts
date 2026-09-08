@@ -248,6 +248,18 @@ export class TtsService {
     })
   }
 
+  private stripRichText(value: string): string {
+    return value
+      .replace(/<br\s*\/?>/gi, ' ')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/\s+/g, ' ')
+      .trim()
+  }
+
   private buildScript(titleBg: string, bodyRaw: unknown): string {
     const parts: string[] = []
     if (titleBg?.trim()) parts.push(titleBg.trim())
@@ -258,9 +270,11 @@ export class TtsService {
     for (const block of body) {
       if (block.type === 'note') {
         if (block.labelBg?.trim()) parts.push(block.labelBg.trim())
-        if (block.textBg?.trim()) parts.push(block.textBg.trim())
+        const note = this.stripRichText(block.textBg ?? '')
+        if (note) parts.push(note)
       } else if (block.type === 'pullquote' || block.type === 'paragraph') {
-        if (block.textBg?.trim()) parts.push(block.textBg.trim())
+        const text = this.stripRichText(block.textBg ?? '')
+        if (text) parts.push(text)
       } else if (block.type === 'caption') {
         // skip captions for narration
       }
