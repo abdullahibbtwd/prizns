@@ -28,7 +28,7 @@
     "framer-motion": "^12.43.0",
     "i18next": "^26.3.6",
     "lucide-react": "^1.28.0",
-    "maplibre-gl": "^6.3.0",
+    "maplibre-gl": "^6.8.0",
     "radix-ui": "^1.6.7",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
