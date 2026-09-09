@@ -3,12 +3,15 @@ import {
   compactBody,
   convertBodyBlock,
   draftPlainTextForAi,
+  dropGalleryMedia,
   emptyTextBlock,
   estimateReadMinutes,
   groupImagesIntoCollage,
+  mediaIdsFromBodyBlock,
   nextBodyMoveIndex,
   remapBodyMediaIds,
   splitPastedParagraphs,
+  swapCollageItems,
   syncBodyImagesWithGallery,
   toolbarTypeAction,
   ungroupCollage,
@@ -313,6 +316,19 @@ describe('groupImagesIntoCollage', () => {
     expect(ungroupCollage(grouped, 1).filter((block) => block.type === 'image')).toHaveLength(3)
   })
 
+  it('swaps two photos inside a collage', () => {
+    const grouped = groupImagesIntoCollage(body, [1, 2, 3])
+    const swapped = swapCollageItems(grouped, 1, 0, 2)
+    expect(swapped[1]).toMatchObject({
+      type: 'collage',
+      items: [
+        { mediaId: 'c', url: '/c.jpg' },
+        { mediaId: 'b', url: '/b.jpg' },
+        { mediaId: 'a', url: '/a.jpg' },
+      ],
+    })
+  })
+
   it('keeps collage extras out of the leftover gallery sync', () => {
     const grouped = groupImagesIntoCollage(body, [1, 2])
     expect(
@@ -326,7 +342,7 @@ describe('groupImagesIntoCollage', () => {
       { type: 'paragraph', textBg: 'Lead.' },
       {
         type: 'collage',
-        layout: 'default',
+        layout: 'mosaic',
         captionBg: '',
         items: [
           { mediaId: 'a', url: '/a.jpg', captionBg: 'One' },
@@ -335,5 +351,42 @@ describe('groupImagesIntoCollage', () => {
       },
       { type: 'image', mediaId: 'c', url: '/c.jpg', captionBg: 'Three' },
     ])
+  })
+})
+
+describe('dropGalleryMedia', () => {
+  it('collects image and collage ids from a body block', () => {
+    expect(
+      mediaIdsFromBodyBlock({
+        type: 'image',
+        mediaId: 'a',
+        url: '/a.jpg',
+        captionBg: '',
+      }),
+    ).toEqual(['a'])
+    expect(
+      mediaIdsFromBodyBlock({
+        type: 'collage',
+        layout: 'mosaic',
+        captionBg: '',
+        items: [
+          { mediaId: 'a', url: '/a.jpg', captionBg: '' },
+          { mediaId: 'b', url: '/b.jpg', captionBg: '' },
+        ],
+      }),
+    ).toEqual(['a', 'b'])
+  })
+
+  it('drops extras from the gallery when the editor deletes them in the body', () => {
+    expect(
+      dropGalleryMedia(
+        [
+          { id: 'hero', url: '/hero.jpg' },
+          { id: 'a', url: '/a.jpg' },
+          { id: 'b', url: '/b.jpg' },
+        ],
+        ['a'],
+      ).map((item) => item.id),
+    ).toEqual(['hero', 'b'])
   })
 })

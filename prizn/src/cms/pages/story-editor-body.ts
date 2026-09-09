@@ -187,6 +187,28 @@ function mappedMediaId(id: string | undefined, idMap: Map<string, string>) {
   return idMap.get(id) || id
 }
 
+export function mediaIdsFromBodyBlock(block: BodyBlock | undefined): string[] {
+  if (!block) return []
+  if (block.type === 'image' || block.type === 'video') {
+    return block.mediaId ? [block.mediaId] : []
+  }
+  if (block.type === 'collage') {
+    return block.items
+      .map((item) => item.mediaId)
+      .filter((id): id is string => Boolean(id))
+  }
+  return []
+}
+
+export function dropGalleryMedia<T extends { id: string }>(
+  gallery: T[],
+  mediaIds: string[],
+): T[] {
+  if (mediaIds.length === 0) return gallery
+  const drop = new Set(mediaIds)
+  return gallery.filter((item) => !drop.has(item.id))
+}
+
 /** Replace local upload ids with saved media ids before persist. */
 export function remapBodyMediaIds(
   body: BodyBlock[],
@@ -197,7 +219,7 @@ export function remapBodyMediaIds(
       if (block.type === 'collage') {
         return {
           type: 'collage',
-          layout: block.layout || 'default',
+          layout: block.layout || 'mosaic',
           captionBg: block.captionBg ?? '',
           items: block.items.map((item) => ({
             mediaId: mappedMediaId(item.mediaId, idMap),
@@ -291,7 +313,7 @@ export function toFormBodyBlock(block: BodyBlock, galleryUrl?: string): BodyBloc
   if (block.type === 'collage') {
     return {
       type: 'collage',
-      layout: block.layout || 'default',
+      layout: block.layout || 'mosaic',
       captionBg: block.captionBg ?? '',
       items: block.items.map((item) => ({
         mediaId: item.mediaId,
@@ -354,7 +376,7 @@ type ImageBodyBlock = Extract<BodyBlock, { type: 'image' }>
 export function groupImagesIntoCollage(
   body: BodyBlock[],
   indexes: number[],
-  layout = 'default',
+  layout = 'mosaic',
 ): BodyBlock[] {
   const sorted = [...new Set(indexes)].sort((a, b) => a - b)
   const items: ImageBodyBlock[] = []
@@ -405,5 +427,31 @@ export function setCollageLayout(
   if (block?.type !== 'collage') return body
   const next = [...body]
   next[index] = { ...block, layout }
+  return next
+}
+
+export function swapCollageItems(
+  body: BodyBlock[],
+  index: number,
+  from: number,
+  to: number,
+): BodyBlock[] {
+  const block = body[index]
+  if (block?.type !== 'collage') return body
+  if (from === to) return body
+  if (
+    from < 0 ||
+    to < 0 ||
+    from >= block.items.length ||
+    to >= block.items.length
+  ) {
+    return body
+  }
+  const items = [...block.items]
+  const moved = items[from]!
+  items[from] = items[to]!
+  items[to] = moved
+  const next = [...body]
+  next[index] = { ...block, items }
   return next
 }

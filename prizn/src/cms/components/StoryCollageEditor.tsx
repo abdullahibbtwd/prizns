@@ -21,6 +21,7 @@ export function StoryCollageEditor({
   onLayoutChange,
   onCaptionChange,
   onUngroup,
+  onSwap,
   onFocus,
 }: {
   items: CollageItem[]
@@ -29,6 +30,7 @@ export function StoryCollageEditor({
   onLayoutChange: (layout: string) => void
   onCaptionChange: (caption: string) => void
   onUngroup: () => void
+  onSwap: (from: number, to: number) => void
   onFocus: () => void
 }) {
   const { t } = useTranslation()
@@ -52,14 +54,17 @@ export function StoryCollageEditor({
           openLabel=""
           layout={current}
           density="editor"
+          onSwap={onSwap}
         />
       ) : null}
 
+      <p className="text-[11px] text-stone-500">{t('cms.editor.collageSwapHint')}</p>
+
       <div>
-        <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#0C2686]/70">
+        <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#0C2686]/70">
           {t('cms.editor.collageLayout')}
         </p>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-1.5">
           {layouts.map((id) => (
             <button
               key={id}
@@ -67,11 +72,12 @@ export function StoryCollageEditor({
               data-testid={`collage-layout-${id}`}
               aria-pressed={current === id}
               aria-label={t(`cms.editor.collageLayout_${id}`)}
+              title={t(`cms.editor.collageLayoutHint_${id}`)}
               onClick={() => onLayoutChange(id)}
               className={cn(
-                'w-16 overflow-hidden rounded-md border bg-[#FAF8F3] p-0.5 transition',
+                'w-[4.25rem] overflow-hidden rounded border bg-[#FAF8F3] p-0.5 text-left transition',
                 current === id
-                  ? 'border-[#0C2686] ring-2 ring-[#0C2686]/25'
+                  ? 'border-[#0C2686] ring-1 ring-[#0C2686]/30'
                   : 'border-[#E8E4DC] hover:border-[#0C2686]/40',
               )}
             >
@@ -81,6 +87,9 @@ export function StoryCollageEditor({
                 layout={id}
                 density="thumb"
               />
+              <span className="mt-0.5 block truncate px-0.5 pb-px text-[7px] font-semibold uppercase leading-tight tracking-wider text-stone-500">
+                {t(`cms.editor.collageLayout_${id}`)}
+              </span>
             </button>
           ))}
         </div>

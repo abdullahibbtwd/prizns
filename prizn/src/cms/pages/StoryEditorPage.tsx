@@ -96,6 +96,7 @@ import {
   toFormBodyBlock,
   compactBody,
   draftPlainTextForAi,
+  dropGalleryMedia,
   remapBodyMediaIds,
   syncBodyImagesWithGallery,
 } from '@/cms/pages/story-editor-body'
@@ -1035,6 +1036,25 @@ export default function CmsStoryEditorPage() {
     revokeIfBlob(doomed?.posterUrl)
     const next = gallery.filter((item) => item.id !== mediaId)
     if (doomed?.kind === 'video' && !next.some((item) => item.kind === 'video')) {
+      form.setValue('videoUrl', '', { shouldDirty: true })
+      form.setValue('videoMediaId', '', { shouldDirty: true })
+    }
+    applyGallery(next)
+  }
+
+  const dropMediaIdsFromBody = (mediaIds: string[]) => {
+    if (mediaIds.length === 0) return
+    const next = dropGalleryMedia(gallery, mediaIds)
+    if (next.length === gallery.length) return
+    for (const item of gallery) {
+      if (!mediaIds.includes(item.id)) continue
+      revokeIfBlob(item.url)
+      revokeIfBlob(item.posterUrl)
+    }
+    if (
+      gallery.some((item) => item.kind === 'video' && mediaIds.includes(item.id)) &&
+      !next.some((item) => item.kind === 'video')
+    ) {
       form.setValue('videoUrl', '', { shouldDirty: true })
       form.setValue('videoMediaId', '', { shouldDirty: true })
     }
@@ -2013,6 +2033,7 @@ export default function CmsStoryEditorPage() {
               insert={insert}
               update={update}
               remove={remove}
+              onDropMediaIds={dropMediaIdsFromBody}
               move={move}
               onAddImages={pickInlineImages}
               replaceBody={replace}

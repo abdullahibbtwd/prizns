@@ -28,8 +28,10 @@ import {
   convertBodyBlock,
   emptyTextBlock,
   groupImagesIntoCollage,
+  mediaIdsFromBodyBlock,
   nextBodyMoveIndex,
   setCollageLayout,
+  swapCollageItems,
   toolbarTypeAction,
   ungroupCollage,
   type TextBlockType,
@@ -59,6 +61,7 @@ export function StoryBodyEditor({
   move,
   onAddImages,
   replaceBody,
+  onDropMediaIds,
 }: {
   form: UseFormReturn<ArticleFormValues>
   fields: Array<{ id: string }>
@@ -70,6 +73,7 @@ export function StoryBodyEditor({
   move: (from: number, to: number) => void
   onAddImages: (files: File[], afterIndex: number) => Promise<void>
   replaceBody: (next: BodyBlock[]) => void
+  onDropMediaIds?: (mediaIds: string[]) => void
 }) {
   const { t } = useTranslation()
   const rootRef = useRef<HTMLDivElement>(null)
@@ -168,6 +172,19 @@ export function StoryBodyEditor({
     insertParagraphAfter(index, afterHtml)
   }
 
+  const removeBlock = (index: number) => {
+    const ids = mediaIdsFromBodyBlock(form.getValues(`body.${index}`))
+    if (fields.length <= minIndex + 1) {
+      update(index, { type: 'paragraph', textBg: '' })
+    } else {
+      remove(index)
+    }
+    if (ids.length) onDropMediaIds?.(ids)
+    setSelected((prev) =>
+      prev.filter((item) => item !== index).map((item) => (item > index ? item - 1 : item)),
+    )
+  }
+
   const onRichEmptyBackspace = (index: number) => {
     if (fields.length <= minIndex + 1) return
     const prev = index - 1
@@ -218,6 +235,10 @@ export function StoryBodyEditor({
 
   const applyCollageLayout = (index: number, layout: string) => {
     replaceBody(setCollageLayout(form.getValues('body'), index, layout))
+  }
+
+  const swapCollagePhotos = (index: number, from: number, to: number) => {
+    replaceBody(swapCollageItems(form.getValues('body'), index, from, to))
   }
 
   const splitCollage = (index: number) => {
@@ -380,13 +401,7 @@ export function StoryBodyEditor({
                         )}
                         <button
                           type="button"
-                          onClick={() => {
-                            if (fields.length <= minIndex + 1) {
-                              update(index, { type: 'paragraph', textBg: '' })
-                              return
-                            }
-                            remove(index)
-                          }}
+                          onClick={() => removeBlock(index)}
                           className="text-stone-400 opacity-0 transition hover:text-rose-700 group-hover:opacity-100 group-focus-within:opacity-100"
                           aria-label={t('cms.editor.removeBlock')}
                         >
@@ -405,7 +420,7 @@ export function StoryBodyEditor({
                                   ?.url,
                             }),
                           )}
-                          layout={form.watch(`body.${index}.layout`) || 'default'}
+                          layout={form.watch(`body.${index}.layout`) || 'mosaic'}
                           captionBg={form.watch(`body.${index}.captionBg`) ?? ''}
                           onLayoutChange={(layout) =>
                             applyCollageLayout(index, layout)
@@ -416,6 +431,7 @@ export function StoryBodyEditor({
                             update(index, { ...current, captionBg: caption })
                           }}
                           onUngroup={() => splitCollage(index)}
+                          onSwap={(from, to) => swapCollagePhotos(index, from, to)}
                           onFocus={() => setFocusedIndex(index)}
                         />
                       ) : type === 'image' || type === 'video' ? (

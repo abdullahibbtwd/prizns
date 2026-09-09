@@ -3,7 +3,11 @@ import {
   collageCellLayout,
   collageGridClass,
   collageLayoutIds,
+  collageShellClass,
+  collageTemplate,
+  isSplitCollageLayout,
   segmentBodyForCollage,
+  tileColumns,
 } from './article-image-collage'
 
 const img = (n: number) => ({
@@ -68,15 +72,72 @@ describe('segmentBodyForCollage', () => {
 
 describe('collageGridClass', () => {
   it('returns a distinct grid for each collage size', () => {
-    expect(collageGridClass(2)).toContain('grid-cols-2')
+    expect(collageGridClass(2)).toContain('grid-cols-3')
     expect(collageGridClass(3)).toContain('grid-rows-2')
     expect(collageGridClass(9)).toContain('grid-cols-3')
-    expect(collageGridClass(10)).toContain('grid-cols-5')
+    expect(collageGridClass(10)).toContain('grid-cols-4')
   })
 
-  it('offers extra layouts without losing the default', () => {
-    expect(collageLayoutIds(3)).toEqual(['default', 'top', 'row'])
-    expect(collageGridClass(2, 'wide')).toContain('grid-cols-3')
-    expect(collageCellLayout(3, 0, 'top').className).toContain('col-span-2')
+  it('offers the editorial templates plus equal wide and tall grids', () => {
+    expect(collageLayoutIds(3)).toEqual([
+      'hero-strip',
+      'portrait-pair',
+      'big-stack',
+      'mosaic',
+      'filmstrip',
+      'equal-wide',
+      'equal-tall',
+    ])
+    expect(collageTemplate('default')).toBe('mosaic')
+    expect(collageTemplate('landscape')).toBe('hero-strip')
+    expect(collageTemplate('row')).toBe('hero-strip')
+    expect(collageTemplate('portrait')).toBe('portrait-pair')
+    expect(collageTemplate('top')).toBe('big-stack')
+    expect(collageTemplate('horizontal')).toBe('equal-wide')
+    expect(collageTemplate('vertical')).toBe('equal-tall')
+  })
+
+  it('uses a wide hero and square strip for hero-strip and filmstrip', () => {
+    expect(isSplitCollageLayout('hero-strip')).toBe(true)
+    expect(isSplitCollageLayout('filmstrip')).toBe(true)
+    expect(collageGridClass(4, 'hero-strip')).toBe('')
+    expect(collageCellLayout(4, 0, 'hero-strip').aspectClass).toContain('16/9')
+    expect(collageCellLayout(4, 1, 'hero-strip').aspectClass).toContain('aspect-square')
+    expect(collageCellLayout(4, 1, 'filmstrip').className).toContain('shrink-0')
+    expect(collageShellClass('hero-strip', 'article')).toContain('max-w-xl')
+    expect(collageShellClass('filmstrip', 'article')).toContain('max-w-xl')
+  })
+
+  it('places tall portraits side by side', () => {
+    expect(collageGridClass(2, 'portrait-pair')).toContain('grid-cols-2')
+    expect(collageGridClass(2, 'portrait-pair')).toContain('aspect-[3/4]')
+    expect(collageGridClass(4, 'portrait-pair')).toContain('grid-rows-2')
+  })
+
+  it('anchors a large portrait beside stacked wide crops', () => {
+    expect(collageGridClass(3, 'big-stack')).toContain('grid-cols-5')
+    expect(collageGridClass(3, 'big-stack')).toContain('aspect-[3/2]')
+    expect(collageCellLayout(3, 0, 'big-stack').className).toContain('col-span-3')
+    expect(collageCellLayout(3, 0, 'big-stack').className).toContain('row-span-2')
+    expect(collageCellLayout(3, 1, 'big-stack').className).toContain('col-span-2')
+  })
+
+  it('keeps mosaic as an asymmetric mix of tall and wide cells', () => {
+    expect(collageCellLayout(2, 0, 'mosaic').className).toContain('col-span-2')
+    expect(collageCellLayout(2, 1, 'mosaic').className).toContain('row-span-2')
+    expect(collageCellLayout(3, 0, 'mosaic').className).toContain('row-span-2')
+    expect(collageShellClass('mosaic', 'article')).toContain('max-w-[22rem]')
+  })
+
+  it('adds equal-size horizontal and vertical grids', () => {
+    expect(tileColumns(4)).toBe(2)
+    expect(tileColumns(5)).toBe(3)
+    expect(tileColumns(8)).toBe(4)
+    expect(collageGridClass(4, 'equal-wide')).toContain('aspect-[3/2]')
+    expect(collageGridClass(4, 'equal-tall')).toContain('aspect-[3/4]')
+    expect(collageGridClass(5, 'equal-wide')).toContain('grid-rows-2')
+    expect(collageCellLayout(5, 4, 'equal-wide').className).toBe('col-span-3')
+    expect(collageCellLayout(4, 0, 'equal-tall').className).toBe('')
+    expect(collageShellClass('equal-wide', 'article')).toContain('max-w-xl')
   })
 })

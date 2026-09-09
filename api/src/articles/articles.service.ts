@@ -360,7 +360,7 @@ export class ArticlesService {
         if (!captionSame || !layoutSame || !itemsSame) bgChanged = true;
         return {
           type: 'collage' as const,
-          layout: block.layout || 'default',
+          layout: block.layout || 'mosaic',
           captionBg: block.captionBg ?? '',
           captionEn: captionSame ? prev.captionEn : null,
           items: block.items.map((item, itemIndex) => {

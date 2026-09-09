@@ -444,7 +444,31 @@ const cmsBg = {
     collageCaption: 'Надпис към колажа (по избор)',
     collageGroup: 'Колаж',
     collageAuto: 'Автоматичен колаж',
-    collageLayout_default: 'По подразбиране',
+    collageSwapHint: 'Плъзни снимка върху друга, за да ги размениш.',
+    collageLayout_default: 'Списание',
+    collageLayout_landscape: 'Герой + лента',
+    collageLayout_portrait: 'Двойка портрети',
+    'collageLayout_hero-strip': 'Герой + лента',
+    'collageLayout_portrait-pair': 'Двойка портрети',
+    'collageLayout_big-stack': 'Голяма + малки',
+    collageLayout_mosaic: 'Списание',
+    collageLayout_filmstrip: 'Филмова лента',
+    'collageLayout_equal-wide': 'Хоризонтална',
+    'collageLayout_equal-tall': 'Вертикална',
+    'collageLayoutHint_hero-strip':
+      'Широка снимка отгоре и по-малки квадратни кадри под нея.',
+    'collageLayoutHint_portrait-pair':
+      'Високи портрети един до друг.',
+    'collageLayoutHint_big-stack':
+      'Голям портрет от едната страна и по-малки широки кадри от другата.',
+    collageLayoutHint_mosaic:
+      'Висок портрет от едната страна, а останалото е асиметрична мрежа от широки и квадратни кадри.',
+    collageLayoutHint_filmstrip:
+      'Широк герой отгоре и хоризонтална лента от квадратни миниатюри отдолу.',
+    'collageLayoutHint_equal-wide':
+      'Еднакви широки кадри в мрежа от 2 или 3 реда, според броя снимки.',
+    'collageLayoutHint_equal-tall':
+      'Еднакви високи кадри в мрежа от 2 или 3 реда, според броя снимки.',
     collageLayout_wide: 'Широка + тясна',
     collageLayout_stack: 'Една под друга',
     collageLayout_top: 'Голяма отгоре',
@@ -1663,7 +1687,31 @@ const cmsEn = {
     collageCaption: 'Collage caption (optional)',
     collageGroup: 'Collage',
     collageAuto: 'Auto collage',
-    collageLayout_default: 'Default',
+    collageSwapHint: 'Drag a photo onto another to swap them.',
+    collageLayout_default: 'Magazine',
+    collageLayout_landscape: 'Hero + strip',
+    collageLayout_portrait: 'Portrait pair',
+    'collageLayout_hero-strip': 'Hero + strip',
+    'collageLayout_portrait-pair': 'Portrait pair',
+    'collageLayout_big-stack': 'Big + small',
+    collageLayout_mosaic: 'Magazine',
+    collageLayout_filmstrip: 'Filmstrip',
+    'collageLayout_equal-wide': 'Horizontal',
+    'collageLayout_equal-tall': 'Vertical',
+    'collageLayoutHint_hero-strip':
+      'A wide image spans the top, with smaller square crops below.',
+    'collageLayoutHint_portrait-pair':
+      'Tall images placed side by side.',
+    'collageLayoutHint_big-stack':
+      'A large portrait on one side, with smaller wide crops stacked on the other.',
+    collageLayoutHint_mosaic:
+      'A tall portrait anchors one side, with a mix of wide and square images in an asymmetric grid.',
+    collageLayoutHint_filmstrip:
+      'A wide hero on top, with a horizontally scrollable row of square thumbnails below.',
+    'collageLayoutHint_equal-wide':
+      'Equal wide crops in a 2–3 row grid, based on how many photos you have.',
+    'collageLayoutHint_equal-tall':
+      'Equal tall crops in a 2–3 row grid, based on how many photos you have.',
     collageLayout_wide: 'Wide + narrow',
     collageLayout_stack: 'Stacked',
     collageLayout_top: 'Large on top',

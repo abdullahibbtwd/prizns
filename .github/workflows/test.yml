@@ -76,7 +76,9 @@ jobs:
         run: npm ci --prefix api
 
       - name: Audit API dependencies
-        run: npm audit --omit=dev --prefix api
+        # MinIO 8 depends on stream-json 1.x (moderate DoS in unused pick/filter
+        # helpers). npm's only "fix" is minio@7, which breaks this client.
+        run: npm audit --omit=dev --audit-level=high --prefix api
 
       - name: Generate Prisma client
         run: npm run prisma:generate --prefix api

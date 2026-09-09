@@ -52,7 +52,7 @@ export function storedBlockToPublic(
     const caption = block.captionEn ?? block.captionBg ?? '';
     return {
       type: 'collage',
-      layout: block.layout || 'default',
+      layout: block.layout || 'mosaic',
       caption,
       captionBg: block.captionBg ?? '',
       images,
