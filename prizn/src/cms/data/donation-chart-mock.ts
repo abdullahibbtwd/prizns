@@ -39,7 +39,17 @@ function buildMockDailySeries(now = new Date()): Array<{ date: Date; amountBgn: 
   return points
 }
 
-const MOCK_DAILY = buildMockDailySeries()
+let dailyCacheKey = ''
+let dailyCache: Array<{ date: Date; amountBgn: number }> = []
+
+function dailySeriesFor(now: Date) {
+  const key = dayKey(now)
+  if (key !== dailyCacheKey) {
+    dailyCacheKey = key
+    dailyCache = buildMockDailySeries(now)
+  }
+  return dailyCache
+}
 
 function pad(n: number) {
   return String(n).padStart(2, '0')
@@ -76,12 +86,13 @@ export function getMockDonationSeries(
   granularity: DonationChartGranularity,
   now = new Date(),
 ): DonationChartPoint[] {
+  const daily = dailySeriesFor(now)
   if (granularity === 'day') {
     // Last 30 days including today
     const start = new Date(now)
     start.setHours(12, 0, 0, 0)
     start.setDate(start.getDate() - 29)
-    return MOCK_DAILY.filter((p) => p.date >= start && p.date <= now).map((p) => ({
+    return daily.filter((p) => p.date >= start && p.date <= now).map((p) => ({
       key: dayKey(p.date),
       label: `${pad(p.date.getDate())} ${MONTH_LABELS[p.date.getMonth()]}`,
       amountBgn: p.amountBgn,
@@ -90,7 +101,7 @@ export function getMockDonationSeries(
 
   if (granularity === 'month') {
     const map = new Map<string, number>()
-    for (const p of MOCK_DAILY) {
+    for (const p of daily) {
       const k = monthKey(p.date)
       map.set(k, (map.get(k) ?? 0) + p.amountBgn)
     }
@@ -108,7 +119,7 @@ export function getMockDonationSeries(
   }
 
   const map = new Map<string, number>()
-  for (const p of MOCK_DAILY) {
+  for (const p of daily) {
     const k = yearKey(p.date)
     map.set(k, (map.get(k) ?? 0) + p.amountBgn)
   }
@@ -123,13 +134,12 @@ export function getMockDonationSeries(
 
 export function getMockMonthTotalBgn(now = new Date()): number {
   const prefix = monthKey(now)
-  return MOCK_DAILY.filter((p) => monthKey(p.date) === prefix).reduce(
-    (sum, p) => sum + p.amountBgn,
-    0,
-  )
+  return dailySeriesFor(now)
+    .filter((p) => monthKey(p.date) === prefix)
+    .reduce((sum, p) => sum + p.amountBgn, 0)
 }
 
 export function getMockTodayTotalBgn(now = new Date()): number {
   const key = dayKey(now)
-  return MOCK_DAILY.find((p) => dayKey(p.date) === key)?.amountBgn ?? 0
+  return dailySeriesFor(now).find((p) => dayKey(p.date) === key)?.amountBgn ?? 0
 }

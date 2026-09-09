@@ -13,6 +13,11 @@ const coverageCollect = [
   '!**/wordpress-import/import-wordpress.ts',
 ];
 
+/** MinIO → query-string still CJS; decode-uri-component@0.5.0 is ESM-only. */
+const decodeUriComponentMapper = {
+  '^decode-uri-component$': '<rootDir>/../test/shims/decode-uri-component.cjs',
+}
+
 const config: Config = {
   projects: [
     {
@@ -23,6 +28,7 @@ const config: Config = {
       transform: {
         '^.+\\.(t|j)s$': 'ts-jest',
       },
+      moduleNameMapper: decodeUriComponentMapper,
       testEnvironment: 'node',
       collectCoverage: true,
       collectCoverageFrom: coverageCollect,
@@ -34,6 +40,9 @@ const config: Config = {
       testRegex: '.e2e-spec.ts$',
       transform: {
         '^.+\\.(t|j)s$': 'ts-jest',
+      },
+      moduleNameMapper: {
+        '^decode-uri-component$': '<rootDir>/shims/decode-uri-component.cjs',
       },
       testEnvironment: 'node',
       globalSetup: '<rootDir>/global-setup.ts',

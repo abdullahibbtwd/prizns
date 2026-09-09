@@ -6,6 +6,9 @@
   "transform": {
     "^.+\\.(t|j)s$": "ts-jest"
   },
+  "moduleNameMapper": {
+    "^decode-uri-component$": "<rootDir>/shims/decode-uri-component.cjs"
+  },
   "globalSetup": "<rootDir>/global-setup.ts",
   "globalTeardown": "<rootDir>/global-teardown.ts",
   "setupFilesAfterEnv": ["<rootDir>/setup-e2e.ts"],
