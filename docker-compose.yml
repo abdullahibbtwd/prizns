@@ -95,14 +95,21 @@ services:
       context: ./prizn
       dockerfile: Dockerfile
       args:
-        # Default `/api` so Coolify/docker builds don't bake localhost into JS.
-        # Override with full URL only for special setups.
-        VITE_API_URL: ${VITE_API_URL:-/api}
+        # Always same-origin in Docker. Do not pass host .env VITE_API_URL
+        # (local Vite uses http://localhost:3003/api — that must not be baked in).
+        VITE_API_URL: /api
         VITE_APP_NAME: ${VITE_APP_NAME:-Prizn}
     restart: unless-stopped
     ports:
-      # Stage2 host nginx: set PUBLISH_BIND=127.0.0.1 so only host :80 is public.
-      - "${PUBLISH_BIND:-0.0.0.0}:${WEB_PORT:-5173}:80"
+      # Must match host nginx upstream (deploy/nginx/stage2.conf → 127.0.0.1:5175).
+      # Stage2: set PUBLISH_BIND=127.0.0.1 so only host :80 is public.
+      - "${PUBLISH_BIND:-0.0.0.0}:${WEB_PORT:-5175}:80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/healthz || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 10s
     depends_on:
       - api
       - minio
