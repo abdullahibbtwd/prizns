@@ -125,7 +125,7 @@ export function usePublicArticles(
       }),
     enabled: (filters?.q?.trim().length ?? 0) === 0 || (filters?.q?.trim().length ?? 0) >= 2,
     staleTime: 60_000,
-    retry: false,
+    retry: 1,
   });
 }
 
@@ -174,7 +174,7 @@ export function usePublicArticleListing(
     enabled: opts?.enabled ?? true,
     placeholderData: keepPreviousData,
     staleTime: 60_000,
-    retry: false,
+    retry: 1,
   });
 
   return {
@@ -193,7 +193,7 @@ export function usePublicArticleSearch(q: string) {
     queryFn: () => listPublicArticles(undefined, { q: trimmed, limit: 12 }),
     enabled: trimmed.length >= 2,
     staleTime: 30_000,
-    retry: false,
+    retry: 1,
   })
 }
 
@@ -202,7 +202,7 @@ export function usePopularStories(limit = 5) {
     queryKey: ["popular-stories", limit],
     queryFn: () => listPopularStories(limit),
     staleTime: 5 * 60_000,
-    retry: false,
+    retry: 1,
   })
 }
 
@@ -211,7 +211,7 @@ export function usePublicCategories() {
     queryKey: ["public-categories"],
     queryFn: listPublicCategories,
     staleTime: 60_000,
-    retry: false,
+    retry: 1,
   });
 }
 
@@ -220,7 +220,7 @@ export function usePublicTags(kind?: TagKind) {
     queryKey: ["public-tags", kind || "all"],
     queryFn: () => listPublicTags(kind),
     staleTime: 60_000,
-    retry: false,
+    retry: 1,
   });
 }
 
@@ -229,7 +229,7 @@ export function usePublicAuthors() {
     queryKey: ["public-authors"],
     queryFn: listPublicAuthors,
     staleTime: 60_000,
-    retry: false,
+    retry: 1,
   });
 }
 
@@ -238,7 +238,7 @@ export function usePublicSeries() {
     queryKey: ["public-series"],
     queryFn: listPublicSeries,
     staleTime: 60_000,
-    retry: false,
+    retry: 1,
   });
 }
 
@@ -264,7 +264,7 @@ export function usePublicMedia(
     queryKey: ["public-media", kind, opts?.limit ?? ""],
     queryFn: () => listPublicMedia(kind, opts),
     staleTime: 60_000,
-    retry: false,
+    retry: 1,
   });
 }
 

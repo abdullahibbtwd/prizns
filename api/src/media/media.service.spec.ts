@@ -20,6 +20,7 @@ describe('MediaService', () => {
     uploadFromPath: jest.fn(),
     publicUrlFor: jest.fn((key: string) => `https://cdn.example/${key}`),
     resolvePublicUrl: jest.fn((row: { url: string }) => row.url),
+    remove: jest.fn().mockResolvedValue(undefined),
   };
   const queue = { add: jest.fn().mockResolvedValue({ id: 'job-1' }) };
 
@@ -60,6 +61,22 @@ describe('MediaService', () => {
         }),
         update: jest.fn().mockResolvedValue(row),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        delete: jest.fn().mockResolvedValue(row),
+      },
+      article: {
+        count: jest.fn().mockResolvedValue(0),
+      },
+      articleGalleryItem: {
+        count: jest.fn().mockResolvedValue(0),
+      },
+      series: {
+        count: jest.fn().mockResolvedValue(0),
+      },
+      product: {
+        count: jest.fn().mockResolvedValue(0),
+      },
+      productGalleryItem: {
+        count: jest.fn().mockResolvedValue(0),
       },
       author: {
         findMany: jest.fn().mockResolvedValue([]),
@@ -225,5 +242,20 @@ describe('MediaService', () => {
       mimeType: 'image/jpeg',
     });
     expect(storage.uploadBuffer).not.toHaveBeenCalled();
+  });
+
+  it('deletes a media row and its stored object', async () => {
+    const result = await service.remove('media-1');
+    expect(result).toEqual({ ok: true, id: 'media-1' });
+    expect(prisma.mediaAsset.delete).toHaveBeenCalledWith({
+      where: { id: 'media-1' },
+    });
+    expect(storage.remove).toHaveBeenCalledWith('media/test.jpg');
+  });
+
+  it('treats unused media as an orphan', async () => {
+    await expect(service.isOrphan('media-1')).resolves.toBe(true);
+    prisma.article.count = jest.fn().mockResolvedValue(1);
+    await expect(service.isOrphan('media-1')).resolves.toBe(false);
   });
 });

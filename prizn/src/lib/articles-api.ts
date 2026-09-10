@@ -166,6 +166,10 @@ export async function waitForCmsMedia(
   throw new Error('Upload is taking too long')
 }
 
+export function deleteCmsMedia(id: string) {
+  return api.delete<{ ok: boolean; id: string }>(`/cms/media/${id}`)
+}
+
 export function listCmsMedia(kind?: 'IMAGE' | 'VIDEO' | 'AUDIO') {
   const qs = kind ? `?kind=${encodeURIComponent(kind)}` : ''
   return api.get<MediaAsset[]>(`/cms/media${qs}`)
@@ -238,12 +242,27 @@ export function listPublicArticlesPage(
   section?: string,
   opts?: PublicArticleListFilters,
 ) {
+  const page = opts?.page ?? 1
+  const pageSize = opts?.pageSize ?? 30
   const qs = publicArticleQuery(section, {
     ...opts,
-    page: opts?.page ?? 1,
-    pageSize: opts?.pageSize ?? 30,
-  });
-  return api.get<PublicArticlesPage>(`/articles${qs ? `?${qs}` : ""}`);
+    page,
+    pageSize,
+  })
+  return api
+    .get<PublicArticlesPage | CmsArticle[]>(`/articles${qs ? `?${qs}` : ""}`)
+    .then((data) => {
+      if (Array.isArray(data)) {
+        return {
+          items: data,
+          total: data.length,
+          page,
+          pageSize: data.length || pageSize,
+          totalPages: 1,
+        } satisfies PublicArticlesPage
+      }
+      return data
+    })
 }
 
 export function getPublicArticle(

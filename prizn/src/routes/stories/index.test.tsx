@@ -75,6 +75,7 @@ describe('StoriesPage', () => {
       totalPages: 1,
       pageSize: 30,
       isLoading: false,
+      isError: false,
     })
   })
 
@@ -119,5 +120,19 @@ describe('StoriesPage', () => {
     expect(screen.getByLabelText('Pagination')).toBeInTheDocument()
     expect(screen.getByText('Page 1 of 2')).toBeInTheDocument()
     expect(screen.getByText('48 stories')).toBeInTheDocument()
+  })
+
+  it('shows loading instead of the empty copy', () => {
+    usePublicArticleListing.mockReturnValue({
+      items: [],
+      total: 0,
+      totalPages: 1,
+      pageSize: 30,
+      isLoading: true,
+      isError: false,
+    })
+    renderPage(<StoriesPage />, { route: '/stories' })
+    expect(screen.getAllByText('Loading…').length).toBeGreaterThan(0)
+    expect(screen.queryByText('No published stories yet.')).not.toBeInTheDocument()
   })
 })

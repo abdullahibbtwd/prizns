@@ -16,15 +16,18 @@ import {
   Settings,
   Sparkles,
   Copy,
+  Trash2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { listCmsMedia, uploadCmsMedia } from '@/lib/articles-api'
+import { deleteCmsMedia, listCmsMedia, uploadCmsMedia } from '@/lib/articles-api'
 import type { MediaAsset } from '@/lib/cms-types'
 import { assertCmsFileSize } from '@/lib/upload-limits'
+import { useCmsConfirm } from '@/cms/components/CmsConfirmDialog'
 
 export function CmsMediaPage() {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
+  const { confirm, dialog } = useCmsConfirm()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [kindFilter, setKindFilter] = useState<
     'ALL' | 'IMAGE' | 'VIDEO' | 'AUDIO'
@@ -71,6 +74,29 @@ export function CmsMediaPage() {
       setFormError(error.message || t('cms.mediaLibrary.uploadFailed'))
     },
   })
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => deleteCmsMedia(id),
+    onSuccess: async () => {
+      setFormError('')
+      setFormOk(t('cms.mediaLibrary.deleted'))
+      await queryClient.invalidateQueries({ queryKey: ['cms-media'] })
+      await queryClient.invalidateQueries({ queryKey: ['public-media'] })
+    },
+    onError: (error: Error) => {
+      setFormOk('')
+      setFormError(error.message || t('cms.mediaLibrary.deleteFailed'))
+    },
+  })
+
+  const confirmDelete = async (item: MediaAsset) => {
+    const ok = await confirm({
+      title: t('cms.mediaLibrary.delete'),
+      description: t('cms.mediaLibrary.deleteConfirm'),
+    })
+    if (!ok) return
+    deleteMutation.mutate(item.id)
+  }
 
   const items = mediaQuery.data ?? []
   const filters: Array<{ id: typeof kindFilter; label: string }> = [
@@ -294,10 +320,20 @@ export function CmsMediaPage() {
                   </p>
                 ) : null}
               </div>
+              <button
+                type="button"
+                onClick={() => void confirmDelete(item)}
+                disabled={deleteMutation.isPending}
+                className="absolute right-2 top-2 inline-flex size-8 items-center justify-center rounded-full bg-black/55 text-white opacity-100 backdrop-blur-sm transition-opacity hover:bg-rose-700 md:opacity-0 md:group-hover:opacity-100"
+                aria-label={t('cms.mediaLibrary.delete')}
+              >
+                <Trash2 className="size-3.5" />
+              </button>
             </div>
           ))}
         </div>
       )}
+      {dialog}
     </div>
   )
 }

@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Post,
@@ -60,6 +61,11 @@ export class MediaController {
       folder: folder ?? folderQuery ?? 'cms',
       uploadedById: user?.id,
     });
+  }
+
+  @Delete(':id')
+  remove(@Param('id') id: string) {
+    return this.media.remove(id);
   }
 
   private parseKind(kind?: string): MediaKind | undefined {

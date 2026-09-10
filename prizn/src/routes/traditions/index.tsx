@@ -4,6 +4,7 @@ import { JournalShell } from '@/components/concept-3/JournalShell'
 import { ListingHeader } from '@/components/concept-3/ListingHeader'
 import { ListingPagination } from '@/components/concept-3/ListingPagination'
 import { SponsoredBadge } from '@/components/concept-3/SponsoredBadge'
+import { ListingBody, listingCountLabel } from '@/components/concept-3/ListingBody'
 import { RegionMap } from '@/components/concept-3/RegionMap'
 import {
   articlePath,
@@ -41,11 +42,13 @@ export default function TraditionsPage() {
                   ? 'Живи обичаи, занаяти и ритуали — паметта, която регионът все още пази в ръцете си.'
                   : 'Living customs, crafts, and rituals — the memory the region still holds in its hands.'
               }
-              countLabel={
+              countLabel={listingCountLabel(
+                lang,
+                listing.isLoading,
                 lang === 'bg'
                   ? `${listing.total} традиции`
-                  : `${listing.total} traditions`
-              }
+                  : `${listing.total} traditions`,
+              )}
             />
 
             <RegionMap
@@ -55,6 +58,19 @@ export default function TraditionsPage() {
             />
 
             <div className="mx-auto max-w-7xl px-6 py-16 md:px-12 md:py-20">
+              <ListingBody
+                lang={lang}
+                isLoading={listing.isLoading}
+                isError={listing.isError}
+                isEmpty={traditions.length === 0}
+                empty={
+                  lang === 'bg'
+                    ? 'Няма публикувани традиции.'
+                    : 'No published traditions yet.'
+                }
+                gridClassName="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3"
+                cardClassName="aspect-[16/11]"
+              >
               <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
                 {traditions.map((item, index) => {
                   return (
@@ -97,6 +113,7 @@ export default function TraditionsPage() {
                   )
                 })}
               </div>
+              </ListingBody>
               <ListingPagination
                 lang={lang}
                 page={page}

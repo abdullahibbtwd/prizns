@@ -447,4 +447,58 @@ export class MediaService {
   withPublicUrl<T extends { key: string; url: string }>(row: T): T {
     return { ...row, url: this.storage.resolvePublicUrl(row) };
   }
+
+  async isOrphan(id: string) {
+    const [
+      hero,
+      audio,
+      video,
+      gallery,
+      series,
+      products,
+      productGallery,
+    ] = await Promise.all([
+      this.prisma.article.count({ where: { heroMediaId: id } }),
+      this.prisma.article.count({ where: { audioMediaId: id } }),
+      this.prisma.article.count({ where: { videoMediaId: id } }),
+      this.prisma.articleGalleryItem.count({ where: { mediaId: id } }),
+      this.prisma.series.count({ where: { coverMediaId: id } }),
+      this.prisma.product.count({ where: { imageMediaId: id } }),
+      this.prisma.productGalleryItem.count({ where: { mediaId: id } }),
+    ]);
+    return (
+      hero +
+        audio +
+        video +
+        gallery +
+        series +
+        products +
+        productGallery ===
+      0
+    );
+  }
+
+  async remove(id: string) {
+    const row = await this.prisma.mediaAsset.findUnique({ where: { id } });
+    if (!row) throw new NotFoundException('Media not found');
+    if (row.tempPath) await unlinkQuietly(row.tempPath);
+    await this.prisma.mediaAsset.delete({ where: { id } });
+    await this.removeStoredObject(row.key);
+    if (row.thumbnailKey) await this.removeStoredObject(row.thumbnailKey);
+    return { ok: true as const, id };
+  }
+
+  private async removeStoredObject(key: string | null | undefined) {
+    const trimmed = key?.trim();
+    if (!trimmed || trimmed.startsWith('pending/')) return;
+    try {
+      await this.storage.remove(trimmed);
+    } catch (error) {
+      this.logger.warn(
+        `Could not delete storage object ${trimmed}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+  }
 }

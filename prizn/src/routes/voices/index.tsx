@@ -2,6 +2,7 @@ import { Radio } from 'lucide-react'
 import { JournalShell } from '@/components/concept-3/JournalShell'
 import { ListingHeader } from '@/components/concept-3/ListingHeader'
 import { ListingPagination } from '@/components/concept-3/ListingPagination'
+import { ListingBody } from '@/components/concept-3/ListingBody'
 import {
   VoicesPlayerGrid,
   toVoiceItem,
@@ -64,25 +65,22 @@ export default function VoicesPage() {
                   </span>
                 </div>
 
-                {listing.isLoading ? (
-                  <p className="font-sans text-sm text-white/50">
-                    {lang === 'bg' ? 'Зареждане на записи…' : 'Loading recordings…'}
-                  </p>
-                ) : listing.isError ? (
-                  <p className="font-sans text-sm text-rose-300">
-                    {lang === 'bg'
-                      ? 'Неуспешно зареждане на аудио.'
-                      : 'Could not load audio.'}
-                  </p>
-                ) : voices.length === 0 ? (
-                  <p className="font-sans text-sm text-white/50">
-                    {lang === 'bg'
+                <ListingBody
+                  lang={lang}
+                  isLoading={listing.isLoading}
+                  isError={listing.isError}
+                  isEmpty={voices.length === 0}
+                  empty={
+                    lang === 'bg'
                       ? 'Все още няма аудио. Публикувайте история с запис или нарация.'
-                      : 'No audio yet. Publish a story with a recording or narration.'}
-                  </p>
-                ) : (
+                      : 'No audio yet. Publish a story with a recording or narration.'
+                  }
+                  tone="dark"
+                  gridClassName="grid grid-cols-1 gap-6 md:grid-cols-2"
+                  cardClassName="h-40"
+                >
                   <VoicesPlayerGrid lang={lang} voices={voices} animateOnMount />
-                )}
+                </ListingBody>
                 <ListingPagination
                   lang={lang}
                   page={page}

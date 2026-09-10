@@ -12,6 +12,7 @@ describe('MediaController', () => {
     list: jest.fn(),
     getById: jest.fn(),
     createFromUpload: jest.fn(),
+    remove: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -51,5 +52,10 @@ describe('MediaController', () => {
         uploadedById: mockAuthUser.id,
       }),
     );
+  });
+
+  it('deletes a media record', () => {
+    controller.remove('media-1');
+    expect(media.remove).toHaveBeenCalledWith('media-1');
   });
 });

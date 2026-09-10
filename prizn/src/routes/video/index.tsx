@@ -5,6 +5,7 @@ import { JournalShell } from '@/components/concept-3/JournalShell'
 import { ListingHeader } from '@/components/concept-3/ListingHeader'
 import { ListingPagination } from '@/components/concept-3/ListingPagination'
 import { LuxuryVideoPlayer } from '@/components/concept-3/LuxuryVideoPlayer'
+import { ListingBody, listingCountLabel } from '@/components/concept-3/ListingBody'
 import {
   articlePath,
   preferApi,
@@ -49,12 +50,27 @@ export default function VideoPage() {
                   ? 'Къси филми от ателиета, пътеки и речни пресичания — кадърът като теренна бележка.'
                   : 'Short films from workshops, trails, and river crossings — the frame as a field note.'
               }
-              countLabel={
-                lang === 'bg' ? `${listing.total} видеа` : `${listing.total} films`
-              }
+              countLabel={listingCountLabel(
+                lang,
+                listing.isLoading,
+                lang === 'bg' ? `${listing.total} видеа` : `${listing.total} films`,
+              )}
             />
 
             <div className="mx-auto max-w-7xl px-6 py-16 md:px-12 md:py-20">
+              <ListingBody
+                lang={lang}
+                isLoading={listing.isLoading}
+                isError={listing.isError}
+                isEmpty={items.length === 0}
+                empty={
+                  lang === 'bg'
+                    ? 'Няма публикувани видеа.'
+                    : 'No published films yet.'
+                }
+                gridClassName="grid grid-cols-1 gap-10 md:grid-cols-2"
+                cardClassName="aspect-video"
+              >
               <div className="grid grid-cols-1 gap-10 md:grid-cols-2">
                 {items.map((item, index) => (
                   <motion.div
@@ -99,6 +115,7 @@ export default function VideoPage() {
                   </motion.div>
                 ))}
               </div>
+              </ListingBody>
               <ListingPagination
                 lang={lang}
                 page={page}

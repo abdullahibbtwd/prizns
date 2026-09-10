@@ -23,6 +23,7 @@ vi.mock('@/lib/articles-api', () => ({
   listCmsAuthors: (...args: unknown[]) => listCmsAuthors(...args),
   createCmsArticle: (...args: unknown[]) => createCmsArticle(...args),
   updateCmsArticle: (...args: unknown[]) => updateCmsArticle(...args),
+  deleteCmsArticle: vi.fn(),
   createCmsAuthor: vi.fn(),
   queueArticleTranslation: vi.fn(),
   uploadCmsMedia: vi.fn(),

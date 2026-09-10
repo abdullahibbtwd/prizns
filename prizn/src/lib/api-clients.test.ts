@@ -22,6 +22,7 @@ import {
   getPublicArticle,
   listCmsArticles,
   listCmsAuthors,
+  deleteCmsMedia,
   listCmsMedia,
   listPublicArticles,
   listPublicArticlesPage,
@@ -226,6 +227,7 @@ describe('articles-api', () => {
     await relateToArticle('places', 'belogradchik', 'v1')
     await listPublicMedia('VIDEO')
     await listCmsMedia('IMAGE')
+    await deleteCmsMedia('media-1')
 
     await listPublicArticles(undefined, { q: 'vidin', limit: 12 })
     await listPublicArticlesPage('stories', { page: 2, pageSize: 30, location: 'vidin' })
@@ -249,6 +251,7 @@ describe('articles-api', () => {
     )
     expect(mocked.get).toHaveBeenCalledWith('/media?kind=VIDEO')
     expect(mocked.get).toHaveBeenCalledWith('/cms/media?kind=IMAGE')
+    expect(mocked.delete).toHaveBeenCalledWith('/cms/media/media-1')
   })
 
   it('uploads CMS media with string credit or metadata object', async () => {

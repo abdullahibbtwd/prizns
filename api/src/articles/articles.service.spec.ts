@@ -6,6 +6,7 @@ import { StorageService } from '../storage/storage.service';
 import { BadgesService } from '../badges/badges.service';
 import { DigestService } from '../digest/digest.service';
 import { AiService } from '../ai/ai.service';
+import { MediaService } from '../media/media.service';
 import { createMockPrisma } from '../../test/helpers/mocks';
 import { buildArticleRow } from '../../test/helpers/factories';
 import { ArticlesService } from './articles.service';
@@ -21,6 +22,10 @@ describe('ArticlesService', () => {
     trySendForPublishedArticle: jest.fn().mockResolvedValue(undefined),
   };
   const ai = { enqueueEmbed: jest.fn().mockResolvedValue(undefined) };
+  const media = {
+    isOrphan: jest.fn().mockResolvedValue(true),
+    remove: jest.fn().mockResolvedValue({ ok: true, id: 'media-1' }),
+  };
 
   let article: ReturnType<typeof buildArticleRow>;
   let lastCreated: ReturnType<typeof buildArticleRow>;
@@ -38,6 +43,14 @@ describe('ArticlesService', () => {
           if (where.id === 'art-new') return lastCreated;
           if (where.id) return { ...article, id: where.id };
           return article;
+        }),
+        findUniqueOrThrow: jest.fn().mockImplementation(async (args) => {
+          const where = args.where as { id?: string };
+          return {
+            ...article,
+            id: where.id ?? article.id,
+            galleryItems: [],
+          };
         }),
         findUniqueOrThrow: jest.fn().mockResolvedValue(article),
         create: jest.fn().mockImplementation(async ({ data }) => {
@@ -92,6 +105,7 @@ describe('ArticlesService', () => {
         { provide: BadgesService, useValue: badges },
         { provide: DigestService, useValue: digest },
         { provide: AiService, useValue: ai },
+        { provide: MediaService, useValue: media },
       ],
     }).compile();
 
@@ -367,5 +381,25 @@ describe('ArticlesService', () => {
       ok: true,
       id: 'art-1',
     });
+  });
+
+  it('deletes unused gallery and hero media with the article', async () => {
+    prisma.article.findUniqueOrThrow = jest.fn().mockResolvedValue({
+      ...article,
+      id: 'art-1',
+      heroMediaId: 'hero-1',
+      audioMediaId: null,
+      videoMediaId: null,
+      galleryItems: [{ mediaId: 'gal-1' }, { mediaId: 'hero-1' }],
+    });
+    media.isOrphan.mockResolvedValue(true);
+
+    await service.remove('art-1');
+
+    expect(prisma.article.delete).toHaveBeenCalledWith({
+      where: { id: 'art-1' },
+    });
+    expect(media.remove).toHaveBeenCalledWith('hero-1');
+    expect(media.remove).toHaveBeenCalledWith('gal-1');
   });
 });

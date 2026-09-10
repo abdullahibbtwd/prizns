@@ -17,6 +17,7 @@ import {
   Loader2,
   Plus,
   Save,
+  Trash2,
   X,
 } from 'lucide-react'
 import {
@@ -26,6 +27,7 @@ import {
   PrimaryButton,
   StatusPill,
 } from '@/cms/components/CmsUI'
+import { useCmsConfirm } from '@/cms/components/CmsConfirmDialog'
 import {
   CmsCheckbox,
   CmsField,
@@ -46,6 +48,7 @@ import { arrayMove } from '@dnd-kit/sortable'
 import {
   createCmsArticle,
   createCmsAuthor,
+  deleteCmsArticle,
   getCmsArticle,
   listCmsAuthors,
   queueArticleTranslation,
@@ -329,6 +332,7 @@ export default function CmsStoryEditorPage() {
   const queryClient = useQueryClient()
   const { t } = useTranslation()
   const { lang } = useJournalLang()
+  const { confirm, dialog } = useCmsConfirm()
   const basePath = '/cms/stories'
   const isNew = !id || id === 'new'
   const querySeriesId = searchParams.get('seriesId') || ''
@@ -784,6 +788,30 @@ export default function CmsStoryEditorPage() {
       await queryClient.invalidateQueries({ queryKey: ['cms-articles'] })
     },
   })
+
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteCmsArticle(id!),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['cms-articles'] })
+      await queryClient.invalidateQueries({ queryKey: ['cms-articles-count'] })
+      await queryClient.invalidateQueries({ queryKey: ['public-articles'] })
+      await queryClient.invalidateQueries({ queryKey: ['public-articles-listing'] })
+      await queryClient.invalidateQueries({ queryKey: ['public-media'] })
+      navigate(basePath)
+    },
+  })
+
+  const confirmDelete = async () => {
+    const title =
+      pickLang(lang, articleQuery.data?.title, form.getValues('titleBg')) ||
+      t('cms.editor.untitled')
+    const ok = await confirm({
+      title: t('cms.stories.delete'),
+      description: t('cms.stories.deleteConfirm', { title }),
+    })
+    if (!ok) return
+    deleteMutation.mutate()
+  }
 
   const createAuthorMutation = useMutation({
     mutationFn: (nameBg: string) => createCmsAuthor(nameBg),
@@ -1389,6 +1417,19 @@ export default function CmsStoryEditorPage() {
             <span className="text-[10px] font-semibold uppercase tracking-wider text-rose-700">
               {t('cms.editor.autosaveFailed')}
             </span>
+          ) : null}
+          {!isNew ? (
+            <GhostButton
+              type="button"
+              className="text-rose-700 hover:border-rose-200 hover:bg-rose-50"
+              disabled={deleteMutation.isPending || editorBusy}
+              onClick={() => void confirmDelete()}
+            >
+              <Trash2 className="size-4" />
+              {deleteMutation.isPending
+                ? t('cms.stories.deleting')
+                : t('cms.stories.delete')}
+            </GhostButton>
           ) : null}
           <EditorActionButton
             type="button"
@@ -2621,6 +2662,7 @@ export default function CmsStoryEditorPage() {
         </div>
       </form>
       </div>
+      {dialog}
     </div>
   )
 }

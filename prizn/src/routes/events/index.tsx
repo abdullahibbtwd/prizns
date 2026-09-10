@@ -4,6 +4,7 @@ import { CalendarDays } from 'lucide-react'
 import { JournalShell } from '@/components/concept-3/JournalShell'
 import { ListingHeader } from '@/components/concept-3/ListingHeader'
 import { ListingPagination } from '@/components/concept-3/ListingPagination'
+import { ListingBody, listingCountLabel } from '@/components/concept-3/ListingBody'
 import {
   articlePath,
   preferApi,
@@ -47,14 +48,29 @@ export default function EventsPage() {
                   ? 'Панаири, нощни пътеки и пазари — живият календар на Северозапада.'
                   : 'Fairs, night paths, and markets — the living calendar of the Northwest.'
               }
-              countLabel={
+              countLabel={listingCountLabel(
+                lang,
+                listing.isLoading,
                 lang === 'bg'
                   ? `${listing.total} събития`
-                  : `${listing.total} events`
-              }
+                  : `${listing.total} events`,
+              )}
             />
 
             <div className="mx-auto max-w-7xl px-6 py-16 md:px-12 md:py-20">
+              <ListingBody
+                lang={lang}
+                isLoading={listing.isLoading}
+                isError={listing.isError}
+                isEmpty={items.length === 0}
+                empty={
+                  lang === 'bg'
+                    ? 'Няма публикувани събития.'
+                    : 'No published events yet.'
+                }
+                gridClassName="grid grid-cols-1 gap-8 md:grid-cols-2"
+                cardClassName="aspect-[16/10]"
+              >
               <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
                 {items.map((item, index) => {
                   return (
@@ -90,6 +106,7 @@ export default function EventsPage() {
                   )
                 })}
               </div>
+              </ListingBody>
               <ListingPagination
                 lang={lang}
                 page={page}

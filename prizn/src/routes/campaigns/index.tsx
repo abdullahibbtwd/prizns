@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import { JournalShell } from '@/components/concept-3/JournalShell'
 import { ListingHeader } from '@/components/concept-3/ListingHeader'
 import { ListingPagination } from '@/components/concept-3/ListingPagination'
+import { ListingBody, listingCountLabel } from '@/components/concept-3/ListingBody'
 import {
   articlePath,
   preferApi,
@@ -44,14 +45,29 @@ export default function CampaignsPage() {
                   ? 'Каузи за читалища, занаят, пътеки и диалекти — дълга грижа за региона.'
                   : 'Causes for reading rooms, craft, trails, and dialects — long care for the region.'
               }
-              countLabel={
+              countLabel={listingCountLabel(
+                lang,
+                listing.isLoading,
                 lang === 'bg'
                   ? `${listing.total} кампании`
-                  : `${listing.total} campaigns`
-              }
+                  : `${listing.total} campaigns`,
+              )}
             />
 
             <div className="mx-auto max-w-7xl px-6 py-16 md:px-12 md:py-20">
+              <ListingBody
+                lang={lang}
+                isLoading={listing.isLoading}
+                isError={listing.isError}
+                isEmpty={items.length === 0}
+                empty={
+                  lang === 'bg'
+                    ? 'Няма публикувани кампании.'
+                    : 'No published campaigns yet.'
+                }
+                gridClassName="grid grid-cols-1 gap-10 md:grid-cols-2"
+                cardClassName="aspect-[16/10]"
+              >
               <div className="grid grid-cols-1 gap-10 md:grid-cols-2">
                 {items.map((item, index) => {
                   return (
@@ -83,6 +99,7 @@ export default function CampaignsPage() {
                   )
                 })}
               </div>
+              </ListingBody>
               <ListingPagination
                 lang={lang}
                 page={page}

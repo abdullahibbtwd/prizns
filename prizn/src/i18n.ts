@@ -217,7 +217,8 @@ const cmsBg = {
     edit: 'Редактирай',
     view: 'Преглед',
     delete: 'Изтрий',
-    deleteConfirm: 'Изтриване на „{{title}}“? Това не може да се отмени.',
+    deleteConfirm:
+      'Изтриване на „{{title}}“? Снимките от галерията, които се ползват само от тази история, също ще се изтрият.',
     deleting: 'Изтриване…',
     deleteFailed: 'Неуспешно изтриване',
     colTitle: 'Заглавие',
@@ -275,6 +276,11 @@ const cmsBg = {
     uploaded: 'Файлът е качен.',
     processing: 'Обработва се…',
     failed: 'Неуспешна обработка',
+    delete: 'Изтрий',
+    deleteConfirm: 'Изтриване на този файл от библиотеката и публичната галерия?',
+    deleting: 'Изтриване…',
+    deleted: 'Файлът е изтрит.',
+    deleteFailed: 'Неуспешно изтриване',
   },
 
   traditions: {
@@ -1470,7 +1476,8 @@ const cmsEn = {
     edit: 'Edit',
     view: 'View',
     delete: 'Delete',
-    deleteConfirm: 'Delete “{{title}}”? This cannot be undone.',
+    deleteConfirm:
+      'Delete “{{title}}”? Gallery images used only by this story will also be deleted.',
     deleting: 'Deleting…',
     deleteFailed: 'Failed to delete',
     colTitle: 'Title',
@@ -1528,6 +1535,11 @@ const cmsEn = {
     uploaded: 'File uploaded.',
     processing: 'Processing…',
     failed: 'Processing failed',
+    delete: 'Delete',
+    deleteConfirm: 'Delete this file from the library and the public gallery?',
+    deleting: 'Deleting…',
+    deleted: 'File deleted.',
+    deleteFailed: 'Failed to delete',
   },
 
   traditions: {

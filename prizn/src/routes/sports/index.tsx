@@ -4,6 +4,7 @@ import { MapPin } from 'lucide-react'
 import { JournalShell } from '@/components/concept-3/JournalShell'
 import { ListingHeader } from '@/components/concept-3/ListingHeader'
 import { ListingPagination } from '@/components/concept-3/ListingPagination'
+import { ListingBody, listingCountLabel } from '@/components/concept-3/ListingBody'
 import {
   articlePath,
   preferApi,
@@ -49,14 +50,29 @@ export default function SportsPage() {
                   ? 'Местен спорт като принадлежност — реки, скали, терени и утринна дисциплина.'
                   : 'Local sport as belonging — rivers, rock, pitches, and morning discipline.'
               }
-              countLabel={
+              countLabel={listingCountLabel(
+                lang,
+                listing.isLoading,
                 lang === 'bg'
                   ? `${listing.total} истории`
-                  : `${listing.total} stories`
-              }
+                  : `${listing.total} stories`,
+              )}
             />
 
             <div className="mx-auto max-w-7xl px-6 py-16 md:px-12 md:py-20">
+              <ListingBody
+                lang={lang}
+                isLoading={listing.isLoading}
+                isError={listing.isError}
+                isEmpty={items.length === 0}
+                empty={
+                  lang === 'bg'
+                    ? 'Няма публикувани спортни истории.'
+                    : 'No published sports stories yet.'
+                }
+                gridClassName="flex flex-col gap-10"
+                cardClassName="aspect-[16/10]"
+              >
               <div className="flex flex-col gap-10">
                 {items.map((item, index) => {
                   return (
@@ -100,6 +116,7 @@ export default function SportsPage() {
                   )
                 })}
               </div>
+              </ListingBody>
               <ListingPagination
                 lang={lang}
                 page={page}

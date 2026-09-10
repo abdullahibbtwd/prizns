@@ -4,6 +4,7 @@ import { MapPin } from 'lucide-react'
 import { JournalShell } from '@/components/concept-3/JournalShell'
 import { ListingHeader } from '@/components/concept-3/ListingHeader'
 import { ListingPagination } from '@/components/concept-3/ListingPagination'
+import { ListingBody, listingCountLabel } from '@/components/concept-3/ListingBody'
 import {
   articlePath,
   preferApi,
@@ -49,14 +50,29 @@ export default function NewsPage() {
                   ? 'Кратки новини и актуални бележки от Северозападна България.'
                   : 'Short news and timely notes from Northwestern Bulgaria.'
               }
-              countLabel={
+              countLabel={listingCountLabel(
+                lang,
+                listing.isLoading,
                 lang === 'bg'
                   ? `${listing.total} материала`
-                  : `${listing.total} pieces`
-              }
+                  : `${listing.total} pieces`,
+              )}
             />
 
             <div className="mx-auto max-w-7xl px-6 py-16 md:px-12 md:py-20">
+              <ListingBody
+                lang={lang}
+                isLoading={listing.isLoading}
+                isError={listing.isError}
+                isEmpty={items.length === 0}
+                empty={
+                  lang === 'bg'
+                    ? 'Няма публикувани новини.'
+                    : 'No published news yet.'
+                }
+                gridClassName="flex flex-col gap-10"
+                cardClassName="h-40"
+              >
               <div className="flex flex-col gap-10">
                 {items.map((item, index) => (
                   <motion.div
@@ -103,6 +119,7 @@ export default function NewsPage() {
                   </motion.div>
                 ))}
               </div>
+              </ListingBody>
               <ListingPagination
                 lang={lang}
                 page={page}

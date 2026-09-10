@@ -186,6 +186,9 @@ export default function CmsStoriesPage() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['cms-articles'] })
       await queryClient.invalidateQueries({ queryKey: ['cms-articles-count'] })
+      await queryClient.invalidateQueries({ queryKey: ['public-articles'] })
+      await queryClient.invalidateQueries({ queryKey: ['public-articles-listing'] })
+      await queryClient.invalidateQueries({ queryKey: ['public-media'] })
     },
   })
 

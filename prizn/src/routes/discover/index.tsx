@@ -4,6 +4,7 @@ import { BookOpen, ChevronRight } from 'lucide-react'
 import { JournalShell } from '@/components/concept-3/JournalShell'
 import { ListingHeader } from '@/components/concept-3/ListingHeader'
 import { ListingPagination } from '@/components/concept-3/ListingPagination'
+import { ListingBody, listingCountLabel } from '@/components/concept-3/ListingBody'
 import {
   articlePath,
   usePublicArticleListing,
@@ -20,6 +21,10 @@ export default function DiscoverPage() {
     page,
     enabled: seriesReady && !hasSeries,
   })
+  const listingLoading =
+    seriesQuery.isLoading || (!hasSeries && discoverQuery.isLoading)
+  const listingError =
+    Boolean(seriesQuery.isError) || (!hasSeries && Boolean(discoverQuery.isError))
 
   return (
     <JournalShell>
@@ -64,14 +69,29 @@ export default function DiscoverPage() {
                   ? 'Всички тематични колекции — дълги истории за бавно четене из Северозападна България.'
                   : 'Every curated collection — long-form stories for slow reading across Northwestern Bulgaria.'
               }
-              countLabel={
+              countLabel={listingCountLabel(
+                lang,
+                listingLoading,
                 lang === 'bg'
                   ? `${total} колекции`
-                  : `${total} collections`
-              }
+                  : `${total} collections`,
+              )}
             />
 
             <div className="mx-auto max-w-7xl px-6 py-16 md:px-12 md:py-20">
+              <ListingBody
+                lang={lang}
+                isLoading={listingLoading}
+                isError={listingError}
+                isEmpty={collections.length === 0}
+                empty={
+                  lang === 'bg'
+                    ? 'Няма публикувани колекции.'
+                    : 'No published collections yet.'
+                }
+                gridClassName="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3"
+                cardClassName="h-56"
+              >
               <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
                 {collections.map((item, index) => {
                   return (
@@ -114,6 +134,7 @@ export default function DiscoverPage() {
                   )
                 })}
               </div>
+              </ListingBody>
               {hasSeries ? null : (
                 <ListingPagination
                   lang={lang}

@@ -16,6 +16,7 @@ import {
 } from '@/lib/public-content'
 import { useListingFilters } from '@/lib/listing-filters'
 import { toHumanStoryCard } from '@/lib/section-cards'
+import { ListingBody, listingCountLabel } from '@/components/concept-3/ListingBody'
 
 export default function StoriesPage() {
   const { t } = useTranslation()
@@ -52,7 +53,11 @@ export default function StoriesPage() {
             eyebrow={t('humanStoriesEyebrow')}
             title={t('humanStories')}
             description={t('humanStoriesDesc')}
-            countLabel={t('storiesCount', { count: listing.total })}
+            countLabel={listingCountLabel(
+              lang,
+              listing.isLoading,
+              t('storiesCount', { count: listing.total }),
+            )}
           />
 
           <RegionMap
@@ -62,13 +67,19 @@ export default function StoriesPage() {
           />
 
           <div className="mx-auto max-w-7xl px-6 py-16 md:px-12 md:py-20">
-            {stories.length === 0 ? (
-              <p className="text-center font-sans text-sm text-[#1A1A1A]/55">
-                {lang === 'bg'
+            <ListingBody
+              lang={lang}
+              isLoading={listing.isLoading}
+              isError={listing.isError}
+              isEmpty={stories.length === 0}
+              empty={
+                lang === 'bg'
                   ? 'Няма публикувани истории.'
-                  : 'No published stories yet.'}
-              </p>
-            ) : (
+                  : 'No published stories yet.'
+              }
+              gridClassName="grid grid-cols-1 gap-10 md:grid-cols-2 lg:grid-cols-3"
+              cardClassName="aspect-[4/5]"
+            >
               <div className="grid grid-cols-1 gap-10 md:grid-cols-2 lg:grid-cols-3">
                 {stories.map((story, index) => (
                   <motion.div
@@ -126,7 +137,7 @@ export default function StoriesPage() {
                   </motion.div>
                 ))}
               </div>
-            )}
+            </ListingBody>
             <ListingPagination
               lang={lang}
               page={page}

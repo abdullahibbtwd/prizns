@@ -31,6 +31,7 @@ import { StorageService } from '../storage/storage.service';
 import { BadgesService } from '../badges/badges.service';
 import { DigestService } from '../digest/digest.service';
 import { AiService } from '../ai/ai.service';
+import { MediaService } from '../media/media.service';
 import { sectionFromCategorySlugs } from '../categories/category-section';
 
 type GalleryMedia = {
@@ -88,6 +89,7 @@ export class ArticlesService {
     private readonly badges: BadgesService,
     private readonly digest: DigestService,
     private readonly ai: AiService,
+    private readonly media: MediaService,
   ) {}
 
   /** Non-blocking Episode of the Day when a published series story lands. */
@@ -1388,8 +1390,37 @@ export class ArticlesService {
   }
 
   async remove(id: string) {
-    await this.prisma.article.findUniqueOrThrow({ where: { id } });
+    const row = await this.prisma.article.findUniqueOrThrow({
+      where: { id },
+      include: { galleryItems: { select: { mediaId: true } } },
+    });
+    const mediaIds = [
+      ...new Set(
+        [
+          row.heroMediaId,
+          row.audioMediaId,
+          row.videoMediaId,
+          ...row.galleryItems.map((item) => item.mediaId),
+        ].filter((mediaId): mediaId is string => Boolean(mediaId)),
+      ),
+    ];
+
     await this.prisma.article.delete({ where: { id } });
+
+    for (const mediaId of mediaIds) {
+      try {
+        if (await this.media.isOrphan(mediaId)) {
+          await this.media.remove(mediaId);
+        }
+      } catch (error) {
+        this.logger.warn(
+          `Could not delete media ${mediaId} after article ${id}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+    }
+
     return { ok: true as const, id };
   }
 

@@ -6,6 +6,7 @@ import { ListingHeader } from '@/components/concept-3/ListingHeader'
 import { ListingPagination } from '@/components/concept-3/ListingPagination'
 import { SponsoredBadge } from '@/components/concept-3/SponsoredBadge'
 import { RegionMap } from '@/components/concept-3/RegionMap'
+import { ListingBody, listingCountLabel } from '@/components/concept-3/ListingBody'
 import { ListingFilters } from '@/components/concept-3/ListingFilters'
 import {
   articlePath,
@@ -51,11 +52,13 @@ export default function PlacesPage() {
                   ? 'Градове, села и пътеки из Северозапада — местата, в които живеят историите.'
                   : 'Towns, villages, and trails across the Northwest — the places where our stories live.'
               }
-              countLabel={
+              countLabel={listingCountLabel(
+                lang,
+                listing.isLoading,
                 lang === 'bg'
                   ? `${listing.total} места`
-                  : `${listing.total} places`
-              }
+                  : `${listing.total} places`,
+              )}
             />
 
             <RegionMap
@@ -93,6 +96,19 @@ export default function PlacesPage() {
             />
 
             <div className="mx-auto max-w-7xl px-6 py-16 md:px-12 md:py-20">
+              <ListingBody
+                lang={lang}
+                isLoading={listing.isLoading}
+                isError={listing.isError}
+                isEmpty={places.length === 0}
+                empty={
+                  lang === 'bg'
+                    ? 'Няма публикувани места.'
+                    : 'No published places yet.'
+                }
+                gridClassName="grid grid-cols-1 gap-8 md:grid-cols-2"
+                cardClassName="h-[420px] md:h-[480px]"
+              >
               <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
                 {places.map((place, index) => {
                   return (
@@ -148,6 +164,7 @@ export default function PlacesPage() {
                   )
                 })}
               </div>
+              </ListingBody>
               <ListingPagination
                 lang={lang}
                 page={page}

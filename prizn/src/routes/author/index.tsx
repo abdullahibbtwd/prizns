@@ -6,6 +6,7 @@ import { Logo } from '@/components/Logo'
 import type { JournalAuthor } from '@/data/concept-3/authors'
 import type { JournalArticle } from '@/data/concept-3/articleTypes'
 import type { JournalLang } from '@/components/concept-3/JournalShell'
+import { ListingBody } from '@/components/concept-3/ListingBody'
 import { useJournalLang } from '@/hooks/useJournalLang'
 import { listPublicArticles } from '@/lib/articles-api'
 import { getPublicAuthor } from '@/lib/public-content'
@@ -22,11 +23,15 @@ function pick(
 function AuthorContent({
   author,
   stories,
+  storiesLoading,
+  storiesError,
   lang,
   setLang,
 }: {
   author: JournalAuthor
   stories: JournalArticle[]
+  storiesLoading: boolean
+  storiesError: boolean
   lang: JournalLang
   setLang: (lang: JournalLang) => void
 }) {
@@ -159,13 +164,19 @@ function AuthorContent({
             </Link>
           </div>
 
-          {stories.length === 0 ? (
-            <p className="font-sans text-sm font-light text-[#1A1A1A]/55">
-              {lang === 'bg'
+          <ListingBody
+            lang={lang}
+            isLoading={storiesLoading}
+            isError={storiesError}
+            isEmpty={stories.length === 0}
+            empty={
+              lang === 'bg'
                 ? 'Все още няма публикувани истории за този автор.'
-                : 'No published stories for this author yet.'}
-            </p>
-          ) : (
+                : 'No published stories for this author yet.'
+            }
+            gridClassName="grid grid-cols-1 gap-8 md:grid-cols-2"
+            cardClassName="aspect-[16/10]"
+          >
             <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
               {stories.map((story) => (
                 <Link
@@ -200,7 +211,7 @@ function AuthorContent({
                 </Link>
               ))}
             </div>
-          )}
+          </ListingBody>
         </section>
       </main>
     </>
@@ -215,14 +226,14 @@ export default function AuthorPage() {
     queryKey: ['public-author', slug],
     queryFn: () => getPublicAuthor(slug!),
     enabled: Boolean(slug),
-    retry: false,
+    retry: 1,
   })
 
   const articlesQuery = useQuery({
     queryKey: ['public-articles', 'all-for-author', slug],
     queryFn: () => listPublicArticles(),
     enabled: Boolean(slug),
-    retry: false,
+    retry: 1,
   })
 
   const apiAuthor = authorQuery.data
@@ -302,6 +313,8 @@ export default function AuthorPage() {
         <AuthorContent
           author={author}
           stories={stories}
+          storiesLoading={articlesQuery.isLoading}
+          storiesError={articlesQuery.isError}
           lang={lang}
           setLang={setLang}
         />

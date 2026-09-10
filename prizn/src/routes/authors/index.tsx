@@ -2,10 +2,11 @@ import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { JournalShell } from '@/components/concept-3/JournalShell'
 import { ListingHeader } from '@/components/concept-3/ListingHeader'
+import { ListingBody, listingCountLabel } from '@/components/concept-3/ListingBody'
 import { preferApi, usePublicAuthors } from '@/lib/public-content'
 
 export default function AuthorsPage() {
-  const { data } = usePublicAuthors()
+  const { data, isLoading, isError } = usePublicAuthors()
 
   return (
     <JournalShell>
@@ -28,14 +29,27 @@ export default function AuthorsPage() {
                   ? 'Редактори, автори и фотографи — хората зад журнала.'
                   : 'Editors, writers, and photographers — the people behind the journal.'
               }
-              countLabel={
+              countLabel={listingCountLabel(
+                lang,
+                isLoading,
                 lang === 'bg'
                   ? `${authors.length} в екипа`
-                  : `${authors.length} team members`
-              }
+                  : `${authors.length} team members`,
+              )}
             />
 
             <div className="mx-auto max-w-7xl px-6 py-16 md:px-12 md:py-20">
+              <ListingBody
+                lang={lang}
+                isLoading={isLoading}
+                isError={isError}
+                isEmpty={authors.length === 0}
+                empty={
+                  lang === 'bg' ? 'Все още няма автори.' : 'No authors yet.'
+                }
+                gridClassName="grid grid-cols-1 gap-12 sm:grid-cols-2 lg:grid-cols-4 lg:gap-8"
+                cardClassName="aspect-[3/4]"
+              >
               <div className="grid grid-cols-1 gap-12 sm:grid-cols-2 lg:grid-cols-4 lg:gap-8">
                 {authors.map((author, index) => {
                   return (
@@ -72,6 +86,7 @@ export default function AuthorsPage() {
                   )
                 })}
               </div>
+              </ListingBody>
             </div>
           </main>
         )

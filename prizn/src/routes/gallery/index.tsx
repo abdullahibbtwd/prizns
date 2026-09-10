@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Maximize2, X, MapPin, Camera } from 'lucide-react'
 import { JournalShell } from '@/components/concept-3/JournalShell'
 import { ListingHeader } from '@/components/concept-3/ListingHeader'
+import { ListingBody, listingCountLabel } from '@/components/concept-3/ListingBody'
 import { preferApi, usePublicMedia } from '@/lib/public-content'
 import { getSectionPublicLabel } from '@/lib/section-i18n'
 
@@ -15,7 +16,7 @@ type PhotoItem = {
 }
 
 export default function GalleryPage() {
-  const { data } = usePublicMedia('IMAGE')
+  const { data, isLoading, isError } = usePublicMedia('IMAGE')
   const [selectedPhoto, setSelectedPhoto] = useState<PhotoItem | null>(null)
 
   return (
@@ -51,21 +52,29 @@ export default function GalleryPage() {
                   ? 'Северозападът в кадри.'
                   : 'The northwest in frames.'
               }
-              countLabel={
+              countLabel={listingCountLabel(
+                lang,
+                isLoading,
                 lang === 'bg'
                   ? `${photos.length} кадъра`
-                  : `${photos.length} frames`
-              }
+                  : `${photos.length} frames`,
+              )}
             />
 
             <div className="mx-auto max-w-7xl px-6 py-16 md:px-12 md:py-20">
-              {photos.length === 0 ? (
-                <p className="text-center font-sans text-sm text-[#1A1A1A]/55">
-                  {lang === 'bg'
+              <ListingBody
+                lang={lang}
+                isLoading={isLoading}
+                isError={isError}
+                isEmpty={photos.length === 0}
+                empty={
+                  lang === 'bg'
                     ? 'Качете изображения от CMS → Медия библиотека.'
-                    : 'Upload images from CMS → Media Library.'}
-                </p>
-              ) : (
+                    : 'Upload images from CMS → Media Library.'
+                }
+                gridClassName="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3"
+                cardClassName="aspect-[4/5]"
+              >
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
                   {photos.map((item, index) => (
                     <motion.button
@@ -101,7 +110,7 @@ export default function GalleryPage() {
                     </motion.button>
                   ))}
                 </div>
-              )}
+              </ListingBody>
             </div>
 
             <AnimatePresence>
