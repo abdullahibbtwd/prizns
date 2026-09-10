@@ -4,11 +4,13 @@ import { BullModule } from '@nestjs/bullmq'
 import { AiModule } from '../ai/ai.module'
 import { ArticlesModule } from '../articles/articles.module'
 import { DigestModule } from '../digest/digest.module'
+import { MediaModule } from '../media/media.module'
 import { TranslationModule } from '../translation/translation.module'
 import { TtsModule } from '../tts/tts.module'
 import {
   QUEUE_AI,
   QUEUE_DIGEST,
+  QUEUE_MEDIA,
   QUEUE_PUBLISH,
   QUEUE_SOCIAL,
   QUEUE_TRANSLATE,
@@ -20,6 +22,7 @@ import { TtsProcessor } from './tts.processor'
 import { EmbedProcessor } from './embed.processor'
 import { DigestProcessor } from './digest.processor'
 import { PublishProcessor } from './publish.processor'
+import { MediaProcessor } from './media.processor'
 
 @Module({
   imports: [
@@ -45,12 +48,14 @@ import { PublishProcessor } from './publish.processor'
       { name: QUEUE_SOCIAL },
       { name: QUEUE_DIGEST },
       { name: QUEUE_PUBLISH },
+      { name: QUEUE_MEDIA },
     ),
     TranslationModule,
     TtsModule,
     AiModule,
     DigestModule,
     ArticlesModule,
+    MediaModule,
   ],
   providers: [
     JobsService,
@@ -59,6 +64,7 @@ import { PublishProcessor } from './publish.processor'
     EmbedProcessor,
     DigestProcessor,
     PublishProcessor,
+    MediaProcessor,
   ],
   exports: [JobsService, BullModule],
 })

@@ -66,6 +66,7 @@ import { listCmsCategories } from '@/lib/categories-api'
 import { categorySelectOptions, primaryCategoryId, slugsForCategory } from '@/lib/category-tree'
 import { sectionFromCategorySlugs } from '@/lib/category-section'
 import { ApiError } from '@/lib/api'
+import { assertCmsFileSize } from '@/lib/upload-limits'
 import { useJournalLang } from '@/hooks/useJournalLang'
 import { pickLang } from '@/lib/pick-lang'
 import { cn, randomId } from '@/lib/utils'
@@ -839,7 +840,15 @@ export default function CmsStoryEditorPage() {
     if (!files || files.length === 0) return
     setMediaPreparing(true)
     try {
-      const list = Array.from(files)
+      const list = Array.from(files).filter((file) => {
+        try {
+          assertCmsFileSize(file)
+          return true
+        } catch {
+          return false
+        }
+      })
+      if (list.length === 0) return
       const items: GalleryItem[] = list.map((file) => ({
         id: `local-${randomId()}`,
         url: URL.createObjectURL(file),
@@ -926,6 +935,11 @@ export default function CmsStoryEditorPage() {
   }
 
   const pickVideoFile = async (file: File) => {
+    try {
+      assertCmsFileSize(file)
+    } catch {
+      return
+    }
     setMediaPreparing(true)
     setPosterBusy(true)
     setMediaTab('video')
@@ -1704,6 +1718,9 @@ export default function CmsStoryEditorPage() {
                     {mediaBusy
                       ? t('cms.editor.preparingMedia')
                       : t('cms.editor.addImages')}
+                    <span className="font-normal text-stone-400">
+                      {t('cms.editor.imageMaxSize')}
+                    </span>
                     <input
                       type="file"
                       accept="image/*"
@@ -1722,6 +1739,9 @@ export default function CmsStoryEditorPage() {
                     {mediaBusy
                       ? t('cms.editor.preparingMedia')
                       : t('cms.editor.addVideo')}
+                    <span className="font-normal text-stone-400">
+                      {t('cms.editor.videoMaxSize')}
+                    </span>
                     <input
                       type="file"
                       accept="video/*"
@@ -1779,6 +1799,9 @@ export default function CmsStoryEditorPage() {
                   <span className="text-[11px] text-stone-400">
                     {t('cms.editor.dropImagesHero')}
                   </span>
+                  <span className="text-[11px] text-stone-400">
+                    {t('cms.editor.imageMaxSize')}
+                  </span>
                   <input
                     type="file"
                     accept="image/*"
@@ -1802,6 +1825,9 @@ export default function CmsStoryEditorPage() {
                   </span>
                   <span className="text-[11px] text-stone-400">
                     {t('cms.editor.uploadVideo')}
+                  </span>
+                  <span className="text-[11px] text-stone-400">
+                    {t('cms.editor.videoMaxSize')}
                   </span>
                   <input
                     type="file"

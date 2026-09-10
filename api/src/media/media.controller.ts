@@ -3,17 +3,22 @@ import {
   Body,
   Controller,
   Get,
+  Param,
   Post,
   Query,
   UploadedFile,
+  UseFilters,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { memoryStorage } from 'multer';
 import { MediaKind } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { AuthUserPayload } from '../auth/auth.types';
 import { MediaService } from './media.service';
+import { MulterExceptionFilter } from './multer-exception.filter';
+import { cmsMulterOptions } from './upload-temp';
 
 @Controller('cms/media')
 @UseGuards(JwtAuthGuard)
@@ -27,16 +32,17 @@ export class MediaController {
     });
   }
 
+  @Get(':id')
+  get(@Param('id') id: string) {
+    return this.media.getById(id);
+  }
+
   @Post('upload')
-  @UseInterceptors(
-    FileInterceptor('file', {
-      storage: memoryStorage(),
-      // Videos/audio on VPS can be large; images stay well under this.
-      limits: { fileSize: 200 * 1024 * 1024 },
-    }),
-  )
+  @UseFilters(MulterExceptionFilter)
+  @UseInterceptors(FileInterceptor('file', cmsMulterOptions))
   upload(
     @UploadedFile() file: Express.Multer.File,
+    @CurrentUser() user: AuthUserPayload,
     @Body('titleBg') titleBg?: string,
     @Body('locationBg') locationBg?: string,
     @Body('creditBg') creditBg?: string,
@@ -52,6 +58,7 @@ export class MediaController {
       locationBg,
       creditBg: creditBg ?? creditBgQuery,
       folder: folder ?? folderQuery ?? 'cms',
+      uploadedById: user?.id,
     });
   }
 

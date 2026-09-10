@@ -24,12 +24,14 @@ import {
   listCmsAuthors,
   listCmsMedia,
   listPublicArticles,
+  listPublicArticlesPage,
   listPublicMedia,
   listRelatedArticles,
   queueArticleNarration,
   queueArticleTranslation,
   relateToArticle,
   updateCmsArticle,
+  waitForCmsMedia,
   uploadCmsMedia,
 } from '@/lib/articles-api'
 import {
@@ -226,11 +228,15 @@ describe('articles-api', () => {
     await listCmsMedia('IMAGE')
 
     await listPublicArticles(undefined, { q: 'vidin', limit: 12 })
+    await listPublicArticlesPage('stories', { page: 2, pageSize: 30, location: 'vidin' })
 
     expect(mocked.get).toHaveBeenCalledWith(
       '/articles?section=stories&series=voices&location=vidin&hasAudio=true',
     )
     expect(mocked.get).toHaveBeenCalledWith('/articles?q=vidin&limit=12')
+    expect(mocked.get).toHaveBeenCalledWith(
+      '/articles?section=stories&location=vidin&page=2&pageSize=30',
+    )
     expect(mocked.get).toHaveBeenCalledWith(
       '/articles/places/belogradchik?visitorKey=v1',
     )
@@ -262,6 +268,20 @@ describe('articles-api', () => {
       undefined,
       { folder: 'gallery', titleBg: 'Hero' },
     )
+  })
+
+  it('polls pending CMS media until processing is done', async () => {
+    mocked.get.mockResolvedValueOnce({
+      id: 'm1',
+      status: 'DONE',
+      url: '/media/prizn/cms/m1.webp',
+    })
+    const done = await waitForCmsMedia(
+      { id: 'm1', status: 'PENDING', url: '', key: '', mimeType: 'image/jpeg', kind: 'IMAGE' },
+      { pollMs: 1 },
+    )
+    expect(mocked.get).toHaveBeenCalledWith('/cms/media/m1')
+    expect(done.url).toBe('/media/prizn/cms/m1.webp')
   })
 })
 

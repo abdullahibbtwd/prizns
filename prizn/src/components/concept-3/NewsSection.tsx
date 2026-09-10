@@ -29,7 +29,7 @@ function toNewsCard(article: CmsArticle) {
 }
 
 export function NewsSection({ lang }: NewsSectionProps) {
-  const { data } = usePublicArticles('news')
+  const { data } = usePublicArticles('news', { limit: 3 })
   const items = preferApi(data?.map(toNewsCard)).slice(0, 3)
 
   if (items.length === 0) return null

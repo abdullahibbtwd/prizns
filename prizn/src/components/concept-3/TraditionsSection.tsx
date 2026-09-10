@@ -15,7 +15,7 @@ interface TraditionsSectionProps {
 }
 
 export function TraditionsSection({ lang }: TraditionsSectionProps) {
-  const { data, isLoading } = usePublicArticles('traditions')
+  const { data, isLoading } = usePublicArticles('traditions', { limit: 3 })
   const traditions = preferApi(
     data?.map((article) => ({
       ...toTraditionCard(article),

@@ -1,6 +1,8 @@
 import { Injectable, Logger, NotFoundException, OnModuleInit, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
+import { createReadStream } from 'fs';
+import { stat } from 'fs/promises';
 import * as Minio from 'minio';
 import {
   assertAllowedUploadMime,
@@ -152,6 +154,16 @@ export class StorageService implements OnModuleInit {
       throw new ServiceUnavailableException('No file provided');
     }
 
+    if (file.path && !file.buffer) {
+      return this.uploadFromPath({
+        filePath: file.path,
+        mimeType: file.mimetype,
+        originalName: file.originalname,
+        folder,
+        profile,
+      });
+    }
+
     return this.uploadBuffer({
       buffer: file.buffer,
       mimeType: file.mimetype,
@@ -167,6 +179,7 @@ export class StorageService implements OnModuleInit {
     originalName: string;
     folder?: string;
     profile?: UploadProfile;
+    key?: string;
   }): Promise<UploadedFile> {
     const profile = input.profile ?? 'cms';
     assertAllowedUploadMime(input.mimeType, profile);
@@ -174,22 +187,79 @@ export class StorageService implements OnModuleInit {
     const ext = input.originalName.includes('.')
       ? input.originalName.slice(input.originalName.lastIndexOf('.'))
       : '';
-    const key = `${folder}/${randomUUID()}${ext}`;
+    const key = assertSafeObjectKey(
+      input.key ?? `${folder}/${randomUUID()}${ext}`,
+    );
     const size = input.buffer.length;
 
     await this.client.putObject(this.bucket, key, input.buffer, size, {
       'Content-Type': input.mimeType,
     });
 
-    const url = this.publicUrlFor(key);
+    return this.persistFileObject({
+      key,
+      originalName: input.originalName,
+      mimeType: input.mimeType,
+      size,
+    });
+  }
 
-    const record = await this.prisma.fileObject.create({
-      data: {
-        key,
+  async uploadFromPath(input: {
+    filePath: string;
+    mimeType: string;
+    originalName: string;
+    folder?: string;
+    profile?: UploadProfile;
+    key?: string;
+  }): Promise<UploadedFile> {
+    const profile = input.profile ?? 'cms';
+    assertAllowedUploadMime(input.mimeType, profile);
+    const folder = sanitizeStorageFolder(input.folder, 'uploads');
+    const ext = input.originalName.includes('.')
+      ? input.originalName.slice(input.originalName.lastIndexOf('.'))
+      : '';
+    const key = assertSafeObjectKey(
+      input.key ?? `${folder}/${randomUUID()}${ext}`,
+    );
+    const size = (await stat(input.filePath)).size;
+
+    await this.client.putObject(
+      this.bucket,
+      key,
+      createReadStream(input.filePath),
+      size,
+      { 'Content-Type': input.mimeType },
+    );
+
+    return this.persistFileObject({
+      key,
+      originalName: input.originalName,
+      mimeType: input.mimeType,
+      size,
+    });
+  }
+
+  private async persistFileObject(input: {
+    key: string;
+    originalName: string;
+    mimeType: string;
+    size: number;
+  }): Promise<UploadedFile> {
+    const url = this.publicUrlFor(input.key);
+    const record = await this.prisma.fileObject.upsert({
+      where: { key: input.key },
+      create: {
+        key: input.key,
         bucket: this.bucket,
         originalName: input.originalName,
         mimeType: input.mimeType,
-        size,
+        size: input.size,
+        url,
+      },
+      update: {
+        originalName: input.originalName,
+        mimeType: input.mimeType,
+        size: input.size,
         url,
       },
     });

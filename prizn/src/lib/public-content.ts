@@ -1,6 +1,10 @@
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { listPublicArticles, listPublicMedia } from "@/lib/articles-api";
+import {
+  listPublicArticles,
+  listPublicArticlesPage,
+  listPublicMedia,
+} from "@/lib/articles-api";
 import { listPopularStories } from "@/lib/analytics-api";
 import type { CmsArticle } from "@/lib/cms-types";
 import { listPublicTags, type TagKind } from "@/lib/tags-api";
@@ -125,6 +129,63 @@ export function usePublicArticles(
   });
 }
 
+export const PUBLIC_LISTING_PAGE_SIZE = 30;
+
+export function usePublicArticleListing(
+  section?: string,
+  opts?: {
+    series?: string;
+    location?: string;
+    topic?: string;
+    category?: string;
+    categorySlug?: string;
+    hasAudio?: boolean;
+    page?: number;
+    pageSize?: number;
+    enabled?: boolean;
+  },
+) {
+  const page = Math.max(1, opts?.page ?? 1);
+  const pageSize = opts?.pageSize ?? PUBLIC_LISTING_PAGE_SIZE;
+  const query = useQuery({
+    queryKey: [
+      "public-articles-listing",
+      section || "all",
+      opts?.series || "",
+      opts?.location || "",
+      opts?.topic || "",
+      opts?.category || "",
+      opts?.categorySlug || "",
+      opts?.hasAudio ? "audio" : "",
+      page,
+      pageSize,
+    ],
+    queryFn: () =>
+      listPublicArticlesPage(section, {
+        series: opts?.series,
+        location: opts?.location,
+        topic: opts?.topic,
+        category: opts?.category,
+        categorySlug: opts?.categorySlug,
+        hasAudio: opts?.hasAudio,
+        page,
+        pageSize,
+      }),
+    enabled: opts?.enabled ?? true,
+    placeholderData: keepPreviousData,
+    staleTime: 60_000,
+    retry: false,
+  });
+
+  return {
+    ...query,
+    items: query.data?.items ?? [],
+    total: query.data?.total ?? 0,
+    totalPages: query.data?.totalPages ?? 1,
+    pageSize: query.data?.pageSize ?? pageSize,
+  };
+}
+
 export function usePublicArticleSearch(q: string) {
   const trimmed = q.trim()
   return useQuery({
@@ -195,10 +256,13 @@ export type PublicMediaItem = {
   createdAt: string
 }
 
-export function usePublicMedia(kind: "IMAGE" | "VIDEO" | "AUDIO" = "IMAGE") {
+export function usePublicMedia(
+  kind: "IMAGE" | "VIDEO" | "AUDIO" = "IMAGE",
+  opts?: { limit?: number },
+) {
   return useQuery({
-    queryKey: ["public-media", kind],
-    queryFn: () => listPublicMedia(kind),
+    queryKey: ["public-media", kind, opts?.limit ?? ""],
+    queryFn: () => listPublicMedia(kind, opts),
     staleTime: 60_000,
     retry: false,
   });

@@ -290,6 +290,7 @@ export default function CmsAuthorEditorPage() {
                 onChange={(e) => void uploadPortrait(e.target.files)}
               />
             </label>
+            <p className="text-[11px] text-stone-400">{t('cms.authors.imageMaxSize')}</p>
             <label className="flex items-center gap-2 text-xs font-medium text-stone-700">
               <input type="checkbox" {...form.register('isActive')} />
               {t('cms.authors.active')}

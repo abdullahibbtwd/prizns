@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { describe, expect, it, vi } from 'vitest'
 import {
   usePopularStories,
+  usePublicArticleListing,
   usePublicArticleSearch,
   usePublicArticles,
   usePublicAuthors,
@@ -16,6 +17,7 @@ import * as analyticsApi from './analytics-api'
 
 vi.mock('./articles-api', () => ({
   listPublicArticles: vi.fn(),
+  listPublicArticlesPage: vi.fn(),
   listPublicMedia: vi.fn(),
 }))
 
@@ -68,6 +70,40 @@ describe('public content hooks', () => {
       limit: undefined,
     })
     expect(result.current.data).toHaveLength(1)
+  })
+
+  it('fetches a paginated public listing page', async () => {
+    vi.mocked(articlesApi.listPublicArticlesPage).mockResolvedValue({
+      items: [{ id: '1', slug: 'story', section: 'stories' } as never],
+      total: 48,
+      page: 2,
+      pageSize: 30,
+      totalPages: 2,
+    })
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+
+    const { result } = renderHook(
+      () => usePublicArticleListing('stories', { location: 'vidin', page: 2 }),
+      { wrapper: wrapper(client) },
+    )
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true)
+    })
+
+    expect(articlesApi.listPublicArticlesPage).toHaveBeenCalledWith('stories', {
+      series: undefined,
+      location: 'vidin',
+      topic: undefined,
+      category: undefined,
+      categorySlug: undefined,
+      hasAudio: undefined,
+      page: 2,
+      pageSize: 30,
+    })
+    expect(result.current.items).toHaveLength(1)
+    expect(result.current.total).toBe(48)
+    expect(result.current.totalPages).toBe(2)
   })
 
   it('searches public articles when the query is at least two characters', async () => {
@@ -143,7 +179,7 @@ describe('public content hooks', () => {
     })
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
-    expect(articlesApi.listPublicMedia).toHaveBeenCalledWith('IMAGE')
+    expect(articlesApi.listPublicMedia).toHaveBeenCalledWith('IMAGE', undefined)
   })
 
   it('fetches popular stories from analytics', async () => {

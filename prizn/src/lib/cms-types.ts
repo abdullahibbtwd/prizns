@@ -263,13 +263,22 @@ export type SeriesFormValues = {
   coverMediaId: string;
 };
 
+export type MediaProcessStatus = 'PENDING' | 'PROCESSING' | 'DONE' | 'FAILED'
+
 export type MediaAsset = {
   id: string
   key: string
   url: string
   mimeType: string
   kind: 'IMAGE' | 'AUDIO' | 'VIDEO'
+  status?: MediaProcessStatus
+  error?: string | null
   originalName?: string | null
+  thumbnailUrl?: string | null
+  originalSize?: number | null
+  processedSize?: number | null
+  width?: number | null
+  height?: number | null
   titleBg?: string | null
   titleEn?: string | null
   locationBg?: string | null

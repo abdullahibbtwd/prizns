@@ -341,6 +341,7 @@ export default function CmsProfilePage() {
                   </GhostButton>
                 )}
               </div>
+              <p className="text-[11px] text-stone-400">{t('cms.profile.imageMaxSize')}</p>
             </CmsCard>
 
             {profile.authorId && (

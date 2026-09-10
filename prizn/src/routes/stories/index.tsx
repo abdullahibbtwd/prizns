@@ -5,27 +5,29 @@ import { ArrowRight, Clock, MapPin } from 'lucide-react'
 import { JournalShell } from '@/components/concept-3/JournalShell'
 import { PageMeta } from '@/components/PageMeta'
 import { ListingHeader } from '@/components/concept-3/ListingHeader'
+import { ListingPagination } from '@/components/concept-3/ListingPagination'
 import { EpisodeBadge } from '@/components/concept-3/EpisodeBadge'
 import { SponsoredBadge } from '@/components/concept-3/SponsoredBadge'
 import { RegionMap } from '@/components/concept-3/RegionMap'
 import {
   articlePath,
   preferApi,
-  usePublicArticles,
+  usePublicArticleListing,
 } from '@/lib/public-content'
 import { useListingFilters } from '@/lib/listing-filters'
 import { toHumanStoryCard } from '@/lib/section-cards'
 
 export default function StoriesPage() {
   const { t } = useTranslation()
-  const { location, setFilters } = useListingFilters()
+  const { location, page, setPage, setFilters } = useListingFilters()
 
-  const { data } = usePublicArticles('stories', {
+  const listing = usePublicArticleListing('stories', {
     location: location || undefined,
+    page,
   })
 
   const stories = preferApi(
-    data?.map((article) => ({
+    listing.items.map((article) => ({
       ...toHumanStoryCard(article),
       path: articlePath(article),
     })),
@@ -50,7 +52,7 @@ export default function StoriesPage() {
             eyebrow={t('humanStoriesEyebrow')}
             title={t('humanStories')}
             description={t('humanStoriesDesc')}
-            countLabel={t('storiesCount', { count: stories.length })}
+            countLabel={t('storiesCount', { count: listing.total })}
           />
 
           <RegionMap
@@ -73,7 +75,7 @@ export default function StoriesPage() {
                     key={story.id}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.6, delay: index * 0.05 }}
+                    transition={{ duration: 0.6, delay: Math.min(index, 8) * 0.05 }}
                   >
                     <Link to={story.path} className="group block">
                       <div className="relative mb-5 aspect-[4/5] overflow-hidden rounded-[16px] bg-[#1A1A1A]">
@@ -125,6 +127,12 @@ export default function StoriesPage() {
                 ))}
               </div>
             )}
+            <ListingPagination
+              lang={lang}
+              page={page}
+              totalPages={listing.totalPages}
+              onPage={setPage}
+            />
           </div>
         </main>
       )}

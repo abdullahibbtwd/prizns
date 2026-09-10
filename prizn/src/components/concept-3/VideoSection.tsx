@@ -30,7 +30,7 @@ function toVideoCard(article: CmsArticle) {
 }
 
 export function VideoSection({ lang }: VideoSectionProps) {
-  const { data } = usePublicArticles('video')
+  const { data } = usePublicArticles('video', { limit: 3 })
   const items = preferApi(data?.map(toVideoCard))
   const [featured, ...rest] = items
   const side = rest.slice(0, 2)

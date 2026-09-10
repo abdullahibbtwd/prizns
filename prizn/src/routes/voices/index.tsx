@@ -1,24 +1,28 @@
 import { Radio } from 'lucide-react'
 import { JournalShell } from '@/components/concept-3/JournalShell'
 import { ListingHeader } from '@/components/concept-3/ListingHeader'
+import { ListingPagination } from '@/components/concept-3/ListingPagination'
 import {
   VoicesPlayerGrid,
   toVoiceItem,
 } from '@/components/concept-3/VoicesPlayerGrid'
-import { preferApi, usePublicArticles } from '@/lib/public-content'
+import { preferApi, usePublicArticleListing } from '@/lib/public-content'
+import { useListingFilters } from '@/lib/listing-filters'
 
 export default function VoicesPage() {
+  const { page, setPage } = useListingFilters()
   // Global audio shelf: any published story with audio (voices uploads + narrations).
-  const { data, isLoading, isError } = usePublicArticles(undefined, {
+  const listing = usePublicArticleListing(undefined, {
     hasAudio: true,
+    page,
   })
 
   return (
     <JournalShell>
       {({ lang }) => {
         const voices = preferApi(
-          data
-            ?.filter((article) => Boolean(article.audioUrl))
+          listing.items
+            .filter((article) => Boolean(article.audioUrl))
             .map(toVoiceItem),
         )
 
@@ -37,13 +41,13 @@ export default function VoicesPage() {
                   : 'Listen to narrations and field recordings from our stories. Click a card to open the full page.'
               }
               countLabel={
-                isLoading
+                listing.isLoading
                   ? lang === 'bg'
                     ? 'Зареждане…'
                     : 'Loading…'
                   : lang === 'bg'
-                    ? `${voices.length} записа`
-                    : `${voices.length} recordings`
+                    ? `${listing.total} записа`
+                    : `${listing.total} recordings`
               }
             />
 
@@ -60,11 +64,11 @@ export default function VoicesPage() {
                   </span>
                 </div>
 
-                {isLoading ? (
+                {listing.isLoading ? (
                   <p className="font-sans text-sm text-white/50">
                     {lang === 'bg' ? 'Зареждане на записи…' : 'Loading recordings…'}
                   </p>
-                ) : isError ? (
+                ) : listing.isError ? (
                   <p className="font-sans text-sm text-rose-300">
                     {lang === 'bg'
                       ? 'Неуспешно зареждане на аудио.'
@@ -79,6 +83,13 @@ export default function VoicesPage() {
                 ) : (
                   <VoicesPlayerGrid lang={lang} voices={voices} animateOnMount />
                 )}
+                <ListingPagination
+                  lang={lang}
+                  page={page}
+                  totalPages={listing.totalPages}
+                  onPage={setPage}
+                  tone="dark"
+                />
               </div>
             </div>
           </main>

@@ -2,35 +2,29 @@ import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { JournalShell } from '@/components/concept-3/JournalShell'
 import { ListingHeader } from '@/components/concept-3/ListingHeader'
+import { ListingPagination } from '@/components/concept-3/ListingPagination'
 import { SponsoredBadge } from '@/components/concept-3/SponsoredBadge'
 import { RegionMap } from '@/components/concept-3/RegionMap'
-import { ListingFilters } from '@/components/concept-3/ListingFilters'
 import {
   articlePath,
   preferApi,
-  usePublicArticles,
-  usePublicSeries,
-  usePublicTags,
+  usePublicArticleListing,
 } from '@/lib/public-content'
 import { useListingFilters } from '@/lib/listing-filters'
 import { toTraditionCard } from '@/lib/section-cards'
 
 export default function TraditionsPage() {
-  const { location, topic, series, setFilters } = useListingFilters()
-  const { data } = usePublicArticles('traditions', {
-    topic: topic || undefined,
+  const { location, page, setPage, setFilters } = useListingFilters()
+  const listing = usePublicArticleListing('traditions', {
     location: location || undefined,
-    series: series || undefined,
+    page,
   })
-  const topicsQuery = usePublicTags('TOPIC')
-  const locationsQuery = usePublicTags('LOCATION')
-  const seriesQuery = usePublicSeries()
 
   return (
     <JournalShell>
       {({ lang }) => {
         const traditions = preferApi(
-          data?.map((article) => ({
+          listing.items.map((article) => ({
             ...toTraditionCard(article),
             path: articlePath(article),
           })),
@@ -49,8 +43,8 @@ export default function TraditionsPage() {
               }
               countLabel={
                 lang === 'bg'
-                  ? `${traditions.length} традиции`
-                  : `${traditions.length} traditions`
+                  ? `${listing.total} традиции`
+                  : `${listing.total} traditions`
               }
             />
 
@@ -58,34 +52,6 @@ export default function TraditionsPage() {
               className="mx-auto max-w-7xl px-6 pt-10 md:px-12"
               selectedSlug={location}
               onSelect={(slug) => setFilters({ location: slug })}
-            />
-
-            <ListingFilters
-              lang={lang}
-              location={{
-                value: location,
-                options: (locationsQuery.data ?? []).map((tag) => ({
-                  value: tag.slug,
-                  label: lang === 'bg' ? tag.nameBg : tag.name,
-                })),
-                onChange: (value) => setFilters({ location: value }),
-              }}
-              topic={{
-                value: topic,
-                options: (topicsQuery.data ?? []).map((tag) => ({
-                  value: tag.slug,
-                  label: lang === 'bg' ? tag.nameBg : tag.name,
-                })),
-                onChange: (value) => setFilters({ topic: value }),
-              }}
-              series={{
-                value: series,
-                options: (seriesQuery.data ?? []).map((item) => ({
-                  value: item.slug,
-                  label: lang === 'bg' ? item.titleBg : item.title || item.titleBg,
-                })),
-                onChange: (value) => setFilters({ series: value }),
-              }}
             />
 
             <div className="mx-auto max-w-7xl px-6 py-16 md:px-12 md:py-20">
@@ -96,7 +62,7 @@ export default function TraditionsPage() {
                       key={item.id}
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.6, delay: index * 0.06 }}
+                      transition={{ duration: 0.6, delay: Math.min(index, 8) * 0.06 }}
                     >
                       <Link to={item.path} className="group block text-left">
                         <div className="relative mb-4 aspect-[16/11] w-full overflow-hidden rounded-[14px] bg-[#1A1A1A]">
@@ -131,6 +97,12 @@ export default function TraditionsPage() {
                   )
                 })}
               </div>
+              <ListingPagination
+                lang={lang}
+                page={page}
+                totalPages={listing.totalPages}
+                onPage={setPage}
+              />
             </div>
           </main>
         )

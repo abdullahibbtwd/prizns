@@ -332,6 +332,9 @@ export default function CmsProductsPage() {
                   {mediaBusy
                     ? t('cms.editor.preparingMedia')
                     : t('cms.editor.addImages')}
+                  <span className="font-normal text-stone-400">
+                    {t('cms.editor.imageMaxSize')}
+                  </span>
                   <input
                     type="file"
                     accept="image/*"
@@ -350,12 +353,15 @@ export default function CmsProductsPage() {
             {gallery.length === 0 ? (
               <label className="relative flex cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-[#E8E4DC] bg-white px-6 py-14 text-center transition-colors hover:border-[#0C2686]/40">
                 <ImagePlus className="size-8 text-[#0C2686]" />
-                <span className="text-sm font-medium text-stone-600">
-                  {mediaBusy
-                    ? t('cms.editor.preparingMedia')
-                    : t('cms.editor.addImages')}
-                </span>
-                <input
+                  <span className="text-sm font-medium text-stone-600">
+                    {mediaBusy
+                      ? t('cms.editor.preparingMedia')
+                      : t('cms.editor.addImages')}
+                  </span>
+                  <span className="text-[11px] text-stone-400">
+                    {t('cms.editor.imageMaxSize')}
+                  </span>
+                  <input
                   type="file"
                   accept="image/*"
                   multiple

@@ -3,12 +3,14 @@ import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { JournalShell } from '@/components/concept-3/JournalShell'
 import { ListingHeader } from '@/components/concept-3/ListingHeader'
+import { ListingPagination } from '@/components/concept-3/ListingPagination'
 import { LuxuryVideoPlayer } from '@/components/concept-3/LuxuryVideoPlayer'
 import {
   articlePath,
   preferApi,
-  usePublicArticles,
+  usePublicArticleListing,
 } from '@/lib/public-content'
+import { useListingFilters } from '@/lib/listing-filters'
 import type { CmsArticle } from '@/lib/cms-types'
 
 function toVideoCard(article: CmsArticle) {
@@ -27,13 +29,14 @@ function toVideoCard(article: CmsArticle) {
 }
 
 export default function VideoPage() {
-  const { data } = usePublicArticles('video')
+  const { page, setPage } = useListingFilters()
+  const listing = usePublicArticleListing('video', { page })
   const [activeId, setActiveId] = useState<string | null>(null)
 
   return (
     <JournalShell>
       {({ lang }) => {
-        const items = preferApi(data?.map(toVideoCard))
+        const items = preferApi(listing.items.map(toVideoCard))
 
         return (
           <main>
@@ -47,7 +50,7 @@ export default function VideoPage() {
                   : 'Short films from workshops, trails, and river crossings — the frame as a field note.'
               }
               countLabel={
-                lang === 'bg' ? `${items.length} видеа` : `${items.length} films`
+                lang === 'bg' ? `${listing.total} видеа` : `${listing.total} films`
               }
             />
 
@@ -58,7 +61,7 @@ export default function VideoPage() {
                     key={item.id}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.6, delay: index * 0.06 }}
+                    transition={{ duration: 0.6, delay: Math.min(index, 8) * 0.06 }}
                     className="space-y-4"
                   >
                     <LuxuryVideoPlayer
@@ -96,6 +99,12 @@ export default function VideoPage() {
                   </motion.div>
                 ))}
               </div>
+              <ListingPagination
+                lang={lang}
+                page={page}
+                totalPages={listing.totalPages}
+                onPage={setPage}
+              />
             </div>
           </main>
         )

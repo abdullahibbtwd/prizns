@@ -16,7 +16,10 @@ function scrollToDiscover() {
 }
 
 export function VoicesAudioSection({ lang }: VoicesAudioSectionProps) {
-  const { data, isLoading } = usePublicArticles(undefined, { hasAudio: true })
+  const { data, isLoading } = usePublicArticles(undefined, {
+    hasAudio: true,
+    limit: 3,
+  })
   const voices = preferApi(
     data?.filter((article) => Boolean(article.audioUrl)).map(toVoiceItem),
   ).slice(0, 3)

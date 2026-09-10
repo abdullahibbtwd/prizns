@@ -41,7 +41,7 @@ vi.mock('react-i18next', () => ({
   }),
 }))
 
-const usePublicArticles = vi.fn()
+const usePublicArticleListing = vi.fn()
 
 vi.mock('@/lib/public-content', async () => {
   const actual = await vi.importActual<typeof import('@/lib/public-content')>(
@@ -49,7 +49,8 @@ vi.mock('@/lib/public-content', async () => {
   )
   return {
     ...actual,
-    usePublicArticles: (...args: unknown[]) => usePublicArticles(...args),
+    usePublicArticleListing: (...args: unknown[]) =>
+      usePublicArticleListing(...args),
   }
 })
 
@@ -59,18 +60,21 @@ vi.mock('@/components/concept-3/RegionMap', () => ({
 
 describe('StoriesPage', () => {
   beforeEach(() => {
-    usePublicArticles.mockReturnValue({
-      data: [
-        buildCmsArticle({
-          section: 'stories',
-          path: '/stories/village-life',
-          slug: 'village-life',
-          title: 'Village life',
-          titleBg: 'Селски живот',
-          subtitle: 'A quiet morning',
-          subtitleBg: 'Тиха сутрин',
-        }),
-      ],
+    const article = buildCmsArticle({
+      section: 'stories',
+      path: '/stories/village-life',
+      slug: 'village-life',
+      title: 'Village life',
+      titleBg: 'Селски живот',
+      subtitle: 'A quiet morning',
+      subtitleBg: 'Тиха сутрин',
+    })
+    usePublicArticleListing.mockReturnValue({
+      items: [article],
+      total: 1,
+      totalPages: 1,
+      pageSize: 30,
+      isLoading: false,
     })
   })
 
@@ -88,10 +92,32 @@ describe('StoriesPage', () => {
     expect(screen.queryByText('Series')).not.toBeInTheDocument()
   })
 
-  it('reads location from the URL', () => {
-    renderPage(<StoriesPage />, { route: '/stories?location=vidin&topic=test' })
-    expect(usePublicArticles).toHaveBeenCalledWith('stories', {
+  it('reads location and page from the URL', () => {
+    renderPage(<StoriesPage />, { route: '/stories?location=vidin&topic=test&page=2' })
+    expect(usePublicArticleListing).toHaveBeenCalledWith('stories', {
       location: 'vidin',
+      page: 2,
     })
+  })
+
+  it('renders pagination when there is more than one page', () => {
+    usePublicArticleListing.mockReturnValue({
+      items: [
+        buildCmsArticle({
+          section: 'stories',
+          path: '/stories/village-life',
+          slug: 'village-life',
+          title: 'Village life',
+        }),
+      ],
+      total: 48,
+      totalPages: 2,
+      pageSize: 30,
+      isLoading: false,
+    })
+    renderPage(<StoriesPage />, { route: '/stories?page=1' })
+    expect(screen.getByLabelText('Pagination')).toBeInTheDocument()
+    expect(screen.getByText('Page 1 of 2')).toBeInTheDocument()
+    expect(screen.getByText('48 stories')).toBeInTheDocument()
   })
 })

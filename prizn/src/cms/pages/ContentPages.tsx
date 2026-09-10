@@ -20,6 +20,7 @@ import {
 import { cn } from '@/lib/utils'
 import { listCmsMedia, uploadCmsMedia } from '@/lib/articles-api'
 import type { MediaAsset } from '@/lib/cms-types'
+import { assertCmsFileSize } from '@/lib/upload-limits'
 
 export function CmsMediaPage() {
   const { t } = useTranslation()
@@ -82,6 +83,22 @@ export function CmsMediaPage() {
   const onPickFile = (next: File | null) => {
     setFormError('')
     setFormOk('')
+    if (next) {
+      try {
+        assertCmsFileSize(next)
+      } catch (error) {
+        setFile(null)
+        setPreviewUrl((prev) => {
+          if (prev) URL.revokeObjectURL(prev)
+          return ''
+        })
+        setFormError(
+          error instanceof Error ? error.message : t('cms.mediaLibrary.uploadFailed'),
+        )
+        if (fileInputRef.current) fileInputRef.current.value = ''
+        return
+      }
+    }
     setPreviewUrl((prev) => {
       if (prev) URL.revokeObjectURL(prev)
       return next ? URL.createObjectURL(next) : ''
@@ -234,9 +251,17 @@ export function CmsMediaPage() {
               key={item.id}
               className="group relative aspect-square overflow-hidden rounded-2xl border border-[#E8E4DC] bg-stone-100 shadow-2xs transition-all hover:shadow-lg"
             >
-              {item.kind === 'IMAGE' ? (
+              {item.status === 'PENDING' || item.status === 'PROCESSING' ? (
+                <div className="flex h-full w-full items-center justify-center bg-stone-200 px-3 text-center text-xs font-semibold text-stone-600">
+                  {t('cms.mediaLibrary.processing')}
+                </div>
+              ) : item.status === 'FAILED' ? (
+                <div className="flex h-full w-full items-center justify-center bg-red-50 px-3 text-center text-xs font-semibold text-red-700">
+                  {item.error || t('cms.mediaLibrary.failed')}
+                </div>
+              ) : item.kind === 'IMAGE' ? (
                 <img
-                  src={item.url}
+                  src={item.thumbnailUrl || item.url}
                   alt={item.titleBg || ''}
                   className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
                 />

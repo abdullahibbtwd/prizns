@@ -3,15 +3,23 @@ import { motion } from 'framer-motion'
 import { BookOpen, ChevronRight } from 'lucide-react'
 import { JournalShell } from '@/components/concept-3/JournalShell'
 import { ListingHeader } from '@/components/concept-3/ListingHeader'
+import { ListingPagination } from '@/components/concept-3/ListingPagination'
 import {
   articlePath,
-  usePublicArticles,
+  usePublicArticleListing,
   usePublicSeries,
 } from '@/lib/public-content'
+import { useListingFilters } from '@/lib/listing-filters'
 
 export default function DiscoverPage() {
+  const { page, setPage } = useListingFilters()
   const seriesQuery = usePublicSeries()
-  const discoverQuery = usePublicArticles('discover')
+  const seriesReady = !seriesQuery.isLoading
+  const hasSeries = (seriesQuery.data?.length ?? 0) > 0
+  const discoverQuery = usePublicArticleListing('discover', {
+    page,
+    enabled: seriesReady && !hasSeries,
+  })
 
   return (
     <JournalShell>
@@ -27,7 +35,7 @@ export default function DiscoverPage() {
           path: series.path,
         }))
 
-        const discoverCards = (discoverQuery.data ?? []).map((article) => ({
+        const discoverCards = discoverQuery.items.map((article) => ({
           id: article.slug || article.id,
           title: article.title,
           titleBg: article.titleBg,
@@ -38,12 +46,12 @@ export default function DiscoverPage() {
           path: articlePath(article),
         }))
 
-        const collections =
-          seriesCards.length > 0
-            ? seriesCards
-            : discoverCards.length > 0
-              ? discoverCards
-              : []
+        const collections = hasSeries
+          ? seriesCards
+          : discoverCards.length > 0
+            ? discoverCards
+            : []
+        const total = hasSeries ? seriesCards.length : discoverQuery.total
 
         return (
           <main>
@@ -58,8 +66,8 @@ export default function DiscoverPage() {
               }
               countLabel={
                 lang === 'bg'
-                  ? `${collections.length} колекции`
-                  : `${collections.length} collections`
+                  ? `${total} колекции`
+                  : `${total} collections`
               }
             />
 
@@ -71,7 +79,7 @@ export default function DiscoverPage() {
                       key={item.id}
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.6, delay: index * 0.06 }}
+                      transition={{ duration: 0.6, delay: Math.min(index, 8) * 0.06 }}
                     >
                       <Link
                         to={item.path}
@@ -106,6 +114,14 @@ export default function DiscoverPage() {
                   )
                 })}
               </div>
+              {hasSeries ? null : (
+                <ListingPagination
+                  lang={lang}
+                  page={page}
+                  totalPages={discoverQuery.totalPages}
+                  onPage={setPage}
+                />
+              )}
             </div>
           </main>
         )

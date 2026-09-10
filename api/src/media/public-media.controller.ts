@@ -8,13 +8,17 @@ export class PublicMediaController {
 
   /** Public gallery feed — images from the CMS media library. */
   @Get('media')
-  list(@Query('kind') kind?: string) {
+  list(@Query('kind') kind?: string, @Query('limit') limit?: string) {
     const parsed =
       kind?.toUpperCase() === 'VIDEO'
         ? MediaKind.VIDEO
         : kind?.toUpperCase() === 'AUDIO'
           ? MediaKind.AUDIO
           : MediaKind.IMAGE;
-    return this.media.listPublic({ kind: parsed });
+    const take = limit ? Number(limit) : undefined;
+    return this.media.listPublic({
+      kind: parsed,
+      take: Number.isFinite(take) ? take : undefined,
+    });
   }
 }

@@ -33,7 +33,7 @@ function aspectForIndex(index: number): { aspect: string; span: string } {
 }
 
 export function PhotographyGallery({ lang }: PhotographyGalleryProps) {
-  const { data, isLoading } = usePublicMedia('IMAGE')
+  const { data, isLoading } = usePublicMedia('IMAGE', { limit: 6 })
   const photos = preferApi(
     data?.map((item, index) => {
       const layout = aspectForIndex(index)

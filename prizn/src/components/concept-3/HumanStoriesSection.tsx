@@ -17,7 +17,7 @@ interface HumanStoriesSectionProps {
 }
 
 export function HumanStoriesSection({ lang }: HumanStoriesSectionProps) {
-  const { data, isLoading } = usePublicArticles('stories')
+  const { data, isLoading } = usePublicArticles('stories', { limit: 3 })
   const stories = preferApi(
     data?.map((article) => ({
       ...toHumanStoryCard(article),

@@ -29,7 +29,7 @@ function toEventsCard(article: CmsArticle) {
 }
 
 export function EventsSection({ lang }: EventsSectionProps) {
-  const { data } = usePublicArticles('events')
+  const { data } = usePublicArticles('events', { limit: 4 })
   const items = preferApi(data?.map(toEventsCard)).slice(0, 4)
 
   return (

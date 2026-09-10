@@ -89,6 +89,13 @@ enum MediaKind {
   VIDEO
 }
 
+enum MediaProcessStatus {
+  PENDING
+  PROCESSING
+  DONE
+  FAILED
+}
+
 enum NarrationStatus {
   IDLE
   PENDING
@@ -189,21 +196,31 @@ model Author {
 }
 
 model MediaAsset {
-  id           String    @id @default(cuid())
-  key          String    @unique
-  url          String
-  mimeType     String    @map("mime_type")
-  kind         MediaKind @default(IMAGE)
-  originalName String?   @map("original_name")
-  size         Int?
-  titleBg      String?   @map("title_bg")
-  titleEn      String?   @map("title_en")
-  locationBg   String?   @map("location_bg")
-  locationEn   String?   @map("location_en")
-  creditBg     String?   @map("credit_bg")
-  creditEn     String?   @map("credit_en")
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @updatedAt @map("updated_at")
+  id            String              @id @default(cuid())
+  key           String              @unique
+  url           String
+  mimeType      String              @map("mime_type")
+  kind          MediaKind           @default(IMAGE)
+  status        MediaProcessStatus  @default(DONE)
+  error         String?
+  originalName  String?             @map("original_name")
+  size          Int?
+  originalSize  Int?                @map("original_size")
+  processedSize Int?                @map("processed_size")
+  thumbnailKey  String?             @map("thumbnail_key")
+  thumbnailUrl  String?             @map("thumbnail_url")
+  width         Int?
+  height        Int?
+  tempPath      String?             @map("temp_path")
+  uploadedById  String?             @map("uploaded_by_id")
+  titleBg       String?             @map("title_bg")
+  titleEn       String?             @map("title_en")
+  locationBg    String?             @map("location_bg")
+  locationEn    String?             @map("location_en")
+  creditBg      String?             @map("credit_bg")
+  creditEn      String?             @map("credit_en")
+  createdAt     DateTime            @default(now()) @map("created_at")
+  updatedAt     DateTime            @updatedAt @map("updated_at")
 
   heroArticles  Article[]            @relation("ArticleHero")
   audioArticles Article[]            @relation("ArticleAudio")
@@ -213,6 +230,7 @@ model MediaAsset {
   products      Product[]
   productGalleryItems ProductGalleryItem[]
 
+  @@index([status])
   @@map("media_assets")
 }
 

@@ -27,7 +27,7 @@ function toCampaignsCard(article: CmsArticle) {
 }
 
 export function CampaignsSection({ lang }: CampaignsSectionProps) {
-  const { data } = usePublicArticles('campaigns')
+  const { data } = usePublicArticles('campaigns', { limit: 3 })
   const items = preferApi(data?.map(toCampaignsCard))
   const [featured, ...rest] = items
   const side = rest.slice(0, 2)

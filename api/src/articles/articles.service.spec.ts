@@ -101,7 +101,10 @@ describe('ArticlesService', () => {
   it('lists public articles', async () => {
     const items = await service.listPublic('stories');
     expect(items).toHaveLength(1);
-    expect(items[0]?.titleBg).toBe('История');
+    expect((items as { titleBg: string; body: unknown[] }[])[0]?.titleBg).toBe(
+      'История',
+    );
+    expect((items as { body: unknown[] }[])[0]?.body).toEqual([]);
   });
 
   it('lists the latest story marked Featured, from any section', async () => {
@@ -270,6 +273,28 @@ describe('ArticlesService', () => {
     });
     const updated = await service.update('art-1', { titleBg: 'Updated title' });
     expect(updated.titleBg).toBe('Updated title');
+  });
+
+  it('paginates public listing pages with skip/take and a total count', async () => {
+    prisma.article.count = jest.fn().mockResolvedValue(48);
+    const result = await service.listPublic('stories', undefined, {
+      page: 2,
+      pageSize: 30,
+    });
+    expect(result).toEqual(
+      expect.objectContaining({
+        total: 48,
+        page: 2,
+        pageSize: 30,
+        totalPages: 2,
+      }),
+    );
+    expect(prisma.article.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        skip: 30,
+        take: 30,
+      }),
+    );
   });
 
   it('lists cms articles with pagination', async () => {

@@ -3,11 +3,13 @@ import { motion } from 'framer-motion'
 import { MapPin } from 'lucide-react'
 import { JournalShell } from '@/components/concept-3/JournalShell'
 import { ListingHeader } from '@/components/concept-3/ListingHeader'
+import { ListingPagination } from '@/components/concept-3/ListingPagination'
 import {
   articlePath,
   preferApi,
-  usePublicArticles,
+  usePublicArticleListing,
 } from '@/lib/public-content'
+import { useListingFilters } from '@/lib/listing-filters'
 import type { CmsArticle } from '@/lib/cms-types'
 
 function toNewsCard(article: CmsArticle) {
@@ -28,12 +30,13 @@ function toNewsCard(article: CmsArticle) {
 }
 
 export default function NewsPage() {
-  const { data } = usePublicArticles('news')
+  const { page, setPage } = useListingFilters()
+  const listing = usePublicArticleListing('news', { page })
 
   return (
     <JournalShell>
       {({ lang }) => {
-        const items = preferApi(data?.map(toNewsCard))
+        const items = preferApi(listing.items.map(toNewsCard))
 
         return (
           <main>
@@ -47,7 +50,9 @@ export default function NewsPage() {
                   : 'Short news and timely notes from Northwestern Bulgaria.'
               }
               countLabel={
-                lang === 'bg' ? `${items.length} материала` : `${items.length} pieces`
+                lang === 'bg'
+                  ? `${listing.total} материала`
+                  : `${listing.total} pieces`
               }
             />
 
@@ -58,7 +63,7 @@ export default function NewsPage() {
                     key={item.id}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.6, delay: index * 0.06 }}
+                    transition={{ duration: 0.6, delay: Math.min(index, 8) * 0.06 }}
                   >
                     <Link
                       to={item.path}
@@ -98,6 +103,12 @@ export default function NewsPage() {
                   </motion.div>
                 ))}
               </div>
+              <ListingPagination
+                lang={lang}
+                page={page}
+                totalPages={listing.totalPages}
+                onPage={setPage}
+              />
             </div>
           </main>
         )

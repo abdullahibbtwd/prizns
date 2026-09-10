@@ -501,6 +501,7 @@ export default function CmsSeriesEditorPage() {
                 }}
               />
             </label>
+            <p className="text-[11px] text-stone-400">{t('cms.series.coverMaxSize')}</p>
             {form.watch('coverMediaId') && (
               <GhostButton
                 type="button"

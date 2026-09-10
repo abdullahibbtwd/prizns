@@ -27,7 +27,14 @@ async function drainBullQueues() {
   });
   try {
     await redis.connect();
-    const prefixes = ['bull:translate:', 'bull:ai:', 'bull:tts:', 'bull:digest:'];
+    const prefixes = [
+      'bull:translate:',
+      'bull:ai:',
+      'bull:tts:',
+      'bull:digest:',
+      'bull:publish:',
+      'bull:media:',
+    ];
     for (const prefix of prefixes) {
       const keys = await redis.keys(`${prefix}*`);
       if (keys.length > 0) await redis.del(...keys);

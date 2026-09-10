@@ -18,7 +18,7 @@ interface OurPlacesSectionProps {
 
 export function OurPlacesSection({ lang }: OurPlacesSectionProps) {
   const navigate = useNavigate()
-  const { data, isLoading } = usePublicArticles('places')
+  const { data, isLoading } = usePublicArticles('places', { limit: 2 })
   const places = preferApi(
     data?.map((article) => ({
       ...toPlaceCard(article),

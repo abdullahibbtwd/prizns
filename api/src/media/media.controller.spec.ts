@@ -4,10 +4,15 @@ import { MediaController } from './media.controller';
 import { MediaService } from './media.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { overrideGuards } from '../../test/helpers/guards';
+import { mockAuthUser } from '../../test/helpers/mocks';
 
 describe('MediaController', () => {
   let controller: MediaController;
-  const media = { list: jest.fn(), createFromUpload: jest.fn() };
+  const media = {
+    list: jest.fn(),
+    getById: jest.fn(),
+    createFromUpload: jest.fn(),
+  };
 
   beforeEach(async () => {
     const builder = Test.createTestingModule({
@@ -24,18 +29,27 @@ describe('MediaController', () => {
     expect(media.list).toHaveBeenCalledWith({ kind: 'IMAGE' });
   });
 
+  it('loads a single media record for polling', () => {
+    controller.get('media-1');
+    expect(media.getById).toHaveBeenCalledWith('media-1');
+  });
+
   it('requires file on upload', () => {
-    expect(() => controller.upload(undefined as never)).toThrow(
-      BadRequestException,
-    );
+    expect(() =>
+      controller.upload(undefined as never, mockAuthUser),
+    ).toThrow(BadRequestException);
   });
 
   it('uploads file via media service', () => {
     const file = { originalname: 'a.jpg' } as Express.Multer.File;
-    controller.upload(file, 'Title', 'Vidin', 'Credit');
+    controller.upload(file, mockAuthUser, 'Title', 'Vidin', 'Credit');
     expect(media.createFromUpload).toHaveBeenCalledWith(
       file,
-      expect.objectContaining({ titleBg: 'Title', folder: 'cms' }),
+      expect.objectContaining({
+        titleBg: 'Title',
+        folder: 'cms',
+        uploadedById: mockAuthUser.id,
+      }),
     );
   });
 });

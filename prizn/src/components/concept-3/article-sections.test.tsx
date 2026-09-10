@@ -67,6 +67,7 @@ describe('article grid sections', () => {
       ],
     })
     renderSection(<HumanStoriesSection lang="en" />)
+    expect(usePublicArticles).toHaveBeenCalledWith('stories', { limit: 3 })
     expect(screen.getByText('Human Stories')).toBeInTheDocument()
     expect(screen.getByText('Village portrait')).toBeInTheDocument()
   })

@@ -11,6 +11,8 @@ import { EmbedProcessor } from '../../src/jobs/embed.processor';
 import {
   QUEUE_AI,
   QUEUE_DIGEST,
+  QUEUE_MEDIA,
+  QUEUE_PUBLISH,
   QUEUE_SOCIAL,
   QUEUE_TRANSLATE,
   QUEUE_TTS,
@@ -18,6 +20,7 @@ import {
 import { TranslateProcessor } from '../../src/jobs/translate.processor';
 import { TtsProcessor } from '../../src/jobs/tts.processor';
 import { DigestProcessor } from '../../src/jobs/digest.processor';
+import { MediaProcessor } from '../../src/jobs/media.processor';
 import { MailService } from '../../src/mail/mail.service';
 import { TranslationService } from '../../src/translation/translation.service';
 import { TtsService } from '../../src/tts/tts.service';
@@ -124,6 +127,8 @@ const QUEUE_NAMES = [
   QUEUE_TTS,
   QUEUE_SOCIAL,
   QUEUE_DIGEST,
+  QUEUE_PUBLISH,
+  QUEUE_MEDIA,
 ] as const;
 
 async function closeBullQueues(moduleFixture: TestingModule) {
@@ -165,6 +170,8 @@ export async function createE2eApp(
     .overrideProvider(EmbedProcessor)
     .useValue(noopProcessor)
     .overrideProvider(DigestProcessor)
+    .useValue(noopProcessor)
+    .overrideProvider(MediaProcessor)
     .useValue(noopProcessor)
     .compile();
 

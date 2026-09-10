@@ -4,6 +4,7 @@ import { Queue } from 'bullmq'
 import {
   QUEUE_AI,
   QUEUE_DIGEST,
+  QUEUE_MEDIA,
   QUEUE_PUBLISH,
   QUEUE_SOCIAL,
   QUEUE_TRANSLATE,
@@ -33,6 +34,7 @@ export class JobsService implements OnModuleInit {
         QUEUE_SOCIAL,
         QUEUE_DIGEST,
         QUEUE_PUBLISH,
+        QUEUE_MEDIA,
       ].join(', ')}`,
     )
     await this.ensureDailyDigestScheduler()

@@ -3,13 +3,14 @@ import { motion } from 'framer-motion'
 import { ArrowUpRight } from 'lucide-react'
 import { JournalShell } from '@/components/concept-3/JournalShell'
 import { ListingHeader } from '@/components/concept-3/ListingHeader'
+import { ListingPagination } from '@/components/concept-3/ListingPagination'
 import { SponsoredBadge } from '@/components/concept-3/SponsoredBadge'
 import { RegionMap } from '@/components/concept-3/RegionMap'
 import { ListingFilters } from '@/components/concept-3/ListingFilters'
 import {
   articlePath,
   preferApi,
-  usePublicArticles,
+  usePublicArticleListing,
   usePublicSeries,
   usePublicTags,
 } from '@/lib/public-content'
@@ -17,11 +18,13 @@ import { useListingFilters } from '@/lib/listing-filters'
 import { toPlaceCard } from '@/lib/section-cards'
 
 export default function PlacesPage() {
-  const { location, topic, series, setFilters } = useListingFilters()
-  const { data } = usePublicArticles('places', {
+  const { location, topic, series, page, setPage, setFilters } =
+    useListingFilters()
+  const listing = usePublicArticleListing('places', {
     location: location || undefined,
     topic: topic || undefined,
     series: series || undefined,
+    page,
   })
   const locationsQuery = usePublicTags('LOCATION')
   const topicsQuery = usePublicTags('TOPIC')
@@ -31,7 +34,7 @@ export default function PlacesPage() {
     <JournalShell>
       {({ lang }) => {
         const places = preferApi(
-          data?.map((article) => ({
+          listing.items.map((article) => ({
             ...toPlaceCard(article),
             path: articlePath(article),
           })),
@@ -49,7 +52,9 @@ export default function PlacesPage() {
                   : 'Towns, villages, and trails across the Northwest — the places where our stories live.'
               }
               countLabel={
-                lang === 'bg' ? `${places.length} места` : `${places.length} places`
+                lang === 'bg'
+                  ? `${listing.total} места`
+                  : `${listing.total} places`
               }
             />
 
@@ -95,7 +100,7 @@ export default function PlacesPage() {
                       key={place.id}
                       initial={{ opacity: 0, y: 24 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.7, delay: index * 0.08 }}
+                      transition={{ duration: 0.7, delay: Math.min(index, 8) * 0.08 }}
                     >
                       <Link
                         to={place.path}
@@ -143,6 +148,12 @@ export default function PlacesPage() {
                   )
                 })}
               </div>
+              <ListingPagination
+                lang={lang}
+                page={page}
+                totalPages={listing.totalPages}
+                onPage={setPage}
+              />
             </div>
           </main>
         )

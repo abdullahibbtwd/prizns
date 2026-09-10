@@ -31,7 +31,7 @@ function toSportsCard(article: CmsArticle) {
 }
 
 export function SportsSection({ lang }: SportsSectionProps) {
-  const { data } = usePublicArticles('sports')
+  const { data } = usePublicArticles('sports', { limit: 3 })
   const items = preferApi(data?.map(toSportsCard)).slice(0, 3)
 
   return (

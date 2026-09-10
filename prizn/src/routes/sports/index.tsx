@@ -3,11 +3,13 @@ import { motion } from 'framer-motion'
 import { MapPin } from 'lucide-react'
 import { JournalShell } from '@/components/concept-3/JournalShell'
 import { ListingHeader } from '@/components/concept-3/ListingHeader'
+import { ListingPagination } from '@/components/concept-3/ListingPagination'
 import {
   articlePath,
   preferApi,
-  usePublicArticles,
+  usePublicArticleListing,
 } from '@/lib/public-content'
+import { useListingFilters } from '@/lib/listing-filters'
 import type { CmsArticle } from '@/lib/cms-types'
 
 function toSportsCard(article: CmsArticle) {
@@ -28,12 +30,13 @@ function toSportsCard(article: CmsArticle) {
 }
 
 export default function SportsPage() {
-  const { data } = usePublicArticles('sports')
+  const { page, setPage } = useListingFilters()
+  const listing = usePublicArticleListing('sports', { page })
 
   return (
     <JournalShell>
       {({ lang }) => {
-        const items = preferApi(data?.map(toSportsCard))
+        const items = preferApi(listing.items.map(toSportsCard))
 
         return (
           <main>
@@ -47,7 +50,9 @@ export default function SportsPage() {
                   : 'Local sport as belonging — rivers, rock, pitches, and morning discipline.'
               }
               countLabel={
-                lang === 'bg' ? `${items.length} истории` : `${items.length} stories`
+                lang === 'bg'
+                  ? `${listing.total} истории`
+                  : `${listing.total} stories`
               }
             />
 
@@ -59,7 +64,7 @@ export default function SportsPage() {
                       key={item.id}
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.6, delay: index * 0.06 }}
+                      transition={{ duration: 0.6, delay: Math.min(index, 8) * 0.06 }}
                     >
                       <Link
                         to={item.path}
@@ -95,6 +100,12 @@ export default function SportsPage() {
                   )
                 })}
               </div>
+              <ListingPagination
+                lang={lang}
+                page={page}
+                totalPages={listing.totalPages}
+                onPage={setPage}
+              />
             </div>
           </main>
         )

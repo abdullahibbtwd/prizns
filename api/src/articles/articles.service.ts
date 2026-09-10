@@ -211,6 +211,16 @@ export class ArticlesService {
     },
   } as const;
 
+  /** Homepage / listing cards need a poster, not the full gallery or body. */
+  private listInclude = {
+    ...this.include,
+    galleryItems: {
+      orderBy: { sortOrder: 'asc' as const },
+      take: 2,
+      include: { media: true },
+    },
+  } as const;
+
   private parseBody(body: Prisma.JsonValue): StoredArticleBlock[] {
     if (!Array.isArray(body)) return [];
     return body as StoredArticleBlock[];
@@ -637,6 +647,13 @@ export class ArticlesService {
     };
   }
 
+  toPublicListDto(article: ArticleWithRelations): PublicArticleDto {
+    return {
+      ...this.toPublicDto({ ...article, body: [] }),
+      body: [],
+    };
+  }
+
   toCmsDto(article: ArticleWithRelations) {
     const gallery = this.galleryFromArticle(article);
     const membership = article.seriesEpisodes?.[0];
@@ -684,6 +701,8 @@ export class ArticlesService {
       hasAudio?: boolean;
       q?: string;
       limit?: number;
+      page?: number;
+      pageSize?: number;
     },
   ) {
     const where: Prisma.ArticleWhereInput = {
@@ -752,6 +771,38 @@ export class ArticlesService {
       ];
     }
 
+    const orderBy = [
+      { publishedAt: 'desc' as const },
+      { updatedAt: 'desc' as const },
+    ];
+    const paginate =
+      filters?.page != null || filters?.pageSize != null;
+
+    if (paginate) {
+      const page = Math.max(1, Number(filters?.page) || 1);
+      const pageSize = Math.min(
+        50,
+        Math.max(1, Number(filters?.pageSize) || 30),
+      );
+      const [total, rows] = await this.prisma.$transaction([
+        this.prisma.article.count({ where }),
+        this.prisma.article.findMany({
+          where,
+          include: this.listInclude,
+          orderBy,
+          skip: (page - 1) * pageSize,
+          take: pageSize,
+        }),
+      ]);
+      return {
+        items: rows.map((row) => this.toPublicListDto(row)),
+        total,
+        page,
+        pageSize,
+        totalPages: Math.max(1, Math.ceil(total / pageSize)),
+      };
+    }
+
     const take =
       q || filters?.limit || featuredFlag
         ? Math.min(
@@ -762,11 +813,11 @@ export class ArticlesService {
 
     const rows = await this.prisma.article.findMany({
       where,
-      include: this.include,
-      orderBy: [{ publishedAt: 'desc' }, { updatedAt: 'desc' }],
+      include: this.listInclude,
+      orderBy,
       ...(take ? { take } : {}),
     });
-    return rows.map((row) => this.toPublicDto(row));
+    return rows.map((row) => this.toPublicListDto(row));
   }
 
   async getPublicBySectionSlug(

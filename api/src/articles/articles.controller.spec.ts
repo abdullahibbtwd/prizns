@@ -60,6 +60,27 @@ describe('ArticlesController', () => {
     );
   });
 
+  it('passes page and pageSize to listPublic', () => {
+    controller.listPublic(
+      'stories',
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      '2',
+      '30',
+    );
+    expect(articles.listPublic).toHaveBeenCalledWith(
+      'stories',
+      undefined,
+      expect.objectContaining({ page: 2, pageSize: 30 }),
+    );
+  });
+
   it('gets cms article by id', () => {
     controller.getCms('art-1');
     expect(articles.getCmsById).toHaveBeenCalledWith('art-1');

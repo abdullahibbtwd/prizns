@@ -6,6 +6,7 @@ import type {
   CmsAuthorOption,
   MediaAsset,
 } from "@/lib/cms-types";
+import { assertCmsFileSize } from "@/lib/upload-limits";
 
 export type CmsArticlesPage = {
   items: CmsArticle[];
@@ -106,7 +107,7 @@ export function createCmsAuthor(nameBg: string) {
   return api.post<CmsAuthorOption>("/cms/authors", { nameBg });
 }
 
-export function uploadCmsMedia(
+export async function uploadCmsMedia(
   file: File,
   creditBgOrMeta?:
     | string
@@ -117,11 +118,12 @@ export function uploadCmsMedia(
         folder?: string
       },
 ) {
+  assertCmsFileSize(file)
   const meta =
     typeof creditBgOrMeta === 'string'
       ? { creditBg: creditBgOrMeta }
       : creditBgOrMeta ?? {}
-  return api.upload<MediaAsset>(
+  const pending = await api.upload<MediaAsset>(
     '/cms/media/upload',
     file,
     undefined,
@@ -132,6 +134,36 @@ export function uploadCmsMedia(
       ...(meta.locationBg ? { locationBg: meta.locationBg } : {}),
     },
   )
+  return waitForCmsMedia(pending)
+}
+
+export function getCmsMedia(id: string) {
+  return api.get<MediaAsset>(`/cms/media/${id}`)
+}
+
+export async function waitForCmsMedia(
+  asset: MediaAsset,
+  opts?: { pollMs?: number; timeoutMs?: number },
+) {
+  if (!asset.status || asset.status === 'DONE') return asset
+  if (asset.status === 'FAILED') {
+    throw new Error(asset.error || 'Upload failed')
+  }
+
+  const pollMs = opts?.pollMs ?? 400
+  const timeoutMs = opts?.timeoutMs ?? 120_000
+  const started = Date.now()
+
+  while (Date.now() - started < timeoutMs) {
+    await new Promise((resolve) => setTimeout(resolve, pollMs))
+    const next = await getCmsMedia(asset.id)
+    if (next.status === 'DONE') return next
+    if (next.status === 'FAILED') {
+      throw new Error(next.error || 'Upload failed')
+    }
+  }
+
+  throw new Error('Upload is taking too long')
 }
 
 export function listCmsMedia(kind?: 'IMAGE' | 'VIDEO' | 'AUDIO') {
@@ -139,7 +171,13 @@ export function listCmsMedia(kind?: 'IMAGE' | 'VIDEO' | 'AUDIO') {
   return api.get<MediaAsset[]>(`/cms/media${qs}`)
 }
 
-export function listPublicMedia(kind: 'IMAGE' | 'VIDEO' | 'AUDIO' = 'IMAGE') {
+export function listPublicMedia(
+  kind: 'IMAGE' | 'VIDEO' | 'AUDIO' = 'IMAGE',
+  opts?: { limit?: number },
+) {
+  const params = new URLSearchParams()
+  params.set('kind', kind)
+  if (opts?.limit != null) params.set('limit', String(opts.limit))
   return api.get<
     Array<{
       id: string
@@ -154,22 +192,25 @@ export function listPublicMedia(kind: 'IMAGE' | 'VIDEO' | 'AUDIO' = 'IMAGE') {
       creditEn?: string | null
       createdAt: string
     }>
-  >(`/media?kind=${encodeURIComponent(kind)}`)
+  >(`/media?${params.toString()}`)
 }
 
-export function listPublicArticles(
-  section?: string,
-  opts?: {
-    series?: string
-    location?: string
-    topic?: string
-    category?: string
-    categorySlug?: string
-    hasAudio?: boolean
-    q?: string
-    limit?: number
-  },
-) {
+export type PublicArticlesPage = CmsArticlesPage;
+
+export type PublicArticleListFilters = {
+  series?: string
+  location?: string
+  topic?: string
+  category?: string
+  categorySlug?: string
+  hasAudio?: boolean
+  q?: string
+  limit?: number
+  page?: number
+  pageSize?: number
+};
+
+function publicArticleQuery(section?: string, opts?: PublicArticleListFilters) {
   const params = new URLSearchParams();
   if (section) params.set("section", section);
   if (opts?.series) params.set("series", opts.series);
@@ -180,8 +221,29 @@ export function listPublicArticles(
   if (opts?.hasAudio === true) params.set("hasAudio", "true");
   if (opts?.q?.trim()) params.set("q", opts.q.trim());
   if (opts?.limit != null) params.set("limit", String(opts.limit));
-  const qs = params.toString();
+  if (opts?.page != null) params.set("page", String(opts.page));
+  if (opts?.pageSize != null) params.set("pageSize", String(opts.pageSize));
+  return params.toString();
+}
+
+export function listPublicArticles(
+  section?: string,
+  opts?: PublicArticleListFilters,
+) {
+  const qs = publicArticleQuery(section, opts);
   return api.get<CmsArticle[]>(`/articles${qs ? `?${qs}` : ""}`);
+}
+
+export function listPublicArticlesPage(
+  section?: string,
+  opts?: PublicArticleListFilters,
+) {
+  const qs = publicArticleQuery(section, {
+    ...opts,
+    page: opts?.page ?? 1,
+    pageSize: opts?.pageSize ?? 30,
+  });
+  return api.get<PublicArticlesPage>(`/articles${qs ? `?${qs}` : ""}`);
 }
 
 export function getPublicArticle(

@@ -15,7 +15,7 @@ interface CuratedCollectionsProps {
 
 export function CuratedCollections({ lang }: CuratedCollectionsProps) {
   const seriesQuery = usePublicSeries()
-  const discoverQuery = usePublicArticles('discover')
+  const discoverQuery = usePublicArticles('discover', { limit: 3 })
   const isLoading = seriesQuery.isLoading || discoverQuery.isLoading
 
   const seriesCards = (seriesQuery.data ?? []).map((series) => ({

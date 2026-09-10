@@ -3,11 +3,13 @@ import { motion } from 'framer-motion'
 import { CalendarDays } from 'lucide-react'
 import { JournalShell } from '@/components/concept-3/JournalShell'
 import { ListingHeader } from '@/components/concept-3/ListingHeader'
+import { ListingPagination } from '@/components/concept-3/ListingPagination'
 import {
   articlePath,
   preferApi,
-  usePublicArticles,
+  usePublicArticleListing,
 } from '@/lib/public-content'
+import { useListingFilters } from '@/lib/listing-filters'
 import type { CmsArticle } from '@/lib/cms-types'
 
 function toEventsCard(article: CmsArticle) {
@@ -26,12 +28,13 @@ function toEventsCard(article: CmsArticle) {
 }
 
 export default function EventsPage() {
-  const { data } = usePublicArticles('events')
+  const { page, setPage } = useListingFilters()
+  const listing = usePublicArticleListing('events', { page })
 
   return (
     <JournalShell>
       {({ lang }) => {
-        const items = preferApi(data?.map(toEventsCard))
+        const items = preferApi(listing.items.map(toEventsCard))
 
         return (
           <main>
@@ -45,7 +48,9 @@ export default function EventsPage() {
                   : 'Fairs, night paths, and markets — the living calendar of the Northwest.'
               }
               countLabel={
-                lang === 'bg' ? `${items.length} събития` : `${items.length} events`
+                lang === 'bg'
+                  ? `${listing.total} събития`
+                  : `${listing.total} events`
               }
             />
 
@@ -57,7 +62,7 @@ export default function EventsPage() {
                       key={item.id}
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.6, delay: index * 0.06 }}
+                      transition={{ duration: 0.6, delay: Math.min(index, 8) * 0.06 }}
                     >
                       <Link to={item.path} className="group block">
                         <div className="aspect-[16/10] overflow-hidden rounded-[14px] bg-[#1A1A1A]">
@@ -85,6 +90,12 @@ export default function EventsPage() {
                   )
                 })}
               </div>
+              <ListingPagination
+                lang={lang}
+                page={page}
+                totalPages={listing.totalPages}
+                onPage={setPage}
+              />
             </div>
           </main>
         )

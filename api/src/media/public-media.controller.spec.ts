@@ -20,6 +20,14 @@ describe('PublicMediaController', () => {
     expect(media.listPublic).toHaveBeenCalledWith({ kind: MediaKind.IMAGE });
   });
 
+  it('passes a homepage limit through to listPublic', () => {
+    controller.list('image', '6');
+    expect(media.listPublic).toHaveBeenCalledWith({
+      kind: MediaKind.IMAGE,
+      take: 6,
+    });
+  });
+
   it('parses video kind', () => {
     controller.list('video');
     expect(media.listPublic).toHaveBeenCalledWith({ kind: MediaKind.VIDEO });

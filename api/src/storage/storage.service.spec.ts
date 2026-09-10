@@ -60,7 +60,7 @@ describe('StorageService', () => {
 
     prisma = {
       fileObject: {
-        create: jest.fn().mockResolvedValue({
+        upsert: jest.fn().mockResolvedValue({
           id: 'file-1',
           key: 'uploads/x.txt',
           bucket: 'prizni',
@@ -90,7 +90,7 @@ describe('StorageService', () => {
       originalName: 'x.jpg',
     });
     expect(result.id).toBe('file-1');
-    expect(prisma.fileObject.create).toHaveBeenCalled();
+    expect(prisma.fileObject.upsert).toHaveBeenCalled();
   });
 
   it('uploads multer files and resolves public urls', async () => {

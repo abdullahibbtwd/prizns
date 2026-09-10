@@ -37,6 +37,8 @@ export class ArticlesController {
     @Query('hasAudio') hasAudio?: string,
     @Query('q') q?: string,
     @Query('limit') limit?: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
   ) {
     return this.articles.listPublic(section, series, {
       location,
@@ -51,6 +53,8 @@ export class ArticlesController {
             : undefined,
       q,
       limit: limit ? Number(limit) : undefined,
+      page: page ? Number(page) : undefined,
+      pageSize: pageSize ? Number(pageSize) : undefined,
     });
   }
 

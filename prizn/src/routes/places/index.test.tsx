@@ -20,6 +20,12 @@ vi.mock('@/lib/public-content', async (importOriginal) => {
   return {
     ...actual,
     usePublicArticles: () => ({ data: [] }),
+    usePublicArticleListing: () => ({
+      items: [],
+      total: 0,
+      totalPages: 1,
+      isLoading: false,
+    }),
     usePublicTags: () => ({
       data: [{ id: 't1', slug: 'vidin', nameBg: 'Видин', name: 'Vidin' }],
     }),
