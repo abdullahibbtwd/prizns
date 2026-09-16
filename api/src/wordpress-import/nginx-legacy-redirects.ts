@@ -1,0 +1,199 @@
+import { type ArticleSection } from '@prisma/client';
+import { buildArticlePath } from '../articles/section.util';
+
+export type LegacyRedirectArticle = {
+  slug: string;
+  path: string;
+  section: ArticleSection;
+};
+
+export type LegacyRedirectSkip = {
+  slug: string;
+  reason: 'empty-slug' | 'reserved' | 'same-path' | 'collision';
+  destination?: string;
+};
+
+export type LegacyRedirectMap = {
+  lines: string[];
+  redirects: Array<{ from: string; to: string }>;
+  skipped: LegacyRedirectSkip[];
+};
+
+/**
+ * First URL segments that already belong to the SPA, API, or nginx.
+ * Never emit `/{this}` → `/{section}/{this}` or hubs like `/stories` break.
+ */
+export const LEGACY_REDIRECT_RESERVED_SLUGS = new Set([
+  'api',
+  'media',
+  'cms',
+  'shop',
+  'auth',
+  'me',
+  'discover',
+  'places',
+  'stories',
+  'authors',
+  'traditions',
+  'voices',
+  'sports',
+  'events',
+  'news',
+  'video',
+  'campaigns',
+  'gallery',
+  'write-for-us',
+  'support',
+  'partnerships',
+  'contact',
+  'why-prizni',
+  'story-of-the-year',
+  'archive',
+  'sitemap.xml',
+  'feed.xml',
+  'feed.json',
+  'robots.txt',
+  'assets',
+  'static',
+]);
+
+export function destinationPath(article: LegacyRedirectArticle): string {
+  const stored = article.path.trim();
+  if (stored) {
+    const withSlash = stored.startsWith('/') ? stored : `/${stored}`;
+    return withSlash.replace(/\/+$/, '') || withSlash;
+  }
+  return buildArticlePath(article.section, article.slug);
+}
+
+function formatMapLine(from: string, to: string): string {
+  return `${from} ${to};`;
+}
+
+/**
+ * WordPress lived at `https://prizni.bg/{slug}`.
+ * The journal now lives at `/{section}/{slug}` (same slug, new section prefix).
+ */
+export function buildLegacyRedirectMap(
+  articles: LegacyRedirectArticle[],
+  opts?: { trailingSlash?: boolean },
+): LegacyRedirectMap {
+  const trailingSlash = opts?.trailingSlash !== false;
+  const skipped: LegacyRedirectSkip[] = [];
+  const bySlug = new Map<string, string>();
+  const collisions = new Set<string>();
+
+  for (const article of articles) {
+    const slug = article.slug.trim();
+    if (!slug) {
+      skipped.push({ slug: article.slug, reason: 'empty-slug' });
+      continue;
+    }
+    if (LEGACY_REDIRECT_RESERVED_SLUGS.has(slug)) {
+      skipped.push({ slug, reason: 'reserved' });
+      continue;
+    }
+
+    const to = destinationPath(article);
+    if (to === `/${slug}`) {
+      skipped.push({ slug, reason: 'same-path', destination: to });
+      continue;
+    }
+
+    const existing = bySlug.get(slug);
+    if (existing && existing !== to) {
+      collisions.add(slug);
+      skipped.push({ slug, reason: 'collision', destination: to });
+      continue;
+    }
+    if (!existing) {
+      bySlug.set(slug, to);
+    }
+  }
+
+  for (const slug of collisions) {
+    const dropped = bySlug.get(slug);
+    if (dropped) {
+      skipped.push({ slug, reason: 'collision', destination: dropped });
+      bySlug.delete(slug);
+    }
+  }
+
+  const redirects = [...bySlug.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .flatMap(([slug, to]) => {
+      const rows = [{ from: `/${slug}`, to }];
+      if (trailingSlash) {
+        rows.push({ from: `/${slug}/`, to });
+      }
+      return rows;
+    });
+
+  return {
+    lines: redirects.map(({ from, to }) => formatMapLine(from, to)),
+    redirects,
+    skipped,
+  };
+}
+
+export const NGINX_MAP_LINE_RE = /^\/[^\s]+ \/[^;\s]+;$/;
+
+export type RedirectMapWriteGuard = {
+  minRedirects?: number;
+  /** New map must keep at least this fraction of the previous entry count. */
+  maxShrinkRatio?: number;
+  force?: boolean;
+};
+
+export function countNginxMapEntries(body: string): number {
+  return body.split('\n').filter((line) => NGINX_MAP_LINE_RE.test(line.trim()))
+    .length;
+}
+
+export function recommendedMapHashMaxSize(entryCount: number): number {
+  const needed = Math.max(2048, entryCount * 2);
+  let size = 2048;
+  while (size < needed) size *= 2;
+  return size;
+}
+
+export function assertRedirectMapReady(
+  lineCount: number,
+  previousLineCount: number | undefined,
+  guard: RedirectMapWriteGuard = {},
+): void {
+  const minRedirects = guard.minRedirects ?? 1;
+  const maxShrinkRatio = guard.maxShrinkRatio ?? 0.8;
+  if (guard.force) return;
+  if (lineCount < minRedirects) {
+    throw new Error(
+      `refusing to write ${lineCount} redirect line${lineCount === 1 ? '' : 's'} (min ${minRedirects}). Fix the generate run or pass --force.`,
+    );
+  }
+  if (
+    previousLineCount !== undefined &&
+    previousLineCount > 0 &&
+    lineCount < Math.ceil(previousLineCount * maxShrinkRatio)
+  ) {
+    throw new Error(
+      `refusing to shrink the map from ${previousLineCount} to ${lineCount} lines (${Math.round(maxShrinkRatio * 100)}% floor). Pass --force if this is expected.`,
+    );
+  }
+}
+
+export function renderNginxRedirectMap(
+  map: LegacyRedirectMap,
+  meta?: { articles?: number; generatedAt?: string },
+): string {
+  const generatedAt = meta?.generatedAt ?? new Date().toISOString();
+  const header = [
+    '# Generated by api/src/wordpress-import/generate-nginx-redirects.ts',
+    '# Legacy WordPress /{slug} → journal /{section}/{slug}',
+    '# Do not edit by hand — regenerate from the API container.',
+    `# generatedAt: ${generatedAt}`,
+    `# articles: ${meta?.articles ?? map.redirects.length}`,
+    `# redirects: ${map.lines.length}`,
+    '',
+  ];
+  return `${header.join('\n')}${map.lines.join('\n')}${map.lines.length ? '\n' : ''}`;
+}

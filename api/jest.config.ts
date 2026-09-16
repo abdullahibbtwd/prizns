@@ -11,6 +11,7 @@ const coverageCollect = [
   '!**/dto/**',
   '!**/processors/**',
   '!**/wordpress-import/import-wordpress.ts',
+  '!**/wordpress-import/generate-nginx-redirects.ts',
 ];
 
 /** MinIO → query-string still CJS; decode-uri-component@0.5.0 is ESM-only. */
@@ -63,6 +64,7 @@ const config: Config = {
         '!<rootDir>/../src/**/dto/**',
         '!<rootDir>/../src/**/processors/**',
         '!<rootDir>/../src/**/wordpress-import/import-wordpress.ts',
+        '!<rootDir>/../src/**/wordpress-import/generate-nginx-redirects.ts',
       ],
     },
   ],

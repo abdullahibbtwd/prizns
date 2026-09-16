@@ -16,6 +16,7 @@
     "import:wordpress:batch": "npm run import:wordpress:batch --prefix api",
     "import:wordpress:export": "npm run import:wordpress:export --prefix api",
     "import:wordpress:package": "npm run import:wordpress:package --prefix api",
+    "nginx:legacy-redirects": "npm run nginx:legacy-redirects --prefix api",
     "test:web": "npm test --prefix prizn",
     "test:web:cov": "npm run test:cov --prefix prizn",
     "test:api": "npm test --prefix api",

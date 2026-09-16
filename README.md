@@ -539,7 +539,13 @@ npm run docker:down
 - Known crawler user-agents get a server-rendered **bot shell** instead of the SPA
 - SPA fallback: `try_files` → `index.html`
 
-**Stage2 host nginx** (`deploy/nginx/stage2.conf`): public `:80` on the VM, `access.log` for Fail2ban, proxy to `127.0.0.1:${WEB_PORT}`. Set `PUBLISH_BIND=127.0.0.1` in `.env`. Jail: `deploy/fail2ban/`.
+**Stage2 host nginx** (`deploy/nginx/stage2.conf`): public `:80` on the VM, `access.log` for Fail2ban, proxy to `127.0.0.1:${WEB_PORT}`. Set `PUBLISH_BIND=127.0.0.1` in `.env`. Jail: `deploy/fail2ban/`. WordPress leftover URLs (`/{slug}`) 301 to `/{section}/{slug}` via `deploy/nginx/redirects.map`. On the VPS, rebuild the API image, then generate with DB retries + map backup, and apply with `nginx -t` rollback:
+
+```bash
+docker compose exec api node dist/wordpress-import/generate-nginx-redirects.js --dry-run
+docker compose exec api node dist/wordpress-import/generate-nginx-redirects.js --min-redirects=1800
+sh deploy/nginx/apply-legacy-redirects.sh
+```
 
 Coolify / compose notes:
 
