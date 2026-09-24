@@ -653,7 +653,6 @@ const cmsBg = {
     narrationGenerating: 'Генериране…',
     narrationDelete: 'Изтрий нарация',
     narrationFailed: 'Нарацията се провали',
-    saveFailed: 'Неуспешно запазване',
     enPreview: 'Английски преглед',
   },
 
@@ -1938,7 +1937,6 @@ const cmsEn = {
     narrationGenerating: 'Generating…',
     narrationDelete: 'Delete narration',
     narrationFailed: 'Narration failed',
-    saveFailed: 'Save failed',
     enPreview: 'English preview',
   },
 

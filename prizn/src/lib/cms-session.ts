@@ -3,12 +3,14 @@
  * remount bootstraps cannot rotate the refresh token twice and wipe auth state.
  */
 
+import type { CmsUserRole } from '@/lib/cms-roles'
+
 type AuthUser = {
   id: string
   email: string
   name: string | null
-  role: string
-  roles?: string[]
+  role: CmsUserRole
+  roles?: CmsUserRole[]
   imageUrl?: string | null
   emailVerified?: boolean
 }
