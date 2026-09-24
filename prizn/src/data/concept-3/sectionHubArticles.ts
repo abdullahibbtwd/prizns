@@ -214,7 +214,7 @@ export const sportsArticles: JournalArticle[] = [
     authorBg: 'Албена Николова',
     date: 'Summer 2026',
     dateBg: 'Лято 2026',
-    image: '/heroimg.jpg',
+    image: '/hero/01.webp',
     lead: 'Boats slip out while cafe shutters are still locked. Each stroke leaves a short silver sentence on the Danube.',
     leadBg:
       'Лодките излизат, докато щорите на кафенетата са още заключени. Всеки гребен замах оставя кратко сребърно изречение върху Дунава.',
@@ -528,7 +528,7 @@ export const campaignArticles: JournalArticle[] = [
     authorBg: 'Албена Николова',
     date: 'Active · 2026',
     dateBg: 'Активна · 2026',
-    image: '/meseum.jpg',
+    image: '/sections/partnerships.webp',
     lead: 'Reading rooms still hold choirs, clubs, and winter films. Many also hold rain where the roof thins.',
     leadBg:
       'Читалищата още държат хорове, клубове и зимни филми. Много от тях държат и дъжд там, където покривът оредява.',

@@ -171,7 +171,7 @@ export default function PartnershipsPage() {
             cta="Send Partnership Inquiry"
             ctaBg="Изпратете запитване"
             ctaHref="#inquiry"
-            image="/meseum.jpg"
+            image="/sections/partnerships.webp"
           />
 
           <SectionShell>

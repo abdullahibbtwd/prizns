@@ -171,7 +171,7 @@ export default function WriteForUsPage() {
             cta="Become a Contributor"
             ctaBg="Станете сътрудник"
             ctaHref="#submit"
-            image="/local-jounal.jpg"
+            image="/sections/write-for-us.webp"
           />
 
           <SectionShell>

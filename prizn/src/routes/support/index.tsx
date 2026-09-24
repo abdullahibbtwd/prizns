@@ -172,7 +172,7 @@ export default function SupportUsPage() {
             cta="Donate Now"
             ctaBg="Дарете сега"
             ctaHref="#donate"
-            image="/happy.jpg"
+            image="/sections/support.webp"
           />
 
           <SectionShell>

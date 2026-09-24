@@ -149,7 +149,7 @@ export const cmsAuthors: CmsAuthor[] = [
     role: 'Senior Writer',
     location: 'Vidin / Lom',
     stories: 14,
-    image: '/heroimg.jpg',
+    image: '/hero/01.webp',
     expertise: 'River towns, memory',
   },
   {

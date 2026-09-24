@@ -58,7 +58,7 @@ export const journalAuthors: JournalAuthor[] = [
     roleBg: 'Старши автор',
     quote: 'Listens for the quieter truths between mountain mornings.',
     quoteBg: 'Слуша тихите истини между планинските утрини.',
-    image: '/heroimg.jpg',
+    image: '/hero/01.webp',
     location: 'Vidin / Lom',
     locationBg: 'Видин / Лом',
     bio: 'Inna writes from river towns and museum corridors. Her reporting treats journals, bells, and borrowed oars as evidence — building portraits where weather and memory share equal weight.',

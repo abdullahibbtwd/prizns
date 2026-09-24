@@ -7,7 +7,18 @@ export const journalContent = {
     editionBg: "Лятно издание 2026",
     cta: "Begin Reading",
     ctaBg: "Започнете четенето",
-    heroImage: "/heroimg.jpg",
+    heroImage: "/hero/01.webp",
+    heroImages: [
+      "/hero/01.webp",
+      "/hero/02.webp",
+      "/hero/03.webp",
+      "/hero/04.webp",
+      "/hero/05.webp",
+      "/hero/06.webp",
+      "/hero/07.webp",
+      "/hero/08.webp",
+      "/hero/09.webp",
+    ],
   },
   editorsLetter: {
     title: "Editor's Letter",
@@ -348,7 +359,7 @@ export const journalContent = {
       stories: 14,
       quote: "Listens for the quieter truths between mountain mornings.",
       quoteBg: "Слуша тихите истини между планинските утрини.",
-      image: "/heroimg.jpg",
+      image: "/hero/01.webp",
     },
     {
       id: "a3",
@@ -516,7 +527,7 @@ export const journalContent = {
       locationBg: "Видин",
       readTime: "7 min",
       readTimeBg: "7 мин",
-      image: "/heroimg.jpg",
+      image: "/hero/01.webp",
       excerpt:
         "Amateur rowers share the water with fishermen — and a strict dawn etiquette.",
     },
@@ -623,7 +634,7 @@ export const journalContent = {
       titleBg: "Спасете селските читалища",
       status: "Active",
       statusBg: "Активна",
-      image: "/meseum.jpg",
+      image: "/sections/partnerships.webp",
       excerpt:
         "A fund for roofs, shelves, and the quiet electricity of borrowed books.",
     },

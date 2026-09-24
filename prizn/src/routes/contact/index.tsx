@@ -77,7 +77,7 @@ export default function ContactPage() {
             cta={lang === 'bg' ? 'Към формата' : 'Write a message'}
             ctaBg="Към формата"
             ctaHref="#contact-form"
-            image="/heroimg.jpg"
+            image="/hero/01.webp"
           />
 
           <SectionShell id="contact-form" className="bg-white">

@@ -1,4 +1,5 @@
-import { motion } from 'framer-motion'
+import { useEffect, useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowDown } from 'lucide-react'
 import { journalContent } from '@/data/concept-3/content'
 
@@ -6,8 +7,22 @@ interface EditorialHeroProps {
   lang: 'bg' | 'en'
 }
 
+const CROSSFADE_MS = 8000
+
 export function EditorialHero({ lang }: EditorialHeroProps) {
   const content = journalContent.hero
+  const images = content.heroImages?.length
+    ? content.heroImages
+    : [content.heroImage]
+  const [index, setIndex] = useState(0)
+
+  useEffect(() => {
+    if (images.length < 2) return
+    const id = window.setInterval(() => {
+      setIndex((current) => (current + 1) % images.length)
+    }, CROSSFADE_MS)
+    return () => window.clearInterval(id)
+  }, [images.length])
 
   const scrollToStories = () => {
     const el =
@@ -20,14 +35,22 @@ export function EditorialHero({ lang }: EditorialHeroProps) {
 
   return (
     <section className="relative h-screen w-full overflow-hidden flex flex-col justify-between items-center text-white px-6 py-12 md:py-16">
-      {/* Editorial Portrait Background with Subtle Slow Motion Zoom */}
-      <motion.div
-        initial={{ scale: 1.05 }}
-        animate={{ scale: 1 }}
-        transition={{ duration: 10, ease: 'easeOut' }}
-        className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat"
-        style={{ backgroundImage: `url(${content.heroImage})` }}
-      />
+      <div className="absolute inset-0 z-0">
+        <AnimatePresence mode="sync">
+          <motion.div
+            key={images[index]}
+            initial={{ opacity: 0, scale: 1.05 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{
+              opacity: { duration: 1.4, ease: 'easeInOut' },
+              scale: { duration: 10, ease: 'easeOut' },
+            }}
+            className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+            style={{ backgroundImage: `url(${images[index]})` }}
+          />
+        </AnimatePresence>
+      </div>
 
       {/* Luxury Matte Dark Overlay */}
       <div className="absolute inset-0 z-0 bg-gradient-to-b from-black/50 via-black/35 to-black/70" />

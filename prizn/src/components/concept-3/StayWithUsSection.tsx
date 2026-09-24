@@ -39,7 +39,7 @@ export function StayWithUsSection({ lang }: StayWithUsSectionProps) {
           >
             <div
               className="absolute inset-0 bg-cover bg-center opacity-45"
-              style={{ backgroundImage: 'url(/festival.jpg)' }}
+              style={{ backgroundImage: 'url(/sections/support.webp)' }}
               aria-hidden
             />
             <div
