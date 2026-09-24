@@ -1,6 +1,6 @@
 import { JournalShell } from '@/components/concept-3/JournalShell'
 import { PageMeta } from '@/components/PageMeta'
-import { Link } from 'react-router-dom'
+import { Link } from '@/components/LocaleLink'
 
 const manifesto = {
   bg: {

@@ -1,4 +1,4 @@
-﻿import { Link } from 'react-router-dom'
+﻿import { Link } from '@/components/LocaleLink'
 import { motion } from 'framer-motion'
 import { ArrowRight, Clock, MapPin } from 'lucide-react'
 import { ViewAllLink } from '@/components/concept-3/ViewAllLink'
@@ -11,6 +11,7 @@ import {
 } from '@/lib/public-content'
 import { toHumanStoryCard } from '@/lib/section-cards'
 import { SectionLoading } from '@/components/concept-3/SectionLoading'
+import { ResponsiveImage } from '@/components/ResponsiveImage'
 
 interface HumanStoriesSectionProps {
   lang: 'bg' | 'en'
@@ -24,6 +25,8 @@ export function HumanStoriesSection({ lang }: HumanStoriesSectionProps) {
       path: articlePath(article),
     })),
   ).slice(0, 3)
+
+  if (!isLoading && stories.length === 0) return null
 
   return (
     <section id="human-stories" className="bg-[#FDFBF7] py-20 md:py-28 px-6 md:px-12 border-t border-[#EAE6DF]">
@@ -55,17 +58,18 @@ export function HumanStoriesSection({ lang }: HumanStoriesSectionProps) {
             return (
               <motion.div
                 key={story.id}
-                initial={{ opacity: 0, y: 24 }}
+                initial={false}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ duration: 0.7, delay: index * 0.08 }}
+                transition={{ duration: 0.35, delay: index * 0.04 }}
               >
                 <Link to={story.path} className="group block">
                   <div className="relative mb-5 aspect-[4/5] overflow-hidden rounded-[16px] bg-[#1A1A1A]">
-                    <img
+                    <ResponsiveImage
                       src={story.image}
+                      thumbSrc={story.imageThumb}
                       alt={story.title}
-                      loading="lazy"
+                      sizes="grid3"
                       className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent" />
@@ -81,10 +85,12 @@ export function HumanStoriesSection({ lang }: HumanStoriesSectionProps) {
                         <EpisodeBadge lang={lang} series={story.series} />
                       ) : null}
                     </div>
-                    <div className="absolute bottom-4 left-4 flex items-center gap-1.5 font-sans text-[11px] text-white/85">
-                      <MapPin className="size-3" />
-                      {story.location}
-                    </div>
+                    {story.location?.trim() ? (
+                      <div className="absolute bottom-4 left-4 flex items-center gap-1.5 font-sans text-[11px] text-white/85">
+                        <MapPin className="size-3" />
+                        {story.location}
+                      </div>
+                    ) : null}
                   </div>
 
                   <h3 className="font-heading text-2xl font-normal leading-snug text-[#1A1A1A] transition-colors group-hover:text-[#0C2686]">

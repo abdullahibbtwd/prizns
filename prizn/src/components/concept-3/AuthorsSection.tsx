@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link } from '@/components/LocaleLink'
 import { motion } from 'framer-motion'
 import { ViewAllLink } from '@/components/concept-3/ViewAllLink'
 import { SectionLoading } from '@/components/concept-3/SectionLoading'
@@ -51,7 +51,7 @@ export function AuthorsSection({ lang }: AuthorsSectionProps) {
             return (
               <motion.div
                 key={author.slug}
-                initial={{ opacity: 0, y: 12 }}
+                initial={false}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.5, delay: index * 0.05 }}

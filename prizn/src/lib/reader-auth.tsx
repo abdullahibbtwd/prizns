@@ -7,6 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
+import { useLocation } from 'react-router-dom'
 import { ApiError } from '@/lib/api'
 import {
   getReaderMe,
@@ -49,7 +50,21 @@ const FEATURE_ENABLED =
   String(import.meta.env.VITE_FEATURE_READER_AUTH ?? 'true').toLowerCase() !==
   'false'
 
+/** Match api/src/reader-auth/reader-auth.types.ts cookie names. */
+const READER_ACCESS_COOKIE = 'prizn_reader_access'
+const READER_REFRESH_COOKIE = 'prizn_reader_refresh'
+
+function hasReaderSessionCookie(): boolean {
+  if (typeof document === 'undefined') return false
+  const raw = document.cookie || ''
+  return (
+    raw.includes(`${READER_ACCESS_COOKIE}=`) ||
+    raw.includes(`${READER_REFRESH_COOKIE}=`)
+  )
+}
+
 export function ReaderAuthProvider({ children }: { children: ReactNode }) {
+  const location = useLocation()
   const [reader, setReader] = useState<Reader | null>(null)
   const [loading, setLoading] = useState(FEATURE_ENABLED)
   const [modalOpen, setModalOpen] = useState(false)
@@ -57,6 +72,7 @@ export function ReaderAuthProvider({ children }: { children: ReactNode }) {
 
   const refresh = useCallback(async () => {
     if (!FEATURE_ENABLED) return false
+    if (location.pathname.startsWith('/cms')) return false
     try {
       await refreshReaderSession()
       const me = await getReaderMe()
@@ -66,10 +82,22 @@ export function ReaderAuthProvider({ children }: { children: ReactNode }) {
       setReader(null)
       return false
     }
-  }, [])
+  }, [location.pathname])
 
   useEffect(() => {
     if (!FEATURE_ENABLED) {
+      setLoading(false)
+      return
+    }
+    // CMS staff desk does not use reader sessions — skip probes (no 401 noise).
+    if (location.pathname.startsWith('/cms')) {
+      setReader(null)
+      setLoading(false)
+      return
+    }
+    // Anonymous visitors have no session cookies — skip /me + /refresh.
+    if (!hasReaderSessionCookie()) {
+      setReader(null)
       setLoading(false)
       return
     }
@@ -92,7 +120,7 @@ export function ReaderAuthProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true
     }
-  }, [refresh])
+  }, [location.pathname, refresh])
 
   const openSignIn = useCallback(
     (opts?: { intent?: MagicLinkIntent; returnUrl?: string }) => {

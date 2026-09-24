@@ -115,6 +115,33 @@ describe('MediaService', () => {
     expect(prisma.mediaAsset.findMany).toHaveBeenCalled();
   });
 
+  it('dedupes WordPress sized derivatives onto the original', () => {
+    const deduped = service.dedupeSizeVariants([
+      {
+        ...service.toClient({
+          ...row,
+          id: 'thumb',
+          originalName: 'photo-150x150.jpg',
+          key: 'wp/photo-150x150.jpg',
+          url: 'https://cdn.example/photo-150x150.jpg',
+          size: 12_000,
+        }),
+      },
+      {
+        ...service.toClient({
+          ...row,
+          id: 'full',
+          originalName: 'photo.jpg',
+          key: 'wp/photo.jpg',
+          url: 'https://cdn.example/photo.jpg',
+          size: 400_000,
+        }),
+      },
+    ]);
+    expect(deduped).toHaveLength(1);
+    expect(deduped[0]?.id).toBe('full');
+  });
+
   it('lists public media without product or shop images', async () => {
     const items = await service.listPublic();
     expect(items[0]?.id).toBe('media-1');

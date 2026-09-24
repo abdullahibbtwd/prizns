@@ -34,9 +34,9 @@ export function EditorialHero({ lang }: EditorialHeroProps) {
 
       {/* Top Brand Mark */}
       <motion.div
-        initial={{ opacity: 0, y: -20 }}
+        initial={false}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 1, delay: 0.2 }}
+        transition={{ duration: 0.35, delay: 0.1 }}
         className="relative z-10 pt-16 md:pt-12 text-center"
       >
         <span className="font-heading text-lg md:text-xl tracking-[0.4em] uppercase font-light text-white/90">
@@ -47,18 +47,18 @@ export function EditorialHero({ lang }: EditorialHeroProps) {
       {/* Center Hero Heading */}
       <div className="relative z-10 max-w-4xl mx-auto text-center my-auto px-4">
         <motion.h1
-          initial={{ opacity: 0, y: 25 }}
+          initial={false}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 1.2, delay: 0.4 }}
+          transition={{ duration: 0.4, delay: 0.15 }}
           className="font-heading text-4xl sm:text-6xl md:text-7xl lg:text-[80px] font-normal leading-[1.08] tracking-tight text-white drop-shadow-sm"
         >
           {lang === 'bg' ? content.bgTitle : content.title}
         </motion.h1>
 
         <motion.div
-          initial={{ opacity: 0 }}
+          initial={false}
           animate={{ opacity: 1 }}
-          transition={{ duration: 1, delay: 0.8 }}
+          transition={{ duration: 0.35, delay: 0.2 }}
           className="mt-6 flex items-center justify-center gap-3"
         >
           <div className="h-px w-8 bg-white/40" />
@@ -71,9 +71,9 @@ export function EditorialHero({ lang }: EditorialHeroProps) {
 
       {/* Bottom Action - Begin Reading */}
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
+        initial={false}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 1, delay: 1 }}
+        transition={{ duration: 0.4, delay: 1 }}
         className="relative z-10 pb-6 md:pb-8 text-center"
       >
         <button

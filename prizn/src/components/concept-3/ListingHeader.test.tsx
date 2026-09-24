@@ -54,6 +54,6 @@ describe('ListingHeader', () => {
     )
 
     await user.click(screen.getByRole('button', { name: /назад|back/i }))
-    expect(navigate).toHaveBeenCalledWith('/')
+    expect(navigate).toHaveBeenCalledWith('/', undefined)
   })
 })

@@ -1,23 +1,28 @@
-import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
+import { useParams, Navigate } from 'react-router-dom'
+import { Link } from '@/components/LocaleLink'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft, ArrowRight, Award, MapPin, PenLine } from 'lucide-react'
 import { JournalShell } from '@/components/concept-3/JournalShell'
 import { Logo } from '@/components/Logo'
+import { PageMeta } from '@/components/PageMeta'
 import type { JournalAuthor } from '@/data/concept-3/authors'
 import type { JournalArticle } from '@/data/concept-3/articleTypes'
 import type { JournalLang } from '@/components/concept-3/JournalShell'
 import { ListingBody } from '@/components/concept-3/ListingBody'
 import { useJournalLang } from '@/hooks/useJournalLang'
+import { useLocalizedNavigate } from '@/hooks/useLocalizedNavigate'
 import { listPublicArticles } from '@/lib/articles-api'
 import { getPublicAuthor } from '@/lib/public-content'
+import { withLocale } from '@/lib/locale-path'
+import { pickLang } from '@/lib/pick-lang'
+import NotFoundPage from '@/routes/not-found'
 
 function pick(
   lang: JournalLang,
   en: string | null | undefined,
   bg: string | null | undefined,
 ) {
-  if (lang === 'bg') return (bg || en || '').trim()
-  return (en || bg || '').trim()
+  return pickLang(lang, en, bg)
 }
 
 function AuthorContent({
@@ -35,7 +40,7 @@ function AuthorContent({
   lang: JournalLang
   setLang: (lang: JournalLang) => void
 }) {
-  const navigate = useNavigate()
+  const navigate = useLocalizedNavigate()
 
   const goBack = () => {
     const idx = (window.history.state as { idx?: number } | null)?.idx
@@ -48,6 +53,16 @@ function AuthorContent({
 
   return (
     <>
+      <PageMeta
+        lang={lang}
+        title={pick(lang, author.name, author.nameBg)}
+        description={
+          pick(lang, author.bio, author.bioBg) ||
+          pick(lang, author.role, author.roleBg)
+        }
+        path={author.path || `/authors/${author.slug}`}
+        image={author.image || undefined}
+      />
       <div className="fixed inset-x-0 top-0 z-50 flex items-center justify-between border-b border-[#EAE6DF] bg-[#FDFBF7]/95 px-6 py-4 backdrop-blur-md md:px-12">
         <div className="flex items-center gap-3">
           <Link to="/" className="shrink-0 cursor-pointer transition-opacity hover:opacity-90">
@@ -98,10 +113,12 @@ function AuthorContent({
               {pick(lang, author.name, author.nameBg)}
             </h1>
 
-            <p className="mt-4 inline-flex items-center gap-1.5 font-sans text-xs uppercase tracking-[0.18em] text-[#1A1A1A]/50">
-              <MapPin className="size-3 text-[#0C2686]" />
-              {pick(lang, author.location, author.locationBg)}
-            </p>
+            {pick(lang, author.location, author.locationBg) ? (
+              <p className="mt-4 inline-flex items-center gap-1.5 font-sans text-xs uppercase tracking-[0.18em] text-[#1A1A1A]/50">
+                <MapPin className="size-3 text-[#0C2686]" />
+                {pick(lang, author.location, author.locationBg)}
+              </p>
+            ) : null}
 
             <blockquote className="mt-8 border-l-2 border-[#0C2686] bg-[#0C2686]/5 py-5 pl-5 pr-4 md:pl-6">
               <p className="font-heading text-xl italic leading-snug text-[#1A1A1A] md:text-2xl">
@@ -259,7 +276,14 @@ export default function AuthorPage() {
     : undefined
 
   if (!slug || (!author && !authorQuery.isLoading && !authorQuery.isFetching)) {
-    return <Navigate to="/authors" replace />
+    return <NotFoundPage />
+  }
+
+  // Old WordPress username aliases (e.g. ami-tola → eva-ivanova).
+  if (author && slug && author.slug !== slug) {
+    return (
+      <Navigate to={withLocale(`/authors/${author.slug}`, lang)} replace />
+    )
   }
 
   if (!author) {

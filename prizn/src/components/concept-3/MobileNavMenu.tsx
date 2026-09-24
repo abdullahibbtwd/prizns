@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
+import { Link } from '@/components/LocaleLink'
 import { Globe, Menu, Search, X } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { cn } from '@/lib/utils'
@@ -10,6 +11,7 @@ import {
   getPrimaryNavLinks,
 } from '@/data/concept-3/nav'
 import { useReaderAuth } from '@/lib/reader-auth'
+import { useSectionPresence } from '@/hooks/useSectionPresence'
 
 interface MobileNavMenuProps {
   lang: 'bg' | 'en'
@@ -19,6 +21,8 @@ interface MobileNavMenuProps {
   /** Distance from the top of the viewport so the drawer sits under the current header. */
   panelOffsetClassName?: string
   className?: string
+  /** Notifies the parent when the overlay opens/closes (for header contrast). */
+  onOpenChange?: (open: boolean) => void
 }
 
 export function MobileNavMenu({
@@ -27,37 +31,47 @@ export function MobileNavMenu({
   onSearch,
   panelOffsetClassName = 'top-[70px]',
   className,
+  onOpenChange,
 }: MobileNavMenuProps) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const { reader, enabled: readerAuthEnabled, openSignIn } = useReaderAuth()
+  const { isPathVisible } = useSectionPresence()
+
+  const setMenuOpen = (next: boolean) => {
+    setOpen(next)
+    onOpenChange?.(next)
+  }
 
   const groups = [
     {
       label: lang === 'bg' ? 'Разкази' : 'Stories',
-      links: getPrimaryNavLinks(lang),
+      links: getPrimaryNavLinks(lang).filter((link) => isPathVisible(link.to)),
     },
     {
       label: lang === 'bg' ? 'Журналът' : 'The journal',
-      links: getFooterSecondaryLinks(lang),
+      links: getFooterSecondaryLinks(lang).filter((link) =>
+        isPathVisible(link.to),
+      ),
     },
     {
       label: lang === 'bg' ? 'Присъединете се' : 'Get involved',
       links: getContributeNavLinks(lang),
     },
-  ]
+  ].filter((group) => group.links.length > 0)
 
-  const close = () => setOpen(false)
+  const close = () => setMenuOpen(false)
 
   return (
     <>
       <button
         type="button"
-        onClick={() => setOpen((current) => !current)}
+        onClick={() => setMenuOpen(!open)}
         className={cn(
-          'p-1 text-journal-ink transition-colors duration-300 lg:hidden',
+          'inline-flex min-h-11 min-w-11 items-center justify-center rounded-full transition-colors duration-300 lg:hidden',
           className,
         )}
-        aria-label="Toggle menu"
+        aria-label={t('toggleMenu')}
         aria-expanded={open}
       >
         {open ? (
@@ -138,7 +152,7 @@ export function MobileNavMenu({
                       className="inline-flex items-center justify-center gap-2 text-xs uppercase tracking-[0.2em] text-[#1A1A1A]/70"
                     >
                       <Search className="size-3.5" />
-                      {lang === 'bg' ? 'Търсене' : 'Search'}
+                      {t('search')}
                     </button>
                   ) : null}
                   <button

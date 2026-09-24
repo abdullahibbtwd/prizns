@@ -17,7 +17,8 @@ export function getPrimaryNavLinks(lang: JournalLang): JournalNavLink[] {
       to: '/places',
     },
     {
-      label: lang === 'bg' ? 'Събития' : 'Events',
+      // Shorter BG label keeps the desktop nav on one row (full title stays on the listing).
+      label: lang === 'bg' ? 'Събития' : 'Events & reports',
       to: '/events',
     },
     {
@@ -35,8 +36,13 @@ export function getFooterSecondaryLinks(lang: JournalLang): JournalNavLink[] {
   return [
     { label: lang === 'bg' ? 'Открийте' : 'Discover', to: '/discover' },
     { label: lang === 'bg' ? 'Спорт' : 'Sports', to: '/sports' },
+    { label: lang === 'bg' ? 'Новини' : 'News', to: '/news' },
+    { label: lang === 'bg' ? 'Галерия' : 'Gallery', to: '/gallery' },
+    { label: lang === 'bg' ? 'Видео' : 'Video', to: '/video' },
+    { label: lang === 'bg' ? 'Гласове' : 'Voices', to: '/voices' },
     { label: lang === 'bg' ? 'Магазин' : 'Shop', to: '/shop' },
     { label: lang === 'bg' ? 'Автори' : 'Authors', to: '/authors' },
+    { label: lang === 'bg' ? 'Контакт' : 'Contact', to: '/contact' },
   ]
 }
 
@@ -69,7 +75,6 @@ export function getJournalNavLinks(lang: JournalLang): JournalNavLink[] {
     ...getPrimaryNavLinks(lang),
     ...getFooterSecondaryLinks(lang),
     ...getContributeNavLinks(lang),
-    { label: lang === 'bg' ? 'Видео' : 'Video', to: '/video' },
     { label: lang === 'bg' ? 'Кампании' : 'Campaigns', to: '/campaigns' },
   ]
 }

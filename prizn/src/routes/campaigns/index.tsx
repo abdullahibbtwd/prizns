@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link } from '@/components/LocaleLink'
 import { motion } from 'framer-motion'
 import { JournalShell } from '@/components/concept-3/JournalShell'
 import { ListingHeader } from '@/components/concept-3/ListingHeader'
@@ -91,7 +91,7 @@ export default function CampaignsPage() {
                         <h2 className="mt-2 font-heading text-2xl font-normal text-[#1A1A1A] transition-colors group-hover:text-[#0C2686] md:text-3xl">
                           {lang === 'bg' ? item.titleBg : item.title}
                         </h2>
-                        <p className="mt-2 font-sans text-sm font-light leading-relaxed text-[#1A1A1A]/60">
+                        <p className="mt-2 line-clamp-2 font-sans text-sm font-light leading-relaxed text-[#1A1A1A]/60">
                           {item.excerpt}
                         </p>
                       </Link>

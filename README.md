@@ -128,7 +128,8 @@ Browser (localhost:5175)
             /api/*     → api:3000
             /media/*   → minio:9000
             /sitemap.xml, /feed.xml, /robots.txt → API
-            bots       → API bot-shell (crawler HTML)
+            bots / curl → API bot-shell (crawler HTML with real meta)
+            browsers   → SPA index.html (PageMeta after hydrate)
 
 API talks to:
     PostgreSQL   content, users, orders, analytics
@@ -537,7 +538,8 @@ npm run docker:down
 - `/media/` → MinIO (range requests for audio/video)
 - `/sitemap.xml`, `/feed.xml`, `/feed.json`, `/robots.txt` → API
 - Known crawler user-agents get a server-rendered **bot shell** instead of the SPA
-- SPA fallback: `try_files` → `index.html`
+- Missing article/author/shop entity paths return **HTTP 404** from the bot shell (with noindex meta)
+- SPA fallback: `try_files` → `index.html` (client router shows a Page not found UI; human HTTP status stays 200 until full SSR)
 
 **Stage2 host nginx** (`deploy/nginx/stage2.conf`): public `:80` on the VM, `access.log` for Fail2ban, proxy to `127.0.0.1:${WEB_PORT}`. Set `PUBLISH_BIND=127.0.0.1` in `.env`. Jail: `deploy/fail2ban/`. WordPress leftover URLs (`/{slug}`) 301 to `/{section}/{slug}` via `deploy/nginx/redirects.map`. On the VPS, rebuild the API image, then generate with DB retries + map backup, and apply with `nginx -t` rollback:
 

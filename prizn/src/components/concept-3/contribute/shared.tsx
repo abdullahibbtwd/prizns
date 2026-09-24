@@ -52,9 +52,9 @@ export function ContributeHero({
       <div className="absolute inset-0 z-0 bg-gradient-to-b from-black/50 via-black/35 to-black/70" />
 
       <motion.div
-        initial={{ opacity: 0, y: -20 }}
+        initial={false}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 1, delay: 0.2 }}
+        transition={{ duration: 0.35, delay: 0.1 }}
         className="relative z-10 pt-16 text-center md:pt-12"
       >
         <span className="font-sans text-[11px] font-medium uppercase tracking-[0.35em] text-white/80">
@@ -64,18 +64,18 @@ export function ContributeHero({
 
       <div className="relative z-10 mx-auto my-auto max-w-4xl px-4 text-center">
         <motion.h1
-          initial={{ opacity: 0, y: 25 }}
+          initial={false}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 1.2, delay: 0.4 }}
+          transition={{ duration: 0.4, delay: 0.15 }}
           className="font-heading text-4xl font-normal leading-[1.08] tracking-tight text-white drop-shadow-sm sm:text-6xl md:text-7xl lg:text-[80px]"
         >
           {lang === 'bg' ? titleBg : title}
         </motion.h1>
 
         <motion.p
-          initial={{ opacity: 0 }}
+          initial={false}
           animate={{ opacity: 1 }}
-          transition={{ duration: 1, delay: 0.8 }}
+          transition={{ duration: 0.35, delay: 0.2 }}
           className="mx-auto mt-6 max-w-2xl font-sans text-sm font-light leading-relaxed text-white/80 md:text-base"
         >
           {lang === 'bg' ? subtitleBg : subtitle}
@@ -83,9 +83,9 @@ export function ContributeHero({
       </div>
 
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
+        initial={false}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 1, delay: 1 }}
+        transition={{ duration: 0.4, delay: 1 }}
         className="relative z-10 pb-6 text-center md:pb-8"
       >
         <button

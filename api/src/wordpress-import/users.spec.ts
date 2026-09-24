@@ -39,6 +39,17 @@ describe('wordpress users', () => {
     expect(mapped.email).toBe('guest@imported.prizni.local');
   });
 
+  it('renames ami-tola to eva-ivanova', () => {
+    const mapped = mapWpUser({
+      id: 13,
+      name: 'Ева Иванова',
+      slug: 'ami-tola',
+      email: 'evanadis1988@gmail.com',
+      roles: ['author'],
+    });
+    expect(mapped.slug).toBe('eva-ivanova');
+  });
+
   it('parses a user array from dumped JSON', () => {
     expect(parseWpUsersJson([{ id: 1, name: 'Admin' }])).toHaveLength(1);
   });

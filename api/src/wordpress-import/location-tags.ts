@@ -1,7 +1,7 @@
 import { TagKind, type PrismaClient } from '@prisma/client';
 import {
   LOCATION_CATEGORY_NAMES,
-  isLocationCategorySlug,
+  canonicalizeLocationSlug,
   type LocationCategorySlug,
 } from '../categories/canonical-categories';
 
@@ -10,8 +10,9 @@ export async function attachLocationTags(
   articleId: string,
   slugs: LocationCategorySlug[],
 ) {
-  for (const slug of slugs) {
-    if (!isLocationCategorySlug(slug)) continue;
+  for (const raw of slugs) {
+    const slug = canonicalizeLocationSlug(raw);
+    if (!slug) continue;
     const names = LOCATION_CATEGORY_NAMES[slug];
     const tag = await prisma.tag.upsert({
       where: { kind_slug: { kind: TagKind.LOCATION, slug } },

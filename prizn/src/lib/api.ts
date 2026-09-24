@@ -1,4 +1,8 @@
 import type { CmsUserRole } from '@/lib/cms-roles'
+import {
+  refreshCmsSession,
+  shouldAttemptCmsRefresh,
+} from '@/lib/cms-session'
 
 export type { CmsUserRole }
 
@@ -23,6 +27,11 @@ export class ApiError extends Error {
   }
 }
 
+export type RequestOptions = {
+  /** Do not try refresh+retry on 401 (auth bootstrap / refresh itself). */
+  skipAuthRefresh?: boolean
+}
+
 async function parseError(response: Response) {
   let message = response.statusText
   try {
@@ -35,7 +44,11 @@ async function parseError(response: Response) {
   throw new ApiError(response.status, message)
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+async function request<T>(
+  path: string,
+  init?: RequestInit,
+  options?: RequestOptions,
+): Promise<T> {
   const headers = new Headers(init?.headers)
   if (init?.body && !(init.body instanceof FormData) && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json')
@@ -47,29 +60,58 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     headers,
   })
 
-  if (!response.ok) await parseError(response)
+  if (!response.ok) {
+    try {
+      await parseError(response)
+    } catch (error) {
+      if (
+        !options?.skipAuthRefresh &&
+        shouldAttemptCmsRefresh(path, error)
+      ) {
+        const recovered = await refreshCmsSession()
+        if (recovered) {
+          return request<T>(path, init, { ...options, skipAuthRefresh: true })
+        }
+      }
+      throw error
+    }
+  }
   if (response.status === 204) return undefined as T
-  return response.json() as Promise<T>
+  return response.json() as T
 }
 
 export const api = {
-  get: <T,>(path: string) => request<T>(path),
-  post: <T,>(path: string, body?: unknown) =>
-    request<T>(path, {
-      method: 'POST',
-      body: body === undefined ? undefined : JSON.stringify(body),
-    }),
-  patch: <T,>(path: string, body?: unknown) =>
-    request<T>(path, {
-      method: 'PATCH',
-      body: body === undefined ? undefined : JSON.stringify(body),
-    }),
-  put: <T,>(path: string, body?: unknown) =>
-    request<T>(path, {
-      method: 'PUT',
-      body: body === undefined ? undefined : JSON.stringify(body),
-    }),
-  delete: <T,>(path: string) => request<T>(path, { method: 'DELETE' }),
+  get: <T,>(path: string, options?: RequestOptions) =>
+    request<T>(path, undefined, options),
+  post: <T,>(path: string, body?: unknown, options?: RequestOptions) =>
+    request<T>(
+      path,
+      {
+        method: 'POST',
+        body: body === undefined ? undefined : JSON.stringify(body),
+      },
+      options,
+    ),
+  patch: <T,>(path: string, body?: unknown, options?: RequestOptions) =>
+    request<T>(
+      path,
+      {
+        method: 'PATCH',
+        body: body === undefined ? undefined : JSON.stringify(body),
+      },
+      options,
+    ),
+  put: <T,>(path: string, body?: unknown, options?: RequestOptions) =>
+    request<T>(
+      path,
+      {
+        method: 'PUT',
+        body: body === undefined ? undefined : JSON.stringify(body),
+      },
+      options,
+    ),
+  delete: <T,>(path: string, options?: RequestOptions) =>
+    request<T>(path, { method: 'DELETE' }, options),
   upload: <T,>(
     path: string,
     file: File,

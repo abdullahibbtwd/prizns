@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link } from '@/components/LocaleLink'
 import { motion } from 'framer-motion'
 import { MapPin } from 'lucide-react'
 import { ViewAllLink } from '@/components/concept-3/ViewAllLink'
@@ -8,6 +8,8 @@ import {
   usePublicArticles,
 } from '@/lib/public-content'
 import type { CmsArticle } from '@/lib/cms-types'
+import { ResponsiveImage } from '@/components/ResponsiveImage'
+import { formatArticleDate } from '@/lib/format-date'
 
 interface NewsSectionProps {
   lang: 'bg' | 'en'
@@ -23,6 +25,7 @@ function toNewsCard(article: CmsArticle) {
     location: article.location || '',
     locationBg: article.locationBg || '',
     image: article.image || '',
+    imageThumb: article.imageThumb || '',
     excerpt: article.subtitle || article.subtitleBg || '',
     path: articlePath(article),
   }
@@ -53,7 +56,7 @@ export function NewsSection({ lang }: NewsSectionProps) {
           {items.map((item, index) => (
             <motion.div
               key={item.id}
-              initial={{ opacity: 0, y: 16 }}
+              initial={false}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.55, delay: index * 0.06 }}
@@ -61,29 +64,30 @@ export function NewsSection({ lang }: NewsSectionProps) {
               <Link to={item.path} className="group block">
                 <div className="aspect-[16/10] overflow-hidden rounded-[14px] bg-[#1A1A1A]">
                   {item.image ? (
-                    <img
+                    <ResponsiveImage
                       src={item.image}
+                      thumbSrc={item.imageThumb}
                       alt={lang === 'bg' ? item.titleBg : item.title}
+                      sizes="grid3"
                       className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
-                      loading="lazy"
                     />
                   ) : null}
                 </div>
                 <p className="mt-4 font-sans text-[10px] uppercase tracking-[0.2em] text-[#0C2686]">
-                  {lang === 'bg' ? item.dateBg : item.date}
+                  {formatArticleDate(lang, item.date, item.dateBg)}
                 </p>
                 <h3 className="mt-2 font-heading text-2xl font-normal text-[#1A1A1A] transition-colors group-hover:text-[#0C2686]">
                   {lang === 'bg' ? item.titleBg : item.title}
                 </h3>
-                <p className="mt-2 font-sans text-sm font-light leading-relaxed text-[#1A1A1A]/65">
+                <p className="mt-2 line-clamp-2 font-sans text-sm font-light leading-relaxed text-[#1A1A1A]/65">
                   {item.excerpt}
                 </p>
-                {(item.location || item.locationBg) && (
+                {((lang === 'bg' ? item.locationBg : item.location) || '').trim() ? (
                   <p className="mt-3 inline-flex items-center gap-1.5 font-sans text-[11px] uppercase tracking-[0.18em] text-[#1A1A1A]/45">
                     <MapPin className="size-3 text-[#0C2686]" />
                     {lang === 'bg' ? item.locationBg : item.location}
                   </p>
-                )}
+                ) : null}
               </Link>
             </motion.div>
           ))}

@@ -87,8 +87,8 @@ describe('CmsStoryEditorPage publishing actions', () => {
       }),
     )
     renderEditor('/cms/stories/art-1')
-    await screen.findByRole('button', { name: 'cms.editor.publish' })
-    await user.type(screen.getByDisplayValue('Village life'), ' edited')
+    const title = await screen.findByDisplayValue('Village life')
+    await user.type(title, ' edited')
     expect(screen.getByRole('button', { name: 'cms.editor.publish' })).toBeEnabled()
   })
 
@@ -138,6 +138,7 @@ describe('CmsStoryEditorPage publishing actions', () => {
     const user = userEvent.setup()
     const draft = buildCmsArticle({
       status: 'DRAFT',
+      translationStatus: 'PENDING',
       bodyRaw: [{ type: 'paragraph', textBg: 'Lead paragraph.' }],
     })
     getCmsArticle.mockResolvedValue(draft)
@@ -160,6 +161,7 @@ describe('CmsStoryEditorPage publishing actions', () => {
     const user = userEvent.setup()
     const draft = buildCmsArticle({
       status: 'DRAFT',
+      translationStatus: 'PENDING',
       bodyRaw: [{ type: 'paragraph', textBg: 'Lead paragraph.' }],
     })
     getCmsArticle.mockResolvedValue(draft)
@@ -191,6 +193,7 @@ describe('CmsStoryEditorPage publishing actions', () => {
     const user = userEvent.setup()
     const draft = buildCmsArticle({
       status: 'DRAFT',
+      translationStatus: 'PENDING',
       bodyRaw: [
         { type: 'paragraph', textBg: 'Lead paragraph.' },
         { type: 'note', labelBg: 'За избора на спорта', textBg: '' },

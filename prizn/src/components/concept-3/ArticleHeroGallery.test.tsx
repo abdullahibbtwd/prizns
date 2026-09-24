@@ -63,7 +63,9 @@ describe('ArticleHeroGallery', () => {
     renderPage(<ArticleHeroGallery slides={slides} title="Story" />)
 
     await user.click(screen.getByRole('button', { name: 'viewFullPhoto' }))
-    expect(screen.getByRole('dialog', { name: 'Story' })).toBeInTheDocument()
+    expect(
+      await screen.findByRole('dialog', { name: 'Story' }),
+    ).toBeInTheDocument()
     expect(
       screen.getAllByRole('img', { name: 'Story' }).some(
         (img) => img.getAttribute('src') === 'https://cdn.example/one.jpg',

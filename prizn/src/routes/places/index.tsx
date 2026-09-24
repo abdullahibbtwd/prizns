@@ -1,13 +1,15 @@
-import { Link } from 'react-router-dom'
+import { Link } from '@/components/LocaleLink'
 import { motion } from 'framer-motion'
 import { ArrowUpRight } from 'lucide-react'
 import { JournalShell } from '@/components/concept-3/JournalShell'
+import { PageMeta } from '@/components/PageMeta'
 import { ListingHeader } from '@/components/concept-3/ListingHeader'
 import { ListingPagination } from '@/components/concept-3/ListingPagination'
 import { SponsoredBadge } from '@/components/concept-3/SponsoredBadge'
 import { RegionMap } from '@/components/concept-3/RegionMap'
 import { ListingBody, listingCountLabel } from '@/components/concept-3/ListingBody'
 import { ListingFilters } from '@/components/concept-3/ListingFilters'
+import { ResponsiveImage } from '@/components/ResponsiveImage'
 import {
   articlePath,
   preferApi,
@@ -43,6 +45,16 @@ export default function PlacesPage() {
 
         return (
           <main>
+            <PageMeta
+              lang={lang}
+              title={lang === 'bg' ? 'Нашите места' : 'Our Places'}
+              description={
+                lang === 'bg'
+                  ? 'Градове, села и пътеки из Северозапада — местата, в които живеят историите.'
+                  : 'Towns, villages, and trails across the Northwest — the places where our stories live.'
+              }
+              path="/places"
+            />
             <ListingHeader
               lang={lang}
               eyebrow={lang === 'bg' ? 'География' : 'Geography'}
@@ -122,10 +134,11 @@ export default function PlacesPage() {
                         to={place.path}
                         className="group relative block h-[420px] overflow-hidden rounded-[16px] border border-[#EAE6DF] bg-[#1A1A1A] shadow-[0_4px_24px_rgba(0,0,0,0.03)] transition-all duration-500 hover:shadow-[0_12px_40px_rgba(0,0,0,0.09)] md:h-[480px]"
                       >
-                        <img
+                        <ResponsiveImage
                           src={place.image}
+                          thumbSrc={place.imageThumb}
                           alt={place.name}
-                          loading="lazy"
+                          sizes="grid2"
                           className="h-full w-full object-cover transition-transform duration-1000 ease-out group-hover:scale-105"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />

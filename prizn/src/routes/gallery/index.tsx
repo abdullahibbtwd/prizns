@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Maximize2, X, MapPin, Camera } from 'lucide-react'
 import { JournalShell } from '@/components/concept-3/JournalShell'
+import { PageMeta } from '@/components/PageMeta'
 import { ListingHeader } from '@/components/concept-3/ListingHeader'
 import { ListingBody, listingCountLabel } from '@/components/concept-3/ListingBody'
 import { preferApi, usePublicMedia } from '@/lib/public-content'
@@ -22,14 +23,13 @@ export default function GalleryPage() {
   return (
     <JournalShell>
       {({ lang }) => {
-        const photos = preferApi(
+        const mapped = preferApi(
           data?.map((item) => ({
             id: item.id,
             title:
               item.titleBg ||
               item.titleEn ||
-              item.originalName?.replace(/\.[^.]+$/, '') ||
-              (lang === 'bg' ? 'Кадър' : 'Frame'),
+              (lang === 'bg' ? 'Снимка от Prizni' : 'Photo from Prizni'),
             caption: item.creditBg || item.creditEn || '',
             image: item.url,
             location:
@@ -40,9 +40,22 @@ export default function GalleryPage() {
                 : 'Northwestern Bulgaria'),
           })),
         )
+        const photos = Array.from(
+          new Map(mapped.map((photo) => [photo.id, photo])).values(),
+        )
 
         return (
           <main>
+            <PageMeta
+              lang={lang}
+              title={getSectionPublicLabel('gallery', lang)}
+              description={
+                lang === 'bg'
+                  ? 'Северозападът в кадри.'
+                  : 'The northwest in frames.'
+              }
+              path="/gallery"
+            />
             <ListingHeader
               lang={lang}
               eyebrow={lang === 'bg' ? 'Фотографски Журнал' : 'Visual Essay'}
@@ -152,10 +165,12 @@ export default function GalleryPage() {
                         {selectedPhoto.caption}
                       </p>
                     ) : null}
-                    <div className="inline-flex items-center gap-1.5 font-sans text-[11px] uppercase tracking-widest text-white/50">
-                      <MapPin className="size-3 text-[#4051C7]" />
-                      <span>{selectedPhoto.location}</span>
-                    </div>
+                    {selectedPhoto.location?.trim() ? (
+                      <div className="inline-flex items-center gap-1.5 font-sans text-[11px] uppercase tracking-widest text-white/50">
+                        <MapPin className="size-3 text-[#4051C7]" />
+                        <span>{selectedPhoto.location}</span>
+                      </div>
+                    ) : null}
                   </div>
                 </motion.div>
               )}

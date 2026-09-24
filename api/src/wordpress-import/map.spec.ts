@@ -1,4 +1,11 @@
-import { mapWpPost, parseWpPostsJson, pickAuthor, pickSection } from './map';
+import {
+  buildSubtitleBg,
+  excerptLooksTruncated,
+  mapWpPost,
+  parseWpPostsJson,
+  pickAuthor,
+  pickSection,
+} from './map';
 import type { WpPost } from './types';
 
 const POST: WpPost = {
@@ -83,7 +90,7 @@ describe('wordpress mapWpPost', () => {
     expect(mapped.categoryBg).toBe('Местни легенди');
     expect(mapped.categorySlugs).toEqual(['mestni-legendi', 'portreti']);
     expect(mapped.titleBg).toContain('Владимир Новков');
-    expect(mapped.subtitleBg).toContain('Всеки от нас има поне един познат');
+    expect(mapped.subtitleBg).toBe('Всеки от нас има поне един познат.');
     expect(mapped.readTimeBg).toBe('8 мин четене');
     expect(mapped.dateBg).toBe('14 август 2026');
     expect(mapped.seoTitleBg).not.toContain('Prizni.bg');
@@ -116,5 +123,16 @@ describe('wordpress mapWpPost', () => {
   it('parses a single post object from dumped JSON', () => {
     expect(parseWpPostsJson(POST)).toHaveLength(1);
     expect(parseWpPostsJson({ posts: [POST] })).toHaveLength(1);
+  });
+
+  it('rebuilds subtitles from body when the WP excerpt is mid-sentence', () => {
+    const cut = 'Всеки от нас има поне един познат, който обича да';
+    expect(excerptLooksTruncated(cut, cut)).toBe(true);
+    expect(
+      buildSubtitleBg({
+        excerptHtml: `<p>${cut}</p>`,
+        bodyPlain: 'Всеки от нас има поне един познат. Следва изречение.',
+      }),
+    ).toBe('Всеки от нас има поне един познат. Следва изречение.');
   });
 });

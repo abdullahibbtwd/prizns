@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
 import { ReaderAuthProvider, useReaderAuth } from './reader-auth'
 import * as readerApi from '@/lib/reader-api'
@@ -51,17 +52,48 @@ function Probe() {
   )
 }
 
+function renderAuth(ui: React.ReactNode, route = '/') {
+  return render(
+    <MemoryRouter initialEntries={[route]}>
+      <ReaderAuthProvider>{ui}</ReaderAuthProvider>
+    </MemoryRouter>,
+  )
+}
+
 describe('ReaderAuthProvider', () => {
+  beforeEach(() => {
+    document.cookie = 'prizn_reader_access=; Max-Age=0; path=/'
+    document.cookie = 'prizn_reader_refresh=; Max-Age=0; path=/'
+    vi.mocked(readerApi.getReaderMe).mockReset()
+    vi.mocked(readerApi.refreshReaderSession).mockReset()
+  })
+
+  it('skips /me and /refresh when no session cookie', async () => {
+    renderAuth(<Probe />)
+    await waitFor(() => {
+      expect(screen.getByText('anon')).toBeInTheDocument()
+    })
+    expect(readerApi.getReaderMe).not.toHaveBeenCalled()
+    expect(readerApi.refreshReaderSession).not.toHaveBeenCalled()
+  })
+
+  it('skips reader bootstrap on CMS routes even with a cookie', async () => {
+    document.cookie = 'prizn_reader_access=test-token'
+    renderAuth(<Probe />, '/cms/stories')
+    await waitFor(() => {
+      expect(screen.getByText('anon')).toBeInTheDocument()
+    })
+    expect(readerApi.getReaderMe).not.toHaveBeenCalled()
+    expect(readerApi.refreshReaderSession).not.toHaveBeenCalled()
+  })
+
   it('bootstraps a logged-in reader', async () => {
+    document.cookie = 'prizn_reader_access=test-token'
     vi.mocked(readerApi.getReaderMe).mockResolvedValue({
       reader: { id: 'r1', email: 'r@x.com', name: null, locale: 'en' },
     })
 
-    render(
-      <ReaderAuthProvider>
-        <Probe />
-      </ReaderAuthProvider>,
-    )
+    renderAuth(<Probe />)
 
     await waitFor(() => {
       expect(screen.getByText('r@x.com')).toBeInTheDocument()
@@ -88,11 +120,7 @@ describe('ReaderAuthProvider', () => {
     vi.mocked(readerApi.logoutReader).mockResolvedValue({ ok: true })
 
     const user = userEvent.setup()
-    render(
-      <ReaderAuthProvider>
-        <Probe />
-      </ReaderAuthProvider>,
-    )
+    renderAuth(<Probe />)
 
     await waitFor(() => {
       expect(screen.getByText('anon')).toBeInTheDocument()

@@ -226,7 +226,7 @@ describe('articles-api', () => {
     await listRelatedArticles('places', 'belogradchik', 4)
     await relateToArticle('places', 'belogradchik', 'v1')
     await listPublicMedia('VIDEO')
-    await listCmsMedia('IMAGE')
+    await listCmsMedia({ kind: 'IMAGE' })
     await deleteCmsMedia('media-1')
 
     await listPublicArticles(undefined, { q: 'vidin', limit: 12 })

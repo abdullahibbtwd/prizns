@@ -1,7 +1,8 @@
-import { Link } from 'react-router-dom'
+import { Link } from '@/components/LocaleLink'
 import { motion } from 'framer-motion'
 import { BookOpen, ChevronRight } from 'lucide-react'
 import { JournalShell } from '@/components/concept-3/JournalShell'
+import { PageMeta } from '@/components/PageMeta'
 import { ListingHeader } from '@/components/concept-3/ListingHeader'
 import { ListingPagination } from '@/components/concept-3/ListingPagination'
 import { ListingBody, listingCountLabel } from '@/components/concept-3/ListingBody'
@@ -60,6 +61,16 @@ export default function DiscoverPage() {
 
         return (
           <main>
+            <PageMeta
+              lang={lang}
+              title={lang === 'bg' ? 'Открийте' : 'Discover'}
+              description={
+                lang === 'bg'
+                  ? 'Всички тематични колекции — дълги истории за бавно четене из Северозападна България.'
+                  : 'Every curated collection — long-form stories for slow reading across Northwestern Bulgaria.'
+              }
+              path="/discover"
+            />
             <ListingHeader
               lang={lang}
               eyebrow={lang === 'bg' ? 'Селекция от редактора' : "Editor's Picks"}

@@ -1,6 +1,12 @@
+import { lazy, Suspense } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { listPlacesMap } from '@/lib/tags-api'
-import { PlacesMap } from '@/components/concept-3/PlacesMap'
+
+const PlacesMap = lazy(() =>
+  import('@/components/concept-3/PlacesMap').then((m) => ({
+    default: m.PlacesMap,
+  })),
+)
 
 export function RegionMap({
   selectedSlug = '',
@@ -20,12 +26,20 @@ export function RegionMap({
 
   return (
     <div className={className}>
-      <PlacesMap
-        pins={pins}
-        selectedSlug={selectedSlug}
-        onSelect={onSelect}
-      />
+      <Suspense
+        fallback={
+          <div
+            className="aspect-[16/9] w-full animate-pulse rounded-[12px] bg-[#EAE6DF]"
+            aria-hidden
+          />
+        }
+      >
+        <PlacesMap
+          pins={pins}
+          selectedSlug={selectedSlug}
+          onSelect={onSelect}
+        />
+      </Suspense>
     </div>
   )
 }
-

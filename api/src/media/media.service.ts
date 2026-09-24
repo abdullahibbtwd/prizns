@@ -18,6 +18,7 @@ import {
   sanitizeStorageFolder,
 } from '../common/upload-validation';
 import { assertUploadSize, detectMediaKind } from '../common/upload-limits';
+import { preferShareImageUrl } from '../common/share-image.util';
 import {
   assertDecodableImage,
   processImageDerivatives,
@@ -58,13 +59,123 @@ export class MediaService {
     @InjectQueue(QUEUE_MEDIA) private readonly mediaQueue: Queue<MediaJobData>,
   ) {}
 
-  async list(opts?: { kind?: MediaKind; take?: number }) {
+  async list(opts?: {
+    kind?: MediaKind;
+    take?: number;
+    page?: number;
+    pageSize?: number;
+    q?: string;
+    dedupe?: boolean;
+  }) {
+    const paginate = opts?.page != null || opts?.pageSize != null;
+    const page = Math.max(1, Number(opts?.page) || 1);
+    const pageSize = Math.min(
+      100,
+      Math.max(1, Number(opts?.pageSize) || opts?.take || 24),
+    );
+    const q = opts?.q?.trim();
+    const where = {
+      ...(opts?.kind ? { kind: opts.kind } : {}),
+      ...(q
+        ? {
+            OR: [
+              { titleBg: { contains: q, mode: 'insensitive' as const } },
+              { titleEn: { contains: q, mode: 'insensitive' as const } },
+              { originalName: { contains: q, mode: 'insensitive' as const } },
+              { key: { contains: q, mode: 'insensitive' as const } },
+              { locationBg: { contains: q, mode: 'insensitive' as const } },
+            ],
+          }
+        : {}),
+    };
+
+    // Fetch a wider window when deduping size variants so pagination totals stay honest.
+    const fetchTake = opts?.dedupe === false
+      ? paginate
+        ? pageSize
+        : Math.min(500, Math.max(1, opts?.take ?? 100))
+      : paginate
+        ? Math.min(2000, pageSize * 8)
+        : Math.min(2000, Math.max(100, (opts?.take ?? 100) * 4));
+
     const rows = await this.prisma.mediaAsset.findMany({
-      where: opts?.kind ? { kind: opts.kind } : undefined,
+      where,
       orderBy: { createdAt: 'desc' },
-      take: opts?.take ?? 100,
+      ...(paginate && opts?.dedupe === false
+        ? { skip: (page - 1) * pageSize, take: pageSize }
+        : { take: fetchTake }),
     });
-    return rows.map((row) => this.toClient(row));
+
+    let items = rows.map((row) => this.toClient(row));
+    if (opts?.dedupe !== false) {
+      items = this.dedupeSizeVariants(items);
+    }
+
+    if (!paginate) {
+      const take = Math.min(500, Math.max(1, opts?.take ?? 100));
+      return items.slice(0, take);
+    }
+
+    const total =
+      opts?.dedupe === false
+        ? await this.prisma.mediaAsset.count({ where })
+        : items.length;
+    const pageItems =
+      opts?.dedupe === false
+        ? items
+        : items.slice((page - 1) * pageSize, page * pageSize);
+
+    return {
+      items: pageItems,
+      total,
+      page,
+      pageSize,
+      totalPages: Math.max(1, Math.ceil(total / pageSize)),
+    };
+  }
+
+  /**
+   * Collapse WordPress sized derivatives (photo-150x150.jpg) and -thumb keys
+   * onto one canonical original entry — same suffix logic as preferShareImageUrl.
+   */
+  dedupeSizeVariants(items: MediaClientAsset[]): MediaClientAsset[] {
+    const groups = new Map<string, MediaClientAsset[]>();
+    for (const item of items) {
+      const key = this.canonicalMediaKey(item);
+      const list = groups.get(key) ?? [];
+      list.push(item);
+      groups.set(key, list);
+    }
+    const out: MediaClientAsset[] = [];
+    for (const group of groups.values()) {
+      group.sort((a, b) => this.mediaPreferScore(b) - this.mediaPreferScore(a));
+      out.push(group[0]!);
+    }
+    out.sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
+    return out;
+  }
+
+  private canonicalMediaKey(item: MediaClientAsset): string {
+    const fromUrl =
+      preferShareImageUrl(item.url) ||
+      preferShareImageUrl(item.thumbnailUrl) ||
+      item.url;
+    const fromName =
+      preferShareImageUrl(item.originalName) || item.originalName || '';
+    const fromKey = preferShareImageUrl(item.key) || item.key;
+    const token = (fromName || fromKey || fromUrl).toLowerCase();
+    return token.replace(/^.*\//, '').replace(/\?.*$/, '');
+  }
+
+  private mediaPreferScore(item: MediaClientAsset): number {
+    const name = `${item.originalName || ''} ${item.key} ${item.url}`;
+    const isDerivative =
+      /-\d{2,4}x\d{2,4}(\.|$)/.test(name) || /-thumb(\.|$)/.test(name);
+    const size = item.originalSize ?? item.size ?? 0;
+    return (isDerivative ? 0 : 1_000_000_000) + size;
   }
 
   async getById(id: string) {
@@ -140,6 +251,7 @@ export class MediaService {
 
     return rows
       .filter((row) => !this.isPortraitAsset(row, portraits))
+      .filter((row, index, all) => all.findIndex((item) => item.id === row.id) === index)
       .slice(0, take)
       .map((row) => this.toClient(row));
   }

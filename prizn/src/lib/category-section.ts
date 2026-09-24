@@ -23,6 +23,7 @@ export const CATEGORY_SLUG_TO_SECTION: Record<string, ArticleSection> = {
   'nashite-mesta': 'places',
   vidin: 'places',
   vratza: 'places',
+  vratsa: 'places',
   montana: 'places',
   'kauzi-sabitia': 'events',
   'kultura-sabitia': 'events',
@@ -40,6 +41,7 @@ export const CATEGORY_SLUG_TO_SECTION: Record<string, ArticleSection> = {
 export const HIDDEN_CMS_CATEGORY_SLUGS = new Set([
   'vidin',
   'vratza',
+  'vratsa',
   'montana',
   'opik',
   'biznes',

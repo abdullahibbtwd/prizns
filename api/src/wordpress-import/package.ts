@@ -1,5 +1,9 @@
 import type { ArticleSection, ArticleStatus } from '@prisma/client';
 import type { StoredArticleBlock } from '../articles/article.types';
+import { preferShareImageUrl } from '../common/share-image.util';
+import {
+  canonicalAuthorSlug,
+} from './author-slug-aliases';
 import type { MappedWpUser } from './users';
 import type { MappedWpArticle, WpInlineImage } from './types';
 
@@ -111,8 +115,13 @@ export function articleToExportJson(article: MappedWpArticle): JsonRecord {
 
 function parseImage(value: unknown): WpInlineImage | null {
   const record = asRecord(value);
-  const src = asString(record?.src) || asString(record?.url) || '';
-  const file = asString(record?.file);
+  const rawSrc = asString(record?.src) || asString(record?.url) || '';
+  const src = preferShareImageUrl(rawSrc) || rawSrc;
+  let file = asString(record?.file);
+  // Packaged -150x150 files are not usable heroes/gallery; force a re-download.
+  if (file && /-\d{2,4}x\d{2,4}\.[a-zA-Z0-9]+$/i.test(file)) {
+    file = undefined;
+  }
   if (!src && !file) return null;
   return {
     src,
@@ -158,7 +167,9 @@ function parseArticle(raw: unknown): MappedWpArticle {
     body: (record.body ?? []) as StoredArticleBlock[],
     authorNameBg:
       asString(record.authorNameBg) || asString(author?.name) || 'Редакция',
-    authorSlug: asString(record.authorSlug) || asString(author?.slug) || 'redakcia',
+    authorSlug: canonicalAuthorSlug(
+      asString(record.authorSlug) || asString(author?.slug) || 'redakcia',
+    ),
     authorBioBg: asString(record.authorBioBg) ?? null,
     heroImage: parseImage(record.heroImage),
     galleryImages: Array.isArray(record.galleryImages)
@@ -197,7 +208,7 @@ export function parseAuthorsJson(raw: unknown): PackagedAuthor[] {
       wpId: Number(record.wpId ?? record.id ?? 0),
       email: String(record.email ?? ''),
       name: String(record.name ?? ''),
-      slug: String(record.slug ?? ''),
+      slug: canonicalAuthorSlug(String(record.slug ?? '')),
       bioBg: asString(record.bioBg) ?? null,
       imageUrl: asString(record.imageUrl) ?? null,
       imageFile: asString(record.imageFile),

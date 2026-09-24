@@ -131,7 +131,7 @@ export default function ContactPage() {
                   className="pointer-events-none absolute h-0 w-0 overflow-hidden opacity-0"
                   aria-hidden
                 >
-                  <label htmlFor="prizn_extra">Leave blank</label>
+                  <label htmlFor="prizn_extra">{t('leaveBlank')}</label>
                   <input
                     id="prizn_extra"
                     name="prizn_extra"

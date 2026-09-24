@@ -1,6 +1,7 @@
-import { Link } from 'react-router-dom'
+import { Link } from '@/components/LocaleLink'
 import { motion } from 'framer-motion'
 import { JournalShell } from '@/components/concept-3/JournalShell'
+import { PageMeta } from '@/components/PageMeta'
 import { ListingHeader } from '@/components/concept-3/ListingHeader'
 import { ListingBody, listingCountLabel } from '@/components/concept-3/ListingBody'
 import { preferApi, usePublicAuthors } from '@/lib/public-content'
@@ -20,6 +21,16 @@ export default function AuthorsPage() {
 
         return (
           <main>
+            <PageMeta
+              lang={lang}
+              title={lang === 'bg' ? 'Автори' : 'Authors'}
+              description={
+                lang === 'bg'
+                  ? 'Редактори, автори и фотографи — хората зад журнала.'
+                  : 'Editors, writers, and photographers — the people behind the journal.'
+              }
+              path="/authors"
+            />
             <ListingHeader
               lang={lang}
               eyebrow={lang === 'bg' ? 'Екипът' : 'The desk'}

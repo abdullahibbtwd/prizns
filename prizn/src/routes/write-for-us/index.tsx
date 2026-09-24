@@ -14,6 +14,7 @@ import {
   Users,
 } from 'lucide-react'
 import { JournalShell } from '@/components/concept-3/JournalShell'
+import { PageMeta } from '@/components/PageMeta'
 import {
   ContributeHero,
   FieldLabel,
@@ -149,6 +150,16 @@ export default function WriteForUsPage() {
     <JournalShell>
       {({ lang }) => (
         <main>
+          <PageMeta
+            lang={lang}
+            title={lang === 'bg' ? 'Пишете за нас' : 'Write for Us'}
+            description={
+              lang === 'bg'
+                ? 'Разкажете неразказаните истории на Северозападна България.'
+                : 'Tell the untold stories of Northwestern Bulgaria.'
+            }
+            path="/write-for-us"
+          />
           <ContributeHero
             lang={lang}
             eyebrow="Write for Us"

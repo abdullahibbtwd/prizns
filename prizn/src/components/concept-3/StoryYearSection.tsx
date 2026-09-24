@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link } from '@/components/LocaleLink'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { motion } from 'framer-motion'
@@ -244,7 +244,7 @@ export function StoryYearSection({ lang }: StoryYearSectionProps) {
             return (
               <motion.div
                 key={n.id}
-                initial={{ opacity: 0, y: 16 }}
+                initial={false}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.55, delay: index * 0.06 }}
@@ -272,7 +272,7 @@ export function StoryYearSection({ lang }: StoryYearSectionProps) {
               {rest.map((n, index) => (
                 <motion.div
                   key={n.id}
-                  initial={{ opacity: 0, y: 10 }}
+                  initial={false}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ duration: 0.4, delay: 0.06 + index * 0.03 }}

@@ -534,15 +534,22 @@ export class AuthService {
       include: { user: true },
     });
 
+    // Possible reuse of a stolen old token after rotation — revoke that session.
+    // Do NOT revoke when the row is merely already rotated (concurrent refresh
+    // race): killing the session would invalidate the newly issued cookies.
+    if (!stored) {
+      await this.revokeSession(payload.sid);
+      throw new UnauthorizedException('Refresh token revoked or unknown');
+    }
     if (
-      !stored ||
-      stored.revokedAt ||
       stored.expiresAt.getTime() < Date.now() ||
       stored.sessionId !== payload.sid ||
       stored.id !== payload.tid
     ) {
-      // Possible reuse — kill the session
       await this.revokeSession(payload.sid);
+      throw new UnauthorizedException('Refresh token revoked or unknown');
+    }
+    if (stored.revokedAt) {
       throw new UnauthorizedException('Refresh token revoked or unknown');
     }
 

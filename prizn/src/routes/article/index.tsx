@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
-import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { lazy, Suspense, useEffect, useState } from 'react'
+import { useLocation, useParams } from 'react-router-dom'
+import { Link } from '@/components/LocaleLink'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import {
@@ -23,16 +24,15 @@ import { SponsoredBadge } from '@/components/concept-3/SponsoredBadge'
 import { SourcedBadge } from '@/components/concept-3/SourcedBadge'
 import { SupportThisStory } from '@/components/concept-3/SupportThisStory'
 import { RegionalContextExplainer } from '@/components/concept-3/RegionalContextExplainer'
+import { SeriesContinue } from '@/components/concept-3/SeriesContinue'
 import { getAuthorForArticle } from '@/data/concept-3/authors'
 import type { ArticleBlock, JournalArticle } from '@/data/concept-3/articleTypes'
 import type { JournalLang } from '@/components/concept-3/JournalShell'
 import { useJournalLang } from '@/hooks/useJournalLang'
-import { LuxuryVideoPlayer } from '@/components/concept-3/LuxuryVideoPlayer'
 import {
   ArticleHeroGallery,
   articleHeroSlides,
 } from '@/components/concept-3/ArticleHeroGallery'
-import { ImageLightbox } from '@/components/concept-3/ImageLightbox'
 import { ArticleImageCollage } from '@/components/concept-3/ArticleImageCollage'
 import { RichText } from '@/components/RichText'
 import {
@@ -49,13 +49,40 @@ import {
   saveArticle,
   unsaveArticle,
 } from '@/lib/reader-api'
+import NotFoundPage from '@/routes/not-found'
+
+import { stripLocalePrefix } from '@/lib/locale-path'
+import { useLocalizedNavigate } from '@/hooks/useLocalizedNavigate'
+import { pickLang } from '@/lib/pick-lang'
+import { formatArticleDate } from '@/lib/format-date'
+
+const LuxuryVideoPlayer = lazy(() =>
+  import('@/components/concept-3/LuxuryVideoPlayer').then((m) => ({
+    default: m.LuxuryVideoPlayer,
+  })),
+)
+const ImageLightbox = lazy(() =>
+  import('@/components/concept-3/ImageLightbox').then((m) => ({
+    default: m.ImageLightbox,
+  })),
+)
 
 function pick(lang: JournalLang, en: string, bg: string) {
-  return lang === 'bg' ? bg : en
+  return pickLang(lang, en, bg)
+}
+
+/** Prefer lang-specific SEO/copy, then the other language, never empty. */
+function metaText(
+  lang: JournalLang,
+  en?: string | null,
+  bg?: string | null,
+) {
+  return pickLang(lang, en, bg)
 }
 
 function sectionFromPath(pathname: string) {
-  const part = decodePath(pathname).split('/').filter(Boolean)[0]
+  const bare = stripLocalePrefix(decodePath(pathname))
+  const part = bare.split('/').filter(Boolean)[0]
   return part || 'stories'
 }
 
@@ -68,7 +95,7 @@ function decodePath(path: string) {
 }
 
 function pathsMatch(a: string, b: string) {
-  return decodePath(a) === decodePath(b)
+  return stripLocalePrefix(decodePath(a)) === stripLocalePrefix(decodePath(b))
 }
 
 function toJournalArticle(api: CmsArticle): JournalArticle {
@@ -206,6 +233,7 @@ function ArticleBlocks({
               key={`${block.type}-${index}`}
               block={block}
               lang={lang}
+              imageAltFallback={fallbackAlt}
               openLabel={t('viewFullPhoto')}
               onOpenImage={
                 imageSlot.has(index)
@@ -216,13 +244,17 @@ function ArticleBlocks({
           )
         })}
       </div>
-      <ImageLightbox
-        open={lightboxIndex !== null}
-        slides={slides}
-        index={lightboxIndex ?? 0}
-        onIndexChange={(next) => setLightboxIndex(next)}
-        onClose={() => setLightboxIndex(null)}
-      />
+      {lightboxIndex !== null ? (
+        <Suspense fallback={null}>
+          <ImageLightbox
+            open
+            slides={slides}
+            index={lightboxIndex}
+            onIndexChange={(next) => setLightboxIndex(next)}
+            onClose={() => setLightboxIndex(null)}
+          />
+        </Suspense>
+      ) : null}
     </>
   )
 }
@@ -230,16 +262,19 @@ function ArticleBlocks({
 function ArticleBlockView({
   block,
   lang,
+  imageAltFallback = '',
   openLabel,
   onOpenImage,
 }: {
   block: ArticleBlock
   lang: JournalLang
+  imageAltFallback?: string
   openLabel?: string
   onOpenImage?: () => void
 }) {
   if (block.type === 'image') {
     const caption = pick(lang, block.text, block.textBg).trim()
+    const alt = caption || imageAltFallback
     return (
       <figure className="my-10">
         {onOpenImage ? (
@@ -251,7 +286,7 @@ function ArticleBlockView({
           >
             <img
               src={block.url}
-              alt={caption}
+              alt={alt}
               className="w-full rounded-[16px] object-cover"
             />
             <span className="pointer-events-none absolute right-3 top-3 flex size-9 items-center justify-center rounded-full bg-black/45 text-white opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 print:hidden">
@@ -261,7 +296,7 @@ function ArticleBlockView({
         ) : (
           <img
             src={block.url}
-            alt={caption}
+            alt={alt}
             className="w-full rounded-[16px] object-cover"
           />
         )}
@@ -278,14 +313,23 @@ function ArticleBlockView({
     const caption = pick(lang, block.text, block.textBg).trim()
     return (
       <figure className="my-10 print-hidden">
-        <LuxuryVideoPlayer
-          src={block.url}
-          title={caption}
-          aspectClassName="aspect-video"
-          tone="editorial"
-          size="featured"
-          className="rounded-[16px]"
-        />
+        <Suspense
+          fallback={
+            <div
+              className="aspect-video w-full animate-pulse rounded-[16px] bg-[#EAE6DF]"
+              aria-hidden
+            />
+          }
+        >
+          <LuxuryVideoPlayer
+            src={block.url}
+            title={caption}
+            aspectClassName="aspect-video"
+            tone="editorial"
+            size="featured"
+            className="rounded-[16px]"
+          />
+        </Suspense>
         {caption ? (
           <figcaption className="mt-3 text-center font-sans text-xs uppercase tracking-[0.16em] text-[#1A1A1A]/45">
             {caption}
@@ -376,7 +420,7 @@ function RelatedStrip({
                 <div className="mb-3 aspect-[16/10] overflow-hidden">
                   <img
                     src={item.image}
-                    alt=""
+                    alt={pick(lang, item.title, item.titleBg)}
                     className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.02]"
                     loading="lazy"
                   />
@@ -412,7 +456,7 @@ function ArticleContent({
   viewerHasRelated?: boolean
 }) {
   const { t } = useTranslation()
-  const navigate = useNavigate()
+  const navigate = useLocalizedNavigate()
   const queryClient = useQueryClient()
   const { reader, enabled: readerAuthEnabled, openSignIn } = useReaderAuth()
   const [readingProgress, setReadingProgress] = useState(0)
@@ -621,16 +665,24 @@ function ArticleContent({
           <span className="font-medium text-[#0C2686]">
             {pick(lang, article.category, article.categoryBg)}
           </span>
-          <span className="opacity-50">•</span>
-          <span className="inline-flex items-center gap-0.5 sm:gap-1">
-            <Clock className="size-2.5 shrink-0 sm:size-3" />
-            {pick(lang, article.readTime, article.readTimeBg)}
-          </span>
-          <span className="opacity-50">•</span>
-          <span className="inline-flex items-center gap-0.5 sm:gap-1">
-            <MapPin className="size-2.5 shrink-0 text-[#0C2686] sm:size-3" />
-            {pick(lang, article.location, article.locationBg)}
-          </span>
+          {pick(lang, article.readTime, article.readTimeBg) ? (
+            <>
+              <span className="opacity-50">•</span>
+              <span className="inline-flex items-center gap-0.5 sm:gap-1">
+                <Clock className="size-2.5 shrink-0 sm:size-3" />
+                {pick(lang, article.readTime, article.readTimeBg)}
+              </span>
+            </>
+          ) : null}
+          {pick(lang, article.location, article.locationBg) ? (
+            <>
+              <span className="opacity-50">•</span>
+              <span className="inline-flex items-center gap-0.5 sm:gap-1">
+                <MapPin className="size-2.5 shrink-0 text-[#0C2686] sm:size-3" />
+                {pick(lang, article.location, article.locationBg)}
+              </span>
+            </>
+          ) : null}
         </div>
 
         {article.sponsored || article.sourced ? (
@@ -680,7 +732,7 @@ function ArticleContent({
               {authorPhoto ? (
                 <img
                   src={authorPhoto}
-                  alt=""
+                  alt={authorName}
                   className="size-9 rounded-full object-cover ring-1 ring-[#EAE6DF]"
                 />
               ) : null}
@@ -696,7 +748,7 @@ function ArticleContent({
               {authorPhoto ? (
                 <img
                   src={authorPhoto}
-                  alt=""
+                  alt={authorName}
                   className="size-9 rounded-full object-cover ring-1 ring-[#EAE6DF]"
                 />
               ) : null}
@@ -710,7 +762,7 @@ function ArticleContent({
             </div>
           ) : null}
           <p className="font-sans text-xs font-light text-[#1A1A1A]/60">
-            {`${t('published')}${pick(lang, article.date, article.dateBg)}`}
+            {`${t('published')}${formatArticleDate(lang, article.date, article.dateBg)}`}
           </p>
         </div>
 
@@ -739,15 +791,24 @@ function ArticleContent({
 
         {article.heroKind === 'video' && article.videoUrl ? (
           <div className="relative mb-14 w-full overflow-hidden rounded-[16px] shadow-[0_4px_24px_rgba(0,0,0,0.04)] print-hidden">
-            <LuxuryVideoPlayer
-              src={article.videoUrl}
-              poster={article.image}
-              title={pick(lang, article.title, article.titleBg)}
-              aspectClassName="aspect-[16/10]"
-              tone="editorial"
-              size="featured"
-              className="rounded-[16px]"
-            />
+            <Suspense
+              fallback={
+                <div
+                  className="aspect-[16/10] w-full animate-pulse bg-[#EAE6DF]"
+                  aria-hidden
+                />
+              }
+            >
+              <LuxuryVideoPlayer
+                src={article.videoUrl}
+                poster={article.image}
+                title={pick(lang, article.title, article.titleBg)}
+                aspectClassName="aspect-[16/10]"
+                tone="editorial"
+                size="featured"
+                className="rounded-[16px]"
+              />
+            </Suspense>
             {article.photoCredit && (
               <div className="absolute bottom-3 right-4 rounded bg-black/40 px-2.5 py-1 font-sans text-[10px] uppercase tracking-widest text-white/80 backdrop-blur-md">
                 {pick(lang, article.photoCredit, article.photoCreditBg)}
@@ -776,15 +837,24 @@ function ArticleContent({
           (block) => block.type === 'video' && block.url === article.videoUrl,
         ) ? (
           <div className="relative mb-14 w-full overflow-hidden rounded-[16px] shadow-[0_4px_24px_rgba(0,0,0,0.04)] print-hidden">
-            <LuxuryVideoPlayer
-              src={article.videoUrl}
-              poster={article.image}
-              title={pick(lang, article.title, article.titleBg)}
-              aspectClassName="aspect-[16/10]"
-              tone="editorial"
-              size="featured"
-              className="rounded-[16px]"
-            />
+            <Suspense
+              fallback={
+                <div
+                  className="aspect-[16/10] w-full animate-pulse bg-[#EAE6DF]"
+                  aria-hidden
+                />
+              }
+            >
+              <LuxuryVideoPlayer
+                src={article.videoUrl}
+                poster={article.image}
+                title={pick(lang, article.title, article.titleBg)}
+                aspectClassName="aspect-[16/10]"
+                tone="editorial"
+                size="featured"
+                className="rounded-[16px]"
+              />
+            </Suspense>
           </div>
         ) : null}
 
@@ -804,6 +874,12 @@ function ArticleContent({
         )}
 
         <ArticleBlocks article={article} lang={lang} />
+
+        <SeriesContinue
+          series={article.series}
+          currentSlug={article.slug}
+          lang={lang}
+        />
 
         {(article.behindStoryBg || article.behindStory) ? (
           <aside className="mt-14 rounded-[16px] border border-[#EAE6DF] bg-white px-6 py-6 md:px-8 print-hidden" data-print-hide>
@@ -886,7 +962,7 @@ export default function ArticlePage() {
   }
 
   if (!article || !pathsMatch(article.path, pathname)) {
-    return <Navigate to="/" replace />
+    return <NotFoundPage />
   }
 
   return (
@@ -897,39 +973,41 @@ export default function ArticlePage() {
             lang={lang}
             type="article"
             title={
-              pick(
-                lang,
-                article.seoTitle || article.title,
-                article.seoTitleBg || article.titleBg,
-              )
+              metaText(lang, article.seoTitle, article.seoTitleBg) ||
+              metaText(lang, article.title, article.titleBg)
             }
             description={
-              pick(
+              metaText(
                 lang,
-                article.seoDescription || article.subtitle,
-                article.seoDescriptionBg || article.subtitleBg,
-              ) || undefined
+                article.seoDescription,
+                article.seoDescriptionBg,
+              ) ||
+              metaText(lang, article.subtitle, article.subtitleBg) ||
+              undefined
             }
             path={article.path}
             image={article.image || undefined}
             jsonLd={{
               '@context': 'https://schema.org',
               '@type': 'Article',
-              headline: pick(
-                lang,
-                article.seoTitle || article.title,
-                article.seoTitleBg || article.titleBg,
-              ),
+              headline:
+                metaText(lang, article.seoTitle, article.seoTitleBg) ||
+                metaText(lang, article.title, article.titleBg),
               description:
-                pick(
+                metaText(
                   lang,
-                  article.seoDescription || article.subtitle,
-                  article.seoDescriptionBg || article.subtitleBg,
-                ) || undefined,
+                  article.seoDescription,
+                  article.seoDescriptionBg,
+                ) ||
+                metaText(lang, article.subtitle, article.subtitleBg) ||
+                undefined,
               image: article.image || undefined,
               datePublished: article.date || undefined,
               author: article.author
-                ? { '@type': 'Person', name: pick(lang, article.author, article.authorBg) }
+                ? {
+                    '@type': 'Person',
+                    name: pick(lang, article.author, article.authorBg),
+                  }
                 : undefined,
               publisher: {
                 '@type': 'Organization',

@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link } from '@/components/LocaleLink'
 import { motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import { ArrowRight, Clock, MapPin } from 'lucide-react'
@@ -9,6 +9,7 @@ import { ListingPagination } from '@/components/concept-3/ListingPagination'
 import { EpisodeBadge } from '@/components/concept-3/EpisodeBadge'
 import { SponsoredBadge } from '@/components/concept-3/SponsoredBadge'
 import { RegionMap } from '@/components/concept-3/RegionMap'
+import { ResponsiveImage } from '@/components/ResponsiveImage'
 import {
   articlePath,
   preferApi,
@@ -20,10 +21,11 @@ import { ListingBody, listingCountLabel } from '@/components/concept-3/ListingBo
 
 export default function StoriesPage() {
   const { t } = useTranslation()
-  const { location, page, setPage, setFilters } = useListingFilters()
+  const { location, page, q, setPage, setFilters } = useListingFilters()
 
-  const listing = usePublicArticleListing('stories', {
-    location: location || undefined,
+  const listing = usePublicArticleListing(q ? undefined : 'stories', {
+    location: q ? undefined : location || undefined,
+    q: q || undefined,
     page,
   })
 
@@ -52,7 +54,13 @@ export default function StoriesPage() {
             lang={lang}
             eyebrow={t('humanStoriesEyebrow')}
             title={t('humanStories')}
-            description={t('humanStoriesDesc')}
+            description={
+              q
+                ? lang === 'bg'
+                  ? `Резултати за „${q}“.`
+                  : `Results for “${q}”.`
+                : t('humanStoriesDesc')
+            }
             countLabel={listingCountLabel(
               lang,
               listing.isLoading,
@@ -60,11 +68,13 @@ export default function StoriesPage() {
             )}
           />
 
-          <RegionMap
-            className="mx-auto max-w-7xl px-6 pt-10 md:px-12"
-            selectedSlug={location}
-            onSelect={(slug) => setFilters({ location: slug })}
-          />
+          {!q ? (
+            <RegionMap
+              className="mx-auto max-w-7xl px-6 pt-10 md:px-12"
+              selectedSlug={location}
+              onSelect={(slug) => setFilters({ location: slug })}
+            />
+          ) : null}
 
           <div className="mx-auto max-w-7xl px-6 py-16 md:px-12 md:py-20">
             <ListingBody
@@ -73,9 +83,13 @@ export default function StoriesPage() {
               isError={listing.isError}
               isEmpty={stories.length === 0}
               empty={
-                lang === 'bg'
-                  ? 'Няма публикувани истории.'
-                  : 'No published stories yet.'
+                q
+                  ? lang === 'bg'
+                    ? `Няма истории за „${q}“.`
+                    : `No stories for “${q}”.`
+                  : lang === 'bg'
+                    ? 'Няма публикувани истории.'
+                    : 'No published stories yet.'
               }
               gridClassName="grid grid-cols-1 gap-10 md:grid-cols-2 lg:grid-cols-3"
               cardClassName="aspect-[4/5]"
@@ -91,10 +105,11 @@ export default function StoriesPage() {
                     <Link to={story.path} className="group block">
                       <div className="relative mb-5 aspect-[4/5] overflow-hidden rounded-[16px] bg-[#1A1A1A]">
                         {story.image ? (
-                          <img
+                          <ResponsiveImage
                             src={story.image}
+                            thumbSrc={story.imageThumb}
                             alt={story.title}
-                            loading="lazy"
+                            sizes="grid3"
                             className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
                           />
                         ) : null}
@@ -111,10 +126,12 @@ export default function StoriesPage() {
                             <EpisodeBadge lang={lang} series={story.series} />
                           ) : null}
                         </div>
-                        <div className="absolute bottom-4 left-4 flex items-center gap-1.5 font-sans text-[11px] text-white/85">
-                          <MapPin className="size-3" />
-                          {story.location}
-                        </div>
+                        {story.location?.trim() ? (
+                          <div className="absolute bottom-4 left-4 flex items-center gap-1.5 font-sans text-[11px] text-white/85">
+                            <MapPin className="size-3" />
+                            {story.location}
+                          </div>
+                        ) : null}
                       </div>
                       <h2 className="font-heading text-2xl font-normal leading-snug text-[#1A1A1A] transition-colors group-hover:text-[#0C2686]">
                         {lang === 'bg' ? story.titleBg : story.title}

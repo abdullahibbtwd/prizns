@@ -16,7 +16,11 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { publicBodyWithInlineImages } from './article-body.util';
-import type { PublicArticleDto, StoredArticleBlock } from './article.types';
+import type {
+  PublicArticleDto,
+  PublicArticleListDto,
+  StoredArticleBlock,
+} from './article.types';
 import { CreateArticleDto } from './dto/create-article.dto';
 import { UpdateArticleDto } from './dto/update-article.dto';
 import {
@@ -27,7 +31,14 @@ import {
   toPublicSection,
 } from './section.util';
 import { ensureUniqueSlug } from '../common/slug.util';
+import { searchLookalikeVariants } from '../common/cyrillic-latin-fold';
+import {
+  stripEmptyBodyBlocks,
+  validateStoryForPublish,
+} from '../common/translation-quality';
+import { canonicalizeLocationSlug } from '../categories/canonical-categories';
 import { StorageService } from '../storage/storage.service';
+import { preferShareImageUrl } from '../common/share-image.util';
 import { BadgesService } from '../badges/badges.service';
 import { DigestService } from '../digest/digest.service';
 import { AiService } from '../ai/ai.service';
@@ -115,14 +126,34 @@ export class ArticlesService {
   ): string {
     if (!media) return '';
     const url = (media.url ?? '').trim();
-    if (
+    const resolved =
       url.startsWith('http://') ||
       url.startsWith('https://') ||
       (url.startsWith('/') && !url.startsWith('/media'))
-    ) {
-      return url;
+        ? url
+        : this.storage.publicUrlFor(media.key);
+    return preferShareImageUrl(resolved) || resolved;
+  }
+
+  /** 480px cover thumb from sharp processing, when present. */
+  private mediaThumbUrl(
+    media:
+      | {
+          key: string;
+          url: string;
+          thumbnailKey?: string | null;
+          thumbnailUrl?: string | null;
+        }
+      | null
+      | undefined,
+  ): string {
+    if (!media) return '';
+    if (media.thumbnailKey?.trim()) {
+      return this.storage.publicUrlFor(media.thumbnailKey);
     }
-    return this.storage.publicUrlFor(media.key);
+    const explicit = media.thumbnailUrl?.trim();
+    if (explicit) return explicit;
+    return '';
   }
 
   /** Normalize optional free-text (keeps PartialType / Prisma fields clearly typed). */
@@ -130,6 +161,30 @@ export class ArticlesService {
     if (typeof value !== 'string') return null;
     const trimmed = value.trim();
     return trimmed || null;
+  }
+
+  private assertPublishable(input: {
+    status?: ArticleStatus | null;
+    titleBg: string;
+    titleEn?: string | null;
+    subtitleBg?: string | null;
+    subtitleEn?: string | null;
+    translationStatus?: string | null;
+    body: StoredArticleBlock[];
+  }) {
+    if (input.status !== ArticleStatus.PUBLISHED) return;
+    const issues = validateStoryForPublish({
+      titleBg: input.titleBg,
+      titleEn: input.titleEn,
+      subtitleBg: input.subtitleBg,
+      subtitleEn: input.subtitleEn,
+      translationStatus: input.translationStatus,
+      body: input.body,
+    });
+    if (issues.length === 0) return;
+    throw new BadRequestException(
+      issues.map((issue) => issue.message).join(' '),
+    );
   }
 
   /**
@@ -561,6 +616,11 @@ export class ArticlesService {
     }));
   }
 
+  private toIsoDate(value: Date | null | undefined): string {
+    if (!value || Number.isNaN(value.getTime())) return '';
+    return value.toISOString().slice(0, 10);
+  }
+
   toPublicDto(article: ArticleWithRelations): PublicArticleDto {
     const section = toPublicSection(article.section);
     const gallery = this.galleryFromArticle(article);
@@ -577,6 +637,7 @@ export class ArticlesService {
       gallery,
       heroUrl,
     );
+    const isoDate = this.toIsoDate(article.publishedAt);
 
     return {
       id: article.id,
@@ -600,9 +661,19 @@ export class ArticlesService {
       authorImage: article.author?.imageUrl?.trim() || undefined,
       speaker: article.speakerEn ?? article.speakerBg ?? undefined,
       speakerBg: article.speakerBg ?? undefined,
-      date: article.dateEn ?? article.dateBg,
-      dateBg: article.dateBg,
+      date: isoDate || article.dateEn || article.dateBg,
+      dateBg: isoDate || article.dateBg,
       image: heroIsVideo ? posterUrl : this.mediaUrl(article.heroMedia),
+      imageThumb: (() => {
+        if (heroIsVideo) {
+          const posterMedia = article.galleryItems?.find(
+            (item) =>
+              item.media.kind !== 'VIDEO' && item.media.kind !== 'AUDIO',
+          )?.media;
+          return this.mediaThumbUrl(posterMedia);
+        }
+        return this.mediaThumbUrl(article.heroMedia);
+      })(),
       heroKind: heroIsVideo ? 'video' : 'image',
       photoCredit: article.photoCreditEn ?? article.photoCreditBg,
       photoCreditBg: article.photoCreditBg,
@@ -649,19 +720,56 @@ export class ArticlesService {
     };
   }
 
-  toPublicListDto(article: ArticleWithRelations): PublicArticleDto {
+  /** Card/list payload — omits body, SEO, gallery, and other detail-only fields. */
+  toPublicListDto(article: ArticleWithRelations): PublicArticleListDto {
+    const full = this.toPublicDto({ ...article, body: [] });
     return {
-      ...this.toPublicDto({ ...article, body: [] }),
+      id: full.id,
+      slug: full.slug,
+      sourceId: full.sourceId,
+      section: full.section,
+      path: full.path,
+      category: full.category,
+      categoryBg: full.categoryBg,
+      title: full.title,
+      titleBg: full.titleBg,
+      subtitle: full.subtitle,
+      subtitleBg: full.subtitleBg,
+      readTime: full.readTime,
+      readTimeBg: full.readTimeBg,
+      location: full.location,
+      locationBg: full.locationBg,
+      author: full.author,
+      authorBg: full.authorBg,
+      authorSlug: full.authorSlug,
+      authorImage: full.authorImage,
+      speaker: full.speaker,
+      speakerBg: full.speakerBg,
+      date: full.date,
+      dateBg: full.dateBg,
+      image: full.image,
+      imageThumb: full.imageThumb,
+      heroKind: full.heroKind,
+      audioUrl: full.audioUrl,
+      audioDuration: full.audioDuration,
+      videoUrl: full.videoUrl,
+      featured: full.featured,
+      sponsored: full.sponsored,
+      sourced: full.sourced,
+      sponsorName: full.sponsorName,
+      series: full.series,
       body: [],
     };
   }
-
   toCmsDto(article: ArticleWithRelations) {
     const gallery = this.galleryFromArticle(article);
     const membership = article.seriesEpisodes?.[0];
     const tags = this.tagsFromArticle(article);
     return {
       ...this.toPublicDto(article),
+      // CMS edits the stored editorial date strings, not the public ISO date.
+      date: article.dateEn ?? article.dateBg,
+      dateBg: article.dateBg,
       authorId: article.authorId,
       heroMediaId: article.heroMediaId,
       audioMediaId: article.audioMediaId,
@@ -733,8 +841,10 @@ export class ArticlesService {
 
     const tagFilters: Array<{ slug: string; kind: TagKind }> = [];
     if (filters?.location?.trim()) {
+      const raw = filters.location.trim();
+      const slug = canonicalizeLocationSlug(raw) ?? raw;
       tagFilters.push({
-        slug: filters.location.trim(),
+        slug,
         kind: TagKind.LOCATION,
       });
     }
@@ -761,16 +871,17 @@ export class ArticlesService {
     }
     const q = filters?.q?.trim();
     if (q) {
-      where.OR = [
-        { titleBg: { contains: q, mode: 'insensitive' } },
-        { titleEn: { contains: q, mode: 'insensitive' } },
-        { slug: { contains: q, mode: 'insensitive' } },
-        { categoryBg: { contains: q, mode: 'insensitive' } },
-        { subtitleBg: { contains: q, mode: 'insensitive' } },
-        { subtitleEn: { contains: q, mode: 'insensitive' } },
-        { locationBg: { contains: q, mode: 'insensitive' } },
-        { locationEn: { contains: q, mode: 'insensitive' } },
-      ];
+      const variants = searchLookalikeVariants(q);
+      where.OR = variants.flatMap((term) => [
+        { titleBg: { contains: term, mode: 'insensitive' as const } },
+        { titleEn: { contains: term, mode: 'insensitive' as const } },
+        { slug: { contains: term, mode: 'insensitive' as const } },
+        { categoryBg: { contains: term, mode: 'insensitive' as const } },
+        { subtitleBg: { contains: term, mode: 'insensitive' as const } },
+        { subtitleEn: { contains: term, mode: 'insensitive' as const } },
+        { locationBg: { contains: term, mode: 'insensitive' as const } },
+        { locationEn: { contains: term, mode: 'insensitive' as const } },
+      ]);
     }
 
     const orderBy = [
@@ -934,7 +1045,7 @@ export class ArticlesService {
       })
       .slice(0, take);
 
-    return scored.map((item) => this.toPublicDto(item.row));
+    return scored.map((item) => this.toPublicListDto(item.row));
   }
 
   private async listRelatedByTags(
@@ -1010,7 +1121,7 @@ export class ArticlesService {
       })
       .slice(0, take);
 
-    return scored.map((item) => this.toPublicDto(item.row));
+    return scored.map((item) => this.toPublicListDto(item.row));
   }
 
   async addRelate(section: string, slug: string, visitorKey: string) {
@@ -1083,11 +1194,12 @@ export class ArticlesService {
       Object.assign(where, await this.categoryIdsFilter(filters.categorySlug.trim()));
     }
     if (filters.q) {
-      where.OR = [
-        { titleBg: { contains: filters.q, mode: 'insensitive' } },
-        { titleEn: { contains: filters.q, mode: 'insensitive' } },
-        { slug: { contains: filters.q, mode: 'insensitive' } },
-      ];
+      const variants = searchLookalikeVariants(filters.q);
+      where.OR = variants.flatMap((term) => [
+        { titleBg: { contains: term, mode: 'insensitive' as const } },
+        { titleEn: { contains: term, mode: 'insensitive' as const } },
+        { slug: { contains: term, mode: 'insensitive' as const } },
+      ]);
     }
 
     const [total, rows] = await this.prisma.$transaction([
@@ -1141,6 +1253,16 @@ export class ArticlesService {
     const path = buildArticlePath(section, slug);
     const galleryIds = dto.galleryMediaIds?.filter(Boolean) ?? [];
     const heroMediaId = this.resolveHeroMediaId(dto.heroMediaId, galleryIds);
+    const body = stripEmptyBodyBlocks(dto.body ?? []);
+    this.assertPublishable({
+      status: dto.status,
+      titleBg: dto.titleBg,
+      titleEn: null,
+      subtitleBg: dto.subtitleBg,
+      subtitleEn: null,
+      translationStatus: null,
+      body,
+    });
 
     const row = await this.prisma.article.create({
       data: {
@@ -1160,7 +1282,7 @@ export class ArticlesService {
         speakerBg: dto.speakerBg,
         audioDuration: dto.audioDuration,
         videoUrl: dto.videoUrl?.trim() || null,
-        body: (dto.body ?? []) as unknown as Prisma.InputJsonValue,
+        body: body as unknown as Prisma.InputJsonValue,
         featured: dto.featured ?? false,
         sponsored: dto.sponsored ?? false,
         sourced: dto.sourced ?? false,
@@ -1230,6 +1352,18 @@ export class ArticlesService {
       dto.body !== undefined
         ? this.mergeBody(dto.body, existing.body)
         : { body: this.parseBody(existing.body), bgChanged: false };
+    bodyMerge.body = stripEmptyBodyBlocks(bodyMerge.body);
+
+    const nextStatus = dto.status ?? existing.status;
+    this.assertPublishable({
+      status: nextStatus,
+      titleBg: dto.titleBg ?? existing.titleBg,
+      titleEn: existing.titleEn,
+      subtitleBg: dto.subtitleBg ?? existing.subtitleBg,
+      subtitleEn: existing.subtitleEn,
+      translationStatus: existing.translationStatus,
+      body: bodyMerge.body,
+    });
 
     const subtitleBgChanged = this.fieldChanged(
       dto.subtitleBg,

@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from '@/components/LocaleLink'
 import { useMutation } from '@tanstack/react-query'
 import { JournalShell } from '@/components/concept-3/JournalShell'
 import { ListingHeader } from '@/components/concept-3/ListingHeader'

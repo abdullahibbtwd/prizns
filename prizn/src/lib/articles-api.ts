@@ -170,9 +170,42 @@ export function deleteCmsMedia(id: string) {
   return api.delete<{ ok: boolean; id: string }>(`/cms/media/${id}`)
 }
 
-export function listCmsMedia(kind?: 'IMAGE' | 'VIDEO' | 'AUDIO') {
-  const qs = kind ? `?kind=${encodeURIComponent(kind)}` : ''
-  return api.get<MediaAsset[]>(`/cms/media${qs}`)
+export type CmsMediaPageResult = {
+  items: MediaAsset[]
+  total: number
+  page: number
+  pageSize: number
+  totalPages: number
+}
+
+export function listCmsMedia(
+  opts?: {
+    kind?: 'IMAGE' | 'VIDEO' | 'AUDIO'
+    q?: string
+    page?: number
+    pageSize?: number
+  },
+) {
+  const params = new URLSearchParams()
+  if (opts?.kind) params.set('kind', opts.kind)
+  if (opts?.q?.trim()) params.set('q', opts.q.trim())
+  if (opts?.page != null) params.set('page', String(opts.page))
+  if (opts?.pageSize != null) params.set('pageSize', String(opts.pageSize))
+  const qs = params.toString()
+  return api.get<CmsMediaPageResult | MediaAsset[]>(
+    `/cms/media${qs ? `?${qs}` : ''}`,
+  ).then((data) => {
+    if (Array.isArray(data)) {
+      return {
+        items: data,
+        total: data.length,
+        page: 1,
+        pageSize: data.length || opts?.pageSize || 24,
+        totalPages: 1,
+      } satisfies CmsMediaPageResult
+    }
+    return data
+  })
 }
 
 export function listPublicMedia(
@@ -186,6 +219,7 @@ export function listPublicMedia(
     Array<{
       id: string
       url: string
+      thumbnailUrl?: string | null
       kind: string
       originalName?: string | null
       titleBg?: string | null

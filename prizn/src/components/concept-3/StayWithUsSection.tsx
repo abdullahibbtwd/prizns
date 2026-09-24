@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link } from '@/components/LocaleLink'
 import { motion } from 'framer-motion'
 import { Handshake, Heart } from 'lucide-react'
 import { journalContent } from '@/data/concept-3/content'
@@ -18,10 +18,10 @@ export function StayWithUsSection({ lang }: StayWithUsSectionProps) {
     >
       <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col px-4 py-6 sm:px-6 md:px-10 md:py-8 lg:px-12 lg:py-10">
         <motion.div
-          initial={{ opacity: 0, y: 12 }}
+          initial={false}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          transition={{ duration: 0.6 }}
+          transition={{ duration: 0.35 }}
           className="shrink-0 pb-5 text-center md:pb-6"
         >
           <span className="font-sans text-[10px] font-medium uppercase tracking-[0.32em] text-[#0C2686] sm:text-[11px]">

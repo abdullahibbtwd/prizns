@@ -1,7 +1,8 @@
-import { Link } from 'react-router-dom'
+import { Link } from '@/components/LocaleLink'
 import { motion } from 'framer-motion'
 import { MapPin } from 'lucide-react'
 import { JournalShell } from '@/components/concept-3/JournalShell'
+import { PageMeta } from '@/components/PageMeta'
 import { ListingHeader } from '@/components/concept-3/ListingHeader'
 import { ListingPagination } from '@/components/concept-3/ListingPagination'
 import { ListingBody, listingCountLabel } from '@/components/concept-3/ListingBody'
@@ -41,6 +42,16 @@ export default function SportsPage() {
 
         return (
           <main>
+            <PageMeta
+              lang={lang}
+              title={lang === 'bg' ? 'Спорт' : 'Sports'}
+              description={
+                lang === 'bg'
+                  ? 'Местен спорт като принадлежност — реки, скали, терени и утринна дисциплина.'
+                  : 'Local sport as belonging — rivers, rock, pitches, and morning discipline.'
+              }
+              path="/sports"
+            />
             <ListingHeader
               lang={lang}
               eyebrow={lang === 'bg' ? 'Движение & Място' : 'Movement & Place'}
@@ -96,20 +107,28 @@ export default function SportsPage() {
                         </div>
                         <div className="md:col-span-7">
                           <span className="font-sans text-[10px] uppercase tracking-[0.22em] text-[#0C2686]">
-                            {lang === 'bg' ? item.subBg : item.sub}
-                            {' · '}
-                            {lang === 'bg' ? item.readTimeBg : item.readTime}
+                            {[
+                              lang === 'bg' ? item.subBg : item.sub,
+                              lang === 'bg' ? item.readTimeBg : item.readTime,
+                            ]
+                              .map((part) => (part || '').trim())
+                              .filter(Boolean)
+                              .join(' · ')}
                           </span>
                           <h2 className="mt-2 font-heading text-3xl font-normal text-[#1A1A1A] transition-colors group-hover:text-[#0C2686] md:text-4xl">
                             {lang === 'bg' ? item.titleBg : item.title}
                           </h2>
-                          <p className="mt-3 max-w-xl font-sans text-sm font-light leading-relaxed text-[#1A1A1A]/65 md:text-base">
-                            {item.excerpt}
-                          </p>
-                          <p className="mt-4 inline-flex items-center gap-1.5 font-sans text-[11px] uppercase tracking-[0.18em] text-[#1A1A1A]/45">
-                            <MapPin className="size-3 text-[#0C2686]" />
-                            {lang === 'bg' ? item.locationBg : item.location}
-                          </p>
+                          {item.excerpt?.trim() ? (
+                            <p className="mt-3 max-w-xl line-clamp-2 font-sans text-sm font-light leading-relaxed text-[#1A1A1A]/65 md:text-base">
+                              {item.excerpt}
+                            </p>
+                          ) : null}
+                          {((lang === 'bg' ? item.locationBg : item.location) || '').trim() ? (
+                            <p className="mt-4 inline-flex items-center gap-1.5 font-sans text-[11px] uppercase tracking-[0.18em] text-[#1A1A1A]/45">
+                              <MapPin className="size-3 text-[#0C2686]" />
+                              {lang === 'bg' ? item.locationBg : item.location}
+                            </p>
+                          ) : null}
                         </div>
                       </Link>
                     </motion.div>

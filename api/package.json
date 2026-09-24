@@ -30,6 +30,11 @@
     "import:wordpress": "node dist/wordpress-import/import-wordpress.js",
     "import:wordpress:batch": "node dist/wordpress-import/import-wordpress.js --users",
     "import:wordpress:export": "ts-node --transpile-only src/wordpress-import/import-wordpress.ts --export=../wordpress-export",
+    "import:wordpress:repair-images": "ts-node --transpile-only src/wordpress-import/import-wordpress.ts --package=../wordpress-export --repair-images",
+    "repair:mixed-scripts": "ts-node --transpile-only src/wordpress-import/repair-mixed-scripts.ts",
+    "repair:publish-quality": "ts-node --transpile-only src/wordpress-import/repair-publish-quality.ts",
+    "repair:tags": "ts-node --transpile-only src/wordpress-import/repair-tags.ts",
+    "repair:slugs": "ts-node --transpile-only src/wordpress-import/repair-slugs.ts",
     "import:wordpress:package": "node dist/wordpress-import/import-wordpress.js --package=../wordpress-export --users",
     "import:wordpress:merge": "node dist/wordpress-import/merge-wordpress-categories.js",
     "nginx:legacy-redirects": "node dist/wordpress-import/generate-nginx-redirects.js"

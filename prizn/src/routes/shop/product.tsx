@@ -1,4 +1,5 @@
-import { Link, useParams } from 'react-router-dom'
+import {useParams } from 'react-router-dom'
+import { Link } from '@/components/LocaleLink'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
@@ -9,6 +10,7 @@ import { getPublicShopProduct } from '@/lib/shop-api'
 import { addToCart } from '@/lib/shop-cart'
 import { QtyStepper } from '@/components/shop/QtyStepper'
 import { useEffect, useMemo, useState } from 'react'
+import NotFoundPage from '@/routes/not-found'
 
 function formatPrice(cents: number, currency: string, lang: string) {
   try {
@@ -75,6 +77,10 @@ export default function ShopProductPage() {
 
   const heroUrl = gallery[activeSlide]?.url || product?.image || undefined
 
+  if (!productQuery.isLoading && (productQuery.isError || !product)) {
+    return <NotFoundPage />
+  }
+
   return (
     <JournalShell navVariant="solid">
       {() => (
@@ -101,9 +107,6 @@ export default function ShopProductPage() {
 
             {productQuery.isLoading && (
               <p className="text-sm text-[#1A1A1A]/50">{t('shop.loading')}</p>
-            )}
-            {productQuery.isError && (
-              <p className="text-sm text-rose-700">{t('shop.productMissing')}</p>
             )}
 
             {product ? (

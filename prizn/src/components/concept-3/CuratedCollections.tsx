@@ -1,8 +1,9 @@
-import { Link } from 'react-router-dom'
+import { Link } from '@/components/LocaleLink'
 import { motion } from 'framer-motion'
 import { BookOpen, ChevronRight } from 'lucide-react'
 import { ViewAllLink } from '@/components/concept-3/ViewAllLink'
 import { SectionLoading } from '@/components/concept-3/SectionLoading'
+import { ResponsiveImage } from '@/components/ResponsiveImage'
 import {
   articlePath,
   usePublicArticles,
@@ -25,6 +26,7 @@ export function CuratedCollections({ lang }: CuratedCollectionsProps) {
     count: series.count,
     countBg: series.countBg,
     image: series.image,
+    imageThumb: undefined as string | undefined,
     description: series.description,
     path: series.path,
   }))
@@ -36,6 +38,7 @@ export function CuratedCollections({ lang }: CuratedCollectionsProps) {
     count: article.readTime || '',
     countBg: article.readTimeBg || '',
     image: article.image,
+    imageThumb: article.imageThumb,
     description: article.subtitle || article.subtitleBg,
     path: articlePath(article),
   }))
@@ -47,6 +50,8 @@ export function CuratedCollections({ lang }: CuratedCollectionsProps) {
         ? discoverCards
         : []
   ).slice(0, 3)
+
+  if (!isLoading && collections.length === 0) return null
 
   return (
     <section id="discover" className="bg-[#FDFBF7] py-20 md:py-28 px-6 md:px-12 border-t border-b border-[#EAE6DF]">
@@ -78,10 +83,10 @@ export function CuratedCollections({ lang }: CuratedCollectionsProps) {
             return (
               <motion.div
                 key={item.id}
-                initial={{ opacity: 0, y: 25 }}
+                initial={false}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ duration: 0.8, delay: index * 0.1 }}
+                transition={{ duration: 0.35, delay: index * 0.04 }}
               >
                 <Link
                   to={item.path}
@@ -89,9 +94,11 @@ export function CuratedCollections({ lang }: CuratedCollectionsProps) {
                 >
                   <div>
                     <div className="relative mb-6 h-56 w-full overflow-hidden rounded-xl bg-[#1A1A1A]">
-                      <img
+                      <ResponsiveImage
                         src={item.image}
+                        thumbSrc={item.imageThumb}
                         alt={item.title}
+                        sizes="grid3"
                         className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />

@@ -97,7 +97,7 @@ describe('ArticlePage', () => {
     expect(screen.getByText('First paragraph of the story.').className).not.toMatch(
       /font-heading/,
     )
-    fireEvent.click(screen.getByRole('button', { name: 'Toggle menu' }))
+    fireEvent.click(screen.getByRole('button', { name: 'toggleMenu' }))
     expect(screen.getAllByRole('link', { name: 'Human Stories' }).length).toBeGreaterThan(0)
     expect(screen.getByRole('navigation', { name: 'Primary' })).toBeInTheDocument()
   })
@@ -126,7 +126,7 @@ describe('ArticlePage', () => {
     expect(await screen.findByText('Sourced')).toBeInTheDocument()
   })
 
-  it('redirects home when the article path does not match', async () => {
+  it('shows 404 when the article path does not match', async () => {
     getPublicArticle.mockResolvedValue(
       buildCmsArticle({
         section: 'stories',
@@ -140,7 +140,21 @@ describe('ArticlePage', () => {
     renderArticle('/stories/village-life')
 
     await waitFor(() => {
-      expect(screen.queryByRole('heading', { name: 'Other' })).not.toBeInTheDocument()
+      expect(
+        screen.getByRole('heading', { name: 'pageNotFoundTitle' }),
+      ).toBeInTheDocument()
+    })
+  })
+
+  it('shows the 404 page when the article is missing', async () => {
+    getPublicArticle.mockRejectedValue(new Error('Article not found'))
+
+    renderArticle('/stories/does-not-exist')
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { name: 'pageNotFoundTitle' }),
+      ).toBeInTheDocument()
     })
   })
 
@@ -212,7 +226,9 @@ describe('ArticlePage', () => {
     )
     expect(screen.getByText('Archive photo')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('img', { name: 'Archive photo' }).closest('button')!)
-    expect(screen.getByRole('dialog', { name: 'Archive photo' })).toBeInTheDocument()
+    expect(
+      await screen.findByRole('dialog', { name: 'Archive photo' }),
+    ).toBeInTheDocument()
     expect(
       screen.getAllByRole('img', { name: 'Archive photo' }).some(
         (img) => img.getAttribute('src') === 'https://cdn.example/two.jpg',
@@ -373,7 +389,7 @@ describe('ArticlePage', () => {
       'src',
       'https://cdn.example/hero.jpg',
     )
-    expect(screen.getByTestId('story-video')).toHaveTextContent(
+    expect(await screen.findByTestId('story-video')).toHaveTextContent(
       'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
     )
   })
@@ -402,7 +418,7 @@ describe('ArticlePage', () => {
     renderArticle()
     await screen.findByRole('heading', { name: 'Village life' })
     expect(screen.queryByRole('img', { name: 'Village life' })).not.toBeInTheDocument()
-    expect(screen.getByTestId('story-video')).toHaveTextContent(
+    expect(await screen.findByTestId('story-video')).toHaveTextContent(
       'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
     )
   })
@@ -431,7 +447,7 @@ describe('ArticlePage', () => {
 
     renderArticle()
     const byline = await screen.findByRole('link', { name: /Maya Ilieva/ })
-    expect(byline).toHaveAttribute('href', '/authors/maya-ilieva')
+    expect(byline).toHaveAttribute('href', '/en/authors/maya-ilieva')
     expect(byline.querySelector('img')).toHaveAttribute(
       'src',
       'https://cdn.example/maya.jpg',

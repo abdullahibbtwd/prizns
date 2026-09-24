@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import {
@@ -10,9 +10,12 @@ import {
 } from '@/cms/components/CmsUI'
 import {
   Bot,
+  ChevronLeft,
+  ChevronRight,
   Film,
   ImagePlus,
   MapPin,
+  Search,
   Settings,
   Sparkles,
   Copy,
@@ -32,6 +35,10 @@ export function CmsMediaPage() {
   const [kindFilter, setKindFilter] = useState<
     'ALL' | 'IMAGE' | 'VIDEO' | 'AUDIO'
   >('ALL')
+  const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const pageSize = 24
   const [titleBg, setTitleBg] = useState('')
   const [locationBg, setLocationBg] = useState('')
   const [file, setFile] = useState<File | null>(null)
@@ -39,10 +46,23 @@ export function CmsMediaPage() {
   const [formError, setFormError] = useState('')
   const [formOk, setFormOk] = useState('')
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedSearch(search.trim())
+      setPage(1)
+    }, 300)
+    return () => window.clearTimeout(timer)
+  }, [search])
+
   const mediaQuery = useQuery({
-    queryKey: ['cms-media', kindFilter],
+    queryKey: ['cms-media', kindFilter, debouncedSearch, page, pageSize],
     queryFn: () =>
-      listCmsMedia(kindFilter === 'ALL' ? undefined : kindFilter),
+      listCmsMedia({
+        kind: kindFilter === 'ALL' ? undefined : kindFilter,
+        q: debouncedSearch || undefined,
+        page,
+        pageSize,
+      }),
   })
 
   const uploadMutation = useMutation({
@@ -98,7 +118,10 @@ export function CmsMediaPage() {
     deleteMutation.mutate(item.id)
   }
 
-  const items = mediaQuery.data ?? []
+  const pageData = mediaQuery.data
+  const items = pageData?.items ?? []
+  const total = pageData?.total ?? 0
+  const totalPages = pageData?.totalPages ?? 1
   const filters: Array<{ id: typeof kindFilter; label: string }> = [
     { id: 'ALL', label: t('cms.mediaLibrary.all') },
     { id: 'IMAGE', label: t('cms.mediaLibrary.images') },
@@ -137,7 +160,7 @@ export function CmsMediaPage() {
       <CmsPageHeader
         title={t('cms.mediaLibrary.title')}
         description={t('cms.mediaLibrary.description')}
-        badge={t('cms.mediaLibrary.badge', { count: items.length })}
+        badge={t('cms.mediaLibrary.badge', { count: total })}
       />
 
       <CmsCard className="mb-8 space-y-4 p-5 md:p-6">
@@ -240,22 +263,37 @@ export function CmsMediaPage() {
         </form>
       </CmsCard>
 
-      <div className="mb-6 flex flex-wrap gap-2">
-        {filters.map((filter) => (
-          <button
-            key={filter.id}
-            type="button"
-            onClick={() => setKindFilter(filter.id)}
-            className={cn(
-              'cursor-pointer rounded-full px-4 py-2 text-xs font-semibold transition-all duration-200',
-              kindFilter === filter.id
-                ? 'bg-[#0C2686] text-white shadow-xs'
-                : 'border border-[#E8E4DC] bg-white text-stone-600 hover:bg-stone-100',
-            )}
-          >
-            {filter.label}
-          </button>
-        ))}
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+        <div className="flex flex-wrap gap-2">
+          {filters.map((filter) => (
+            <button
+              key={filter.id}
+              type="button"
+              onClick={() => {
+                setKindFilter(filter.id)
+                setPage(1)
+              }}
+              className={cn(
+                'cursor-pointer rounded-full px-4 py-2 text-xs font-semibold transition-all duration-200',
+                kindFilter === filter.id
+                  ? 'bg-[#0C2686] text-white shadow-xs'
+                  : 'border border-[#E8E4DC] bg-white text-stone-600 hover:bg-stone-100',
+              )}
+            >
+              {filter.label}
+            </button>
+          ))}
+        </div>
+        <label className="relative block w-full sm:max-w-xs">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-stone-400" />
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={t('cms.mediaLibrary.searchPlaceholder')}
+            className="w-full rounded-full border border-[#E8E4DC] bg-white py-2 pl-9 pr-3 text-sm outline-none focus:border-[#0C2686]"
+          />
+        </label>
       </div>
 
       {mediaQuery.isLoading ? (
@@ -271,6 +309,7 @@ export function CmsMediaPage() {
           {t('cms.mediaLibrary.empty')}
         </CmsCard>
       ) : (
+        <>
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
           {items.map((item: MediaAsset) => (
             <div
@@ -311,7 +350,7 @@ export function CmsMediaPage() {
               )}
               <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent p-3">
                 <p className="line-clamp-1 text-xs font-semibold text-white">
-                  {item.titleBg || item.originalName || item.id.slice(0, 8)}
+                  {item.titleBg || 'Снимка от Prizni'}
                 </p>
                 {item.locationBg ? (
                   <p className="mt-0.5 flex items-center gap-1 text-[10px] text-white/75">
@@ -332,6 +371,41 @@ export function CmsMediaPage() {
             </div>
           ))}
         </div>
+        {totalPages > 1 ? (
+          <div className="mt-6 flex items-center justify-between gap-3 rounded-2xl border border-[#E8E4DC] bg-white px-4 py-3 shadow-2xs">
+            <p className="text-xs font-medium text-stone-600">
+              {t('cms.mediaLibrary.showing', {
+                from: (page - 1) * pageSize + 1,
+                to: Math.min(page * pageSize, total),
+                count: total,
+              })}
+            </p>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1}
+                className="inline-flex size-8 items-center justify-center rounded-full border border-[#E8E4DC] text-stone-600 disabled:opacity-40"
+                aria-label={t('cms.mediaLibrary.prevPage')}
+              >
+                <ChevronLeft className="size-4" />
+              </button>
+              <span className="min-w-[4.5rem] text-center text-xs font-semibold text-stone-700">
+                {page} / {totalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+                className="inline-flex size-8 items-center justify-center rounded-full border border-[#E8E4DC] text-stone-600 disabled:opacity-40"
+                aria-label={t('cms.mediaLibrary.nextPage')}
+              >
+                <ChevronRight className="size-4" />
+              </button>
+            </div>
+          </div>
+        ) : null}
+        </>
       )}
       {dialog}
     </div>

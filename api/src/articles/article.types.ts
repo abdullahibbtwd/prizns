@@ -76,6 +76,8 @@ export type PublicArticleDto = {
   date: string;
   dateBg: string;
   image: string;
+  /** 480px WebP thumb when the hero was processed by our sharp pipeline. */
+  imageThumb?: string;
   /** First slot in the CMS media strip — photo or video. */
   heroKind?: 'image' | 'video';
   photoCredit: string;
@@ -160,4 +162,46 @@ export type PublicArticleDto = {
   /** Phase 3 — “I Relate” count (public article). */
   relateCount?: number;
   viewerHasRelated?: boolean;
+};
+
+/**
+ * Lightweight card/list payload — no body, SEO, or gallery.
+ * `date` / `dateBg` are ISO `YYYY-MM-DD` from `publishedAt` when available.
+ */
+export type PublicArticleListDto = {
+  id: string;
+  slug: string;
+  sourceId?: string;
+  section: string;
+  path: string;
+  category: string;
+  categoryBg: string;
+  title: string;
+  titleBg: string;
+  subtitle: string;
+  subtitleBg: string;
+  readTime: string;
+  readTimeBg: string;
+  location: string;
+  locationBg: string;
+  author: string;
+  authorBg: string;
+  authorSlug?: string;
+  authorImage?: string;
+  speaker?: string;
+  speakerBg?: string;
+  date: string;
+  dateBg: string;
+  image: string;
+  imageThumb?: string;
+  heroKind?: 'image' | 'video';
+  audioUrl?: string;
+  audioDuration?: string;
+  videoUrl?: string;
+  featured: boolean;
+  sponsored: boolean;
+  sourced: boolean;
+  sponsorName?: string | null;
+  series?: PublicArticleDto['series'];
+  body: [];
 };

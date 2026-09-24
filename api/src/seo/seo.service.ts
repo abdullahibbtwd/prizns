@@ -2,6 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ArticleStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { toPrismaSectionFilter } from '../articles/section.util';
+import {
+  absoluteShareUrl,
+} from '../common/share-image.util';
 
 const STATIC_ROUTES = [
   '/',
@@ -16,11 +20,45 @@ const STATIC_ROUTES = [
   '/support',
   '/partnerships',
   '/story-of-the-year',
+  '/discover',
+  '/voices',
+  '/authors',
+  '/shop',
+  '/contact',
+  '/gallery',
+  '/video',
+  '/campaigns',
+  '/archive',
 ] as const;
+
+const CONTENT_SECTIONS = new Set([
+  'stories',
+  'places',
+  'traditions',
+  'discover',
+  'voices',
+  'sports',
+  'events',
+  'news',
+  'video',
+  'campaigns',
+  'gallery',
+]);
 
 const SITE_NAME = 'Prizni';
 const DEFAULT_DESCRIPTION =
-  'Prizni — human stories, places, and traditions from Northwestern Bulgaria.';
+  'Prizni — човешки истории, места и традиции от Северозападна България.';
+const NOT_FOUND_TITLE = 'Страницата не е намерена';
+const NOT_FOUND_DESCRIPTION =
+  'Тази връзка не води към публикувана страница в Prizni.';
+const NOT_FOUND_TITLE_EN = 'Page not found';
+const NOT_FOUND_DESCRIPTION_EN =
+  'This link does not match a published page on Prizni.';
+
+export type BotShellResult = {
+  html: string;
+  status: number;
+};
 
 @Injectable()
 export class SeoService {
@@ -36,11 +74,7 @@ export class SeoService {
     return raw.replace(/\/+$/, '');
   }
 
-  private filled(value?: string | null): boolean {
-    return Boolean(value?.trim());
-  }
-
-  /** CMS desk: technical SEO is live; unique title/description is the editorial gap. */
+  /** CMS desk: coverage from the same HTML shell production serves (bot-shell), not DB field presence alone. */
   async cmsOverview() {
     const base = this.siteUrl();
     const published = await this.prisma.article.findMany({
@@ -51,38 +85,109 @@ export class SeoService {
         section: true,
         titleBg: true,
         titleEn: true,
+        subtitleBg: true,
+        subtitleEn: true,
         seoTitleBg: true,
         seoTitleEn: true,
         seoDescriptionBg: true,
         seoDescriptionEn: true,
+        publishedAt: true,
+        updatedAt: true,
+        heroMedia: { select: { url: true } },
+        author: { select: { nameBg: true, nameEn: true } },
       },
       orderBy: { updatedAt: 'desc' },
     });
 
     const rows = published.map((article) => {
+      const path = article.path.startsWith('/')
+        ? article.path
+        : `/${article.path}`;
+      const lang = 'bg' as const;
+      const localized = this.localizedPath(path, lang);
+      const canonical = `${base}${localized === '/' ? '' : localized}`;
+      const title =
+        this.pickLocalized(lang, article.seoTitleBg, article.seoTitleEn) ||
+        this.pickLocalized(lang, article.titleBg, article.titleEn) ||
+        SITE_NAME;
+      const description =
+        this.pickLocalized(
+          lang,
+          article.seoDescriptionBg,
+          article.seoDescriptionEn,
+        ) ||
+        this.pickLocalized(lang, article.subtitleBg, article.subtitleEn) ||
+        DEFAULT_DESCRIPTION;
+      const image =
+        absoluteShareUrl(base, article.heroMedia?.url) ||
+        `${base}/og-default.png`;
+      const authorName =
+        this.pickLocalized(
+          lang,
+          article.author?.nameBg,
+          article.author?.nameEn,
+        ) || undefined;
+      const fullTitle = `${title} | ${SITE_NAME}`;
+      const html = this.renderHtml({
+        title: fullTitle,
+        description,
+        canonical,
+        barePath: path,
+        lang,
+        image,
+        type: 'article',
+        jsonLd: {
+          '@context': 'https://schema.org',
+          '@type': 'Article',
+          headline: title,
+          description,
+          image: [image],
+          datePublished: article.publishedAt?.toISOString(),
+          dateModified: article.updatedAt.toISOString(),
+          mainEntityOfPage: canonical,
+          author: authorName
+            ? { '@type': 'Person', name: authorName }
+            : { '@type': 'Organization', name: SITE_NAME },
+          publisher: {
+            '@type': 'Organization',
+            name: SITE_NAME,
+            url: base,
+            logo: `${base}/prizni.svg`,
+          },
+        },
+      });
+
       const hasTitle =
-        this.filled(article.seoTitleBg) || this.filled(article.seoTitleEn);
+        title !== SITE_NAME &&
+        html.includes(`<title>${this.escapeHtml(fullTitle)}</title>`);
       const hasDescription =
-        this.filled(article.seoDescriptionBg) ||
-        this.filled(article.seoDescriptionEn);
+        description !== DEFAULT_DESCRIPTION &&
+        html.includes(`content="${this.escapeHtml(description)}"`);
+      const hasOg = html.includes('property="og:title"');
+      const hasJsonLd =
+        html.includes('application/ld+json') &&
+        html.includes('"@type":"Article"');
+      const shellOk = hasTitle && hasDescription && hasOg && hasJsonLd;
+
       return {
         id: article.id,
-        path: article.path.startsWith('/') ? article.path : `/${article.path}`,
+        path,
         section: article.section,
         titleBg: article.titleBg,
         titleEn: article.titleEn,
         hasTitle,
         hasDescription,
+        shellOk,
       };
     });
 
     const missingTitle = rows.filter((row) => !row.hasTitle).length;
     const missingDescription = rows.filter((row) => !row.hasDescription).length;
-    const withUniqueMeta = rows.filter(
-      (row) => row.hasTitle && row.hasDescription,
-    ).length;
+    const withUniqueMeta = rows.filter((row) => row.shellOk).length;
     const coveragePct =
-      rows.length === 0 ? 100 : Math.round((withUniqueMeta / rows.length) * 100);
+      rows.length === 0
+        ? 100
+        : Math.round((withUniqueMeta / rows.length) * 100);
 
     return {
       siteUrl: base,
@@ -100,8 +205,9 @@ export class SeoService {
         places: published.filter((article) => article.section === 'places').length,
       },
       gaps: rows
-        .filter((row) => !row.hasTitle || !row.hasDescription)
-        .slice(0, 50),
+        .filter((row) => !row.shellOk)
+        .slice(0, 50)
+        .map(({ shellOk: _shellOk, ...gap }) => gap),
     };
   }
 
@@ -126,11 +232,51 @@ export class SeoService {
     const trimmed = (raw ?? '/').trim() || '/';
     try {
       const decoded = decodeURIComponent(trimmed);
-      if (!decoded.startsWith('/')) return `/${decoded}`;
-      return decoded.split('?')[0] || '/';
+      const withSlash = decoded.startsWith('/') ? decoded : `/${decoded}`;
+      const noQuery = withSlash.split('?')[0] || '/';
+      // English locale prefix is URL-only; content paths stay unprefixed in the DB.
+      if (noQuery === '/en') return '/';
+      if (noQuery.startsWith('/en/')) return noQuery.slice(3) || '/';
+      return noQuery;
     } catch {
-      return trimmed.startsWith('/') ? trimmed.split('?')[0] : `/${trimmed}`;
+      const fallback = trimmed.startsWith('/')
+        ? trimmed.split('?')[0]
+        : `/${trimmed}`;
+      if (fallback === '/en') return '/';
+      if (fallback.startsWith('/en/')) return fallback.slice(3) || '/';
+      return fallback;
     }
+  }
+
+  private requestLocale(raw?: string): 'bg' | 'en' {
+    const trimmed = (raw ?? '/').trim() || '/';
+    try {
+      const decoded = decodeURIComponent(trimmed);
+      const withSlash = decoded.startsWith('/') ? decoded : `/${decoded}`;
+      const noQuery = withSlash.split('?')[0] || '/';
+      if (noQuery === '/en' || noQuery.startsWith('/en/')) return 'en';
+      return 'bg';
+    } catch {
+      if (trimmed === '/en' || trimmed.startsWith('/en/')) return 'en';
+      return 'bg';
+    }
+  }
+
+  private localizedPath(barePath: string, lang: 'bg' | 'en'): string {
+    if (lang === 'en') return barePath === '/' ? '/en' : `/en${barePath}`;
+    return barePath === '/' ? '/' : barePath;
+  }
+
+  private pickLocalized(
+    lang: 'bg' | 'en',
+    bg?: string | null,
+    en?: string | null,
+  ): string {
+    if (lang === 'en') {
+      const english = en?.trim();
+      if (english) return english;
+    }
+    return bg?.trim() || en?.trim() || '';
   }
 
   async sitemapXml(): Promise<string> {
@@ -313,12 +459,8 @@ ${items}
     ].join('\n');
   }
 
-  async botShellHtml(rawPath?: string): Promise<string> {
-    const base = this.siteUrl();
-    const path = this.normalizePath(rawPath);
-    const canonical = `${base}${path === '/' ? '' : path}`;
-
-    const article = await this.prisma.article.findFirst({
+  private async findPublishedArticle(path: string) {
+    const byPath = await this.prisma.article.findFirst({
       where: {
         status: ArticleStatus.PUBLISHED,
         path,
@@ -328,22 +470,103 @@ ${items}
         author: true,
       },
     });
+    if (byPath) return byPath;
 
-    if (article) {
+    const parts = path.split('/').filter(Boolean);
+    if (parts.length !== 2) return null;
+    const [section, slug] = parts;
+    if (!CONTENT_SECTIONS.has(section)) return null;
+
+    try {
+      const sectionFilter = toPrismaSectionFilter(section);
+      return this.prisma.article.findFirst({
+        where: {
+          status: ArticleStatus.PUBLISHED,
+          slug,
+          ...(sectionFilter ? { section: sectionFilter } : {}),
+        },
+        include: {
+          heroMedia: true,
+          author: true,
+        },
+      });
+    } catch {
+      return null;
+    }
+  }
+
+  private isKnownStaticPath(path: string): boolean {
+    return (STATIC_ROUTES as readonly string[]).includes(path);
+  }
+
+  private entityKind(
+    path: string,
+  ): 'article' | 'author' | 'shop' | 'none' {
+    const parts = path.split('/').filter(Boolean);
+    if (parts.length !== 2) return 'none';
+    const [section] = parts;
+    if (section === 'authors') return 'author';
+    if (section === 'shop') return 'shop';
+    if (CONTENT_SECTIONS.has(section)) return 'article';
+    return 'none';
+  }
+
+  private notFoundShell(
+    canonical: string,
+    base: string,
+    barePath: string,
+    lang: 'bg' | 'en',
+  ): BotShellResult {
+    return {
+      status: 404,
+      html: this.renderHtml({
+        title: `${lang === 'en' ? NOT_FOUND_TITLE_EN : NOT_FOUND_TITLE} | ${SITE_NAME}`,
+        description:
+          lang === 'en' ? NOT_FOUND_DESCRIPTION_EN : NOT_FOUND_DESCRIPTION,
+        canonical,
+        barePath,
+        lang,
+        image: `${base}/og-default.png`,
+        type: 'website',
+        noIndex: true,
+      }),
+    };
+  }
+
+  async botShellHtml(rawPath?: string): Promise<BotShellResult> {
+    const base = this.siteUrl();
+    const lang = this.requestLocale(rawPath);
+    const path = this.normalizePath(rawPath);
+    const localized = this.localizedPath(path, lang);
+    const canonical = `${base}${localized === '/' ? '' : localized}`;
+    const kind = this.entityKind(path);
+    const parts = path.split('/').filter(Boolean);
+
+    if (kind === 'article') {
+      const article = await this.findPublishedArticle(path);
+      if (!article) return this.notFoundShell(canonical, base, path, lang);
+
       const title =
-        article.seoTitleEn ??
-        article.seoTitleBg ??
-        article.titleEn ??
-        article.titleBg;
+        this.pickLocalized(lang, article.seoTitleBg, article.seoTitleEn) ||
+        this.pickLocalized(lang, article.titleBg, article.titleEn) ||
+        SITE_NAME;
       const description =
-        article.seoDescriptionEn ??
-        article.seoDescriptionBg ??
-        article.subtitleEn ??
-        article.subtitleBg ??
+        this.pickLocalized(
+          lang,
+          article.seoDescriptionBg,
+          article.seoDescriptionEn,
+        ) ||
+        this.pickLocalized(lang, article.subtitleBg, article.subtitleEn) ||
         DEFAULT_DESCRIPTION;
-      const image = article.heroMedia?.url?.trim() || `${base}/og-default.png`;
+      const image =
+        absoluteShareUrl(base, article.heroMedia?.url) ||
+        `${base}/og-default.png`;
       const authorName =
-        article.author?.nameEn ?? article.author?.nameBg ?? undefined;
+        this.pickLocalized(
+          lang,
+          article.author?.nameBg,
+          article.author?.nameEn,
+        ) || undefined;
       const published = article.publishedAt?.toISOString();
       const modified = article.updatedAt.toISOString();
 
@@ -367,60 +590,175 @@ ${items}
         },
       };
 
-      return this.renderHtml({
-        title: `${title} | ${SITE_NAME}`,
-        description,
-        canonical,
-        image,
-        type: 'article',
-        jsonLd,
-      });
+      return {
+        status: 200,
+        html: this.renderHtml({
+          title: `${title} | ${SITE_NAME}`,
+          description,
+          canonical,
+          barePath: path,
+          lang,
+          image,
+          type: 'article',
+          jsonLd,
+        }),
+      };
     }
 
-    return this.renderHtml({
-      title: SITE_NAME,
-      description: DEFAULT_DESCRIPTION,
-      canonical,
-      image: `${base}/og-default.png`,
-      type: 'website',
-      jsonLd: {
-        '@context': 'https://schema.org',
-        '@type': 'Organization',
-        name: SITE_NAME,
-        url: base,
-        logo: `${base}/prizni.svg`,
+    if (kind === 'author') {
+      const slug = parts[1];
+      const author = await this.prisma.author.findFirst({
+        where: {
+          isActive: true,
+          OR: [{ slug }, { aliases: { has: slug } }],
+        },
+        select: {
+          slug: true,
+          nameBg: true,
+          nameEn: true,
+          bioBg: true,
+          bioEn: true,
+          imageUrl: true,
+        },
+      });
+      if (!author) return this.notFoundShell(canonical, base, path, lang);
+      const name =
+        this.pickLocalized(lang, author.nameBg, author.nameEn) || SITE_NAME;
+      const description =
+        this.pickLocalized(lang, author.bioBg, author.bioEn) ||
+        DEFAULT_DESCRIPTION;
+      const image =
+        absoluteShareUrl(base, author.imageUrl) || `${base}/og-default.png`;
+      const authorPath = `/authors/${author.slug}`;
+      const authorCanonical =
+        lang === 'en' ? `${base}/en${authorPath}` : `${base}${authorPath}`;
+      return {
+        status: 200,
+        html: this.renderHtml({
+          title: `${name} | ${SITE_NAME}`,
+          description,
+          canonical: authorCanonical,
+          barePath: authorPath,
+          lang,
+          image,
+          type: 'website',
+          jsonLd: {
+            '@context': 'https://schema.org',
+            '@type': 'Person',
+            name,
+            description,
+            image,
+            url: authorCanonical,
+          },
+        }),
+      };
+    }
+
+    if (kind === 'shop') {
+      const slug = parts[1];
+      const product = await this.prisma.product.findFirst({
+        where: { slug, active: true },
+        select: {
+          titleBg: true,
+          titleEn: true,
+          descriptionBg: true,
+          descriptionEn: true,
+          imageMedia: { select: { url: true } },
+        },
+      });
+      if (!product) return this.notFoundShell(canonical, base, path, lang);
+      const title =
+        this.pickLocalized(lang, product.titleBg, product.titleEn) ||
+        SITE_NAME;
+      const description =
+        this.pickLocalized(lang, product.descriptionBg, product.descriptionEn) ||
+        DEFAULT_DESCRIPTION;
+      const image =
+        absoluteShareUrl(base, product.imageMedia?.url) ||
+        `${base}/og-default.png`;
+      return {
+        status: 200,
+        html: this.renderHtml({
+          title: `${title} | ${SITE_NAME}`,
+          description,
+          canonical,
+          barePath: path,
+          lang,
+          image,
+          type: 'website',
+        }),
+      };
+    }
+
+    if (!this.isKnownStaticPath(path)) {
+      return this.notFoundShell(canonical, base, path, lang);
+    }
+
+    return {
+      status: 200,
+      html: this.renderHtml({
+        title: SITE_NAME,
         description: DEFAULT_DESCRIPTION,
-      },
-    });
+        canonical,
+        barePath: path,
+        lang,
+        image: `${base}/og-default.png`,
+        type: 'website',
+        jsonLd: {
+          '@context': 'https://schema.org',
+          '@type': 'Organization',
+          name: SITE_NAME,
+          url: base,
+          logo: `${base}/prizni.svg`,
+          description: DEFAULT_DESCRIPTION,
+        },
+      }),
+    };
   }
 
   private renderHtml(meta: {
     title: string;
     description: string;
     canonical: string;
+    barePath: string;
+    lang: 'bg' | 'en';
     image: string;
     type: 'article' | 'website';
     jsonLd?: Record<string, unknown>;
+    noIndex?: boolean;
   }): string {
     const title = this.escapeHtml(meta.title);
     const description = this.escapeHtml(meta.description);
     const canonical = this.escapeHtml(meta.canonical);
     const image = this.escapeHtml(meta.image);
+    const base = this.siteUrl();
+    const bgPath = meta.barePath === '/' ? '' : meta.barePath;
+    const enPath = meta.barePath === '/' ? '/en' : `/en${meta.barePath}`;
+    const bgHref = this.escapeHtml(`${base}${bgPath}`);
+    const enHref = this.escapeHtml(`${base}${enPath}`);
     const imageType = meta.image.toLowerCase().includes('.png')
       ? 'image/png'
       : 'image/jpeg';
+    const robots = meta.noIndex
+      ? '<meta name="robots" content="noindex,nofollow" />\n'
+      : '';
     const jsonLdBlock = meta.jsonLd
       ? `<script type="application/ld+json">${JSON.stringify(meta.jsonLd)}</script>`
       : '';
+    const ogLocale = meta.lang === 'en' ? 'en_US' : 'bg_BG';
+    const ogLocaleAlt = meta.lang === 'en' ? 'bg_BG' : 'en_US';
 
     return `<!DOCTYPE html>
-<html lang="bg">
+<html lang="${meta.lang}">
 <head>
 <meta charset="utf-8" />
 <title>${title}</title>
 <meta name="description" content="${description}" />
 <link rel="canonical" href="${canonical}" />
-<meta property="og:site_name" content="${SITE_NAME}" />
+<link rel="alternate" hreflang="bg" href="${bgHref}" />
+<link rel="alternate" hreflang="en" href="${enHref}" />
+<link rel="alternate" hreflang="x-default" href="${bgHref}" />
+${robots}<meta property="og:site_name" content="${SITE_NAME}" />
 <meta property="og:type" content="${meta.type}" />
 <meta property="og:title" content="${title}" />
 <meta property="og:description" content="${description}" />
@@ -428,7 +766,8 @@ ${items}
 <meta property="og:image" content="${image}" />
 <meta property="og:image:alt" content="${title}" />
 <meta property="og:image:type" content="${imageType}" />
-<meta property="og:locale" content="bg_BG" />
+<meta property="og:locale" content="${ogLocale}" />
+<meta property="og:locale:alternate" content="${ogLocaleAlt}" />
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content="${title}" />
 <meta name="twitter:description" content="${description}" />

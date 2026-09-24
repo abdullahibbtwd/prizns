@@ -36,10 +36,13 @@ import {
 } from '@/lib/dashboard-api'
 import { canAccessCmsPath } from '@/lib/cms-roles'
 import { formatTrendPct } from '@/lib/format'
+import { pickLang } from '@/lib/pick-lang'
+import { useJournalLang } from '@/hooks/useJournalLang'
 import { cn } from '@/lib/utils'
 
 export default function CmsDashboard() {
   const { t, i18n } = useTranslation()
+  const { lang } = useJournalLang()
   const { user } = useAuth()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -121,13 +124,18 @@ export default function CmsDashboard() {
   const scheduled = checklist?.scheduledArticles ?? 0
   const analytics = analyticsQuery.data
   const trafficValue = (analytics?.visitors ?? 0).toLocaleString()
-  const trafficTrend = formatTrendPct(analytics?.visitorsTrendPct ?? 0)
+  const trafficTrend = formatTrendPct(
+    analytics?.visitorsTrendPct,
+    t('cms.dashboard.trendNew'),
+  )
   const trafficTrendType =
-    (analytics?.visitorsTrendPct ?? 0) > 0
-      ? 'up'
-      : (analytics?.visitorsTrendPct ?? 0) < 0
-        ? 'down'
-        : 'neutral'
+    analytics?.visitorsTrendPct == null
+      ? 'neutral'
+      : analytics.visitorsTrendPct > 0
+        ? 'up'
+        : analytics.visitorsTrendPct < 0
+          ? 'down'
+          : 'neutral'
   const sparklineData =
     analytics?.daily && analytics.daily.length > 0
       ? analytics.daily.map((d) => d.views)
@@ -434,7 +442,11 @@ export default function CmsDashboard() {
                   </span>
                   <div className="min-w-0">
                     <p className="truncate text-sm font-bold text-stone-900 transition-colors group-hover:text-[#0C2686]">
-                      {item.title}
+                      {pickLang(
+                        lang,
+                        item.titleEn ?? item.title,
+                        item.titleBg ?? item.title,
+                      )}
                     </p>
                     <p className="mt-0.5 text-xs font-medium text-stone-600">
                       {t('cms.dashboard.avgTime', { time: item.avgDwellLabel })}

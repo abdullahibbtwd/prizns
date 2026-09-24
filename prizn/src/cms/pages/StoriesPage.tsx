@@ -27,6 +27,7 @@ import { categorySelectOptions } from '@/lib/category-tree'
 import type { ArticleStatus, CmsArticle } from '@/lib/cms-types'
 import { cn } from '@/lib/utils'
 import { useJournalLang } from '@/hooks/useJournalLang'
+import { formatCmsListDate } from '@/lib/format-date'
 import { pickLang } from '@/lib/pick-lang'
 import { getSectionLabel } from '@/lib/section-i18n'
 import { ApiError } from '@/lib/api'
@@ -46,39 +47,77 @@ function storyCategoryLabel(story: CmsArticle, lang: 'bg' | 'en') {
   return story.categoryBg || getSectionLabel(story.section, lang)
 }
 
-const PAGE_SIZE_OPTIONS = [6, 9, 12, 24] as const
+const PAGE_SIZE_OPTIONS = [10, 20, 50] as const
 const BASE_PATH = '/cms/stories'
 const ALL_CATEGORIES = ''
 const ALL_AUTHORS = ''
+
+function parseStatusFilter(
+  value: string | null,
+): (typeof filters)[number] {
+  if (value && filters.includes(value as (typeof filters)[number])) {
+    return value as (typeof filters)[number]
+  }
+  return 'all'
+}
 
 export default function CmsStoriesPage() {
   const { t } = useTranslation()
   const { lang } = useJournalLang()
   const { confirm, dialog } = useCmsConfirm()
   const queryClient = useQueryClient()
-  const [searchParams] = useSearchParams()
-  const statusParam = searchParams.get('status')
-  const [filter, setFilter] = useState<(typeof filters)[number]>(() =>
-    statusParam && filters.includes(statusParam as (typeof filters)[number])
-      ? (statusParam as (typeof filters)[number])
-      : 'all',
-  )
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  const filter = parseStatusFilter(searchParams.get('status'))
+  const debouncedQuery = searchParams.get('q') ?? ''
+  const page = Math.max(1, Number(searchParams.get('page') || 1) || 1)
   const [categorySlug, setCategorySlug] = useState(ALL_CATEGORIES)
   const [authorId, setAuthorId] = useState(ALL_AUTHORS)
-  const [query, setQuery] = useState('')
-  const [debouncedQuery, setDebouncedQuery] = useState('')
+  const [queryInput, setQueryInput] = useState(debouncedQuery)
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid')
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>(9)
+  const [pageSize, setPageSize] =
+    useState<(typeof PAGE_SIZE_OPTIONS)[number]>(20)
+
+  const patchParams = (patch: Record<string, string | null>) => {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        for (const [key, value] of Object.entries(patch)) {
+          if (value == null || value === '') next.delete(key)
+          else next.set(key, value)
+        }
+        return next
+      },
+      { replace: true },
+    )
+  }
+
+  const setFilter = (next: (typeof filters)[number]) => {
+    patchParams({
+      status: next === 'all' ? null : next,
+      page: null,
+    })
+  }
+
+  const setPage = (next: number | ((current: number) => number)) => {
+    const resolved = typeof next === 'function' ? next(page) : next
+    patchParams({ page: resolved <= 1 ? null : String(resolved) })
+  }
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 300)
+    const timer = window.setTimeout(() => {
+      const trimmed = queryInput.trim()
+      if (trimmed === debouncedQuery) return
+      patchParams({ q: trimmed || null, page: null })
+    }, 300)
     return () => window.clearTimeout(timer)
-  }, [query])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-run on typed query
+  }, [queryInput])
 
   useEffect(() => {
     setPage(1)
-  }, [filter, categorySlug, authorId, debouncedQuery, pageSize])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categorySlug, authorId, pageSize])
 
   const authorsQuery = useQuery({
     queryKey: ['cms-authors-options'],
@@ -225,7 +264,11 @@ export default function CmsStoriesPage() {
       <CmsPageHeader
         title={t('cms.stories.title')}
         description={t('cms.stories.description')}
-        badge={t('cms.stories.items', { count: total })}
+        badge={
+          articlesQuery.isLoading && !articlesQuery.data
+            ? t('cms.stories.itemsLoading')
+            : t('cms.stories.items', { count: total })
+        }
         actions={
           <Link to={`${BASE_PATH}/new`}>
             <PrimaryButton>
@@ -260,8 +303,8 @@ export default function CmsStoriesPage() {
             <div className="relative flex-1 md:w-64">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-stone-400" />
               <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                value={queryInput}
+                onChange={(e) => setQueryInput(e.target.value)}
                 placeholder={t('cms.stories.filterPlaceholder')}
                 className="w-full rounded-xl border border-[#E8E4DC] bg-stone-50 py-2 pl-9 pr-3 text-xs outline-none focus:border-[#0C2686]"
               />
@@ -329,14 +372,40 @@ export default function CmsStoriesPage() {
         </p>
       )}
 
-      {!articlesQuery.isLoading && total === 0 && (
-        <CmsCard className="p-8 text-center text-sm text-stone-500">
-          {t('cms.stories.empty')}{' '}
-          <Link to={`${BASE_PATH}/new`} className="font-semibold text-[#0C2686]">
-            {t('cms.stories.createFirst')}
-          </Link>
-        </CmsCard>
-      )}
+      {!articlesQuery.isLoading && total === 0 && (() => {
+        const filtersActive =
+          filter !== 'all' ||
+          Boolean(debouncedQuery) ||
+          Boolean(categorySlug) ||
+          Boolean(authorId)
+        if (filtersActive) {
+          return (
+            <CmsCard className="p-8 text-center text-sm text-stone-500">
+              <p>{t('cms.stories.emptyFiltered')}</p>
+              <button
+                type="button"
+                className="mt-3 text-xs font-semibold text-[#0C2686] underline-offset-2 hover:underline"
+                onClick={() => {
+                  setQueryInput('')
+                  setCategorySlug(ALL_CATEGORIES)
+                  setAuthorId(ALL_AUTHORS)
+                  setSearchParams({}, { replace: true })
+                }}
+              >
+                {t('cms.stories.clearFilters')}
+              </button>
+            </CmsCard>
+          )
+        }
+        return (
+          <CmsCard className="p-8 text-center text-sm text-stone-500">
+            {t('cms.stories.empty')}{' '}
+            <Link to={`${BASE_PATH}/new`} className="font-semibold text-[#0C2686]">
+              {t('cms.stories.createFirst')}
+            </Link>
+          </CmsCard>
+        )
+      })()}
 
       {total > 0 && viewMode === 'grid' && (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -346,7 +415,11 @@ export default function CmsStoriesPage() {
                 {story.image ? (
                   <img
                     src={story.image}
-                    alt=""
+                    alt={
+                      pickLang(lang, story.title, story.titleBg) ||
+                      story.titleBg ||
+                      ''
+                    }
                     className="h-full w-full object-cover"
                   />
                 ) : null}
@@ -370,8 +443,10 @@ export default function CmsStoriesPage() {
                   </h3>
                   <p className="mt-1 text-xs text-stone-500">
                     {pickLang(lang, story.author, story.authorBg) ||
-                      t('cms.stories.noAuthor')}{' '}
-                    · {story.updatedAt?.slice(0, 10)}
+                      t('cms.stories.noAuthor')}
+                    {formatCmsListDate(story, lang)
+                      ? ` · ${formatCmsListDate(story, lang)}`
+                      : ''}
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">

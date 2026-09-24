@@ -99,6 +99,24 @@ describe('AuthorsService', () => {
     expect(row?.slug).toBe('ivan-petrov');
   });
 
+  it('gets public author by alias slug', async () => {
+    prisma.author.findFirst = jest.fn().mockResolvedValue({
+      ...author,
+      slug: 'eva-ivanova',
+      aliases: ['ami-tola', 'wp-user:13'],
+    });
+    const row = await service.getPublicBySlug('ami-tola');
+    expect(row?.slug).toBe('eva-ivanova');
+    expect(row?.path).toBe('/authors/eva-ivanova');
+    expect(prisma.author.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          OR: [{ slug: 'ami-tola' }, { aliases: { has: 'ami-tola' } }],
+        }),
+      }),
+    );
+  });
+
   it('throws when cms author missing', async () => {
     prisma.author.findUnique = jest.fn().mockResolvedValue(null);
     await expect(service.getById('missing')).rejects.toBeInstanceOf(

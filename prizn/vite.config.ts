@@ -2,6 +2,7 @@ import path from 'path'
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import { prizniSeoShellPlugin } from './vite.seo-plugin'
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
@@ -9,9 +10,10 @@ export default defineConfig(({ mode }) => {
   const rootEnv = loadEnv(mode, path.resolve(__dirname, '..'), '')
   const localEnv = loadEnv(mode, __dirname, '')
   const env = { ...rootEnv, ...localEnv }
+  const apiOrigin = `http://localhost:${env.API_PORT || 3003}/api`
 
   return {
-    plugins: [react(), tailwindcss()],
+    plugins: [react(), tailwindcss(), prizniSeoShellPlugin(apiOrigin)],
     envDir: path.resolve(__dirname, '..'),
     resolve: {
       alias: {

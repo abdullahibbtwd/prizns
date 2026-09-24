@@ -19,10 +19,10 @@ export function QuoteSection({ lang }: QuoteSectionProps) {
 
       <div className="max-w-4xl mx-auto text-center relative z-10">
         <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
+          initial={false}
           whileInView={{ opacity: 1, scale: 1 }}
           viewport={{ once: true }}
-          transition={{ duration: 1.2 }}
+          transition={{ duration: 0.35 }}
           className="space-y-4"
         >
           <span className="font-heading text-6xl md:text-8xl text-[#0C2686]/30 leading-none block">

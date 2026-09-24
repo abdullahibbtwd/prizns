@@ -1,10 +1,12 @@
-import { Link } from 'react-router-dom'
+import { Link } from '@/components/LocaleLink'
 import { motion } from 'framer-motion'
 import { MapPin } from 'lucide-react'
 import { JournalShell } from '@/components/concept-3/JournalShell'
+import { PageMeta } from '@/components/PageMeta'
 import { ListingHeader } from '@/components/concept-3/ListingHeader'
 import { ListingPagination } from '@/components/concept-3/ListingPagination'
 import { ListingBody, listingCountLabel } from '@/components/concept-3/ListingBody'
+import { ResponsiveImage } from '@/components/ResponsiveImage'
 import {
   articlePath,
   preferApi,
@@ -25,6 +27,7 @@ function toNewsCard(article: CmsArticle) {
     readTime: article.readTime || '',
     readTimeBg: article.readTimeBg || '',
     image: article.image || '',
+    imageThumb: article.imageThumb || '',
     excerpt: article.subtitle || article.subtitleBg || '',
     path: articlePath(article),
   }
@@ -41,6 +44,16 @@ export default function NewsPage() {
 
         return (
           <main>
+            <PageMeta
+              lang={lang}
+              title={lang === 'bg' ? 'Новини' : 'News'}
+              description={
+                lang === 'bg'
+                  ? 'Кратки новини и актуални бележки от Северозападна България.'
+                  : 'Short news and timely notes from Northwestern Bulgaria.'
+              }
+              path="/news"
+            />
             <ListingHeader
               lang={lang}
               eyebrow={lang === 'bg' ? 'Регионът днес' : 'The region today'}
@@ -87,11 +100,12 @@ export default function NewsPage() {
                     >
                       <div className="aspect-[16/10] overflow-hidden rounded-[14px] bg-[#1A1A1A] md:col-span-5">
                         {item.image ? (
-                          <img
+                          <ResponsiveImage
                             src={item.image}
+                            thumbSrc={item.imageThumb}
                             alt={lang === 'bg' ? item.titleBg : item.title}
+                            sizes="grid2"
                             className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
-                            loading="lazy"
                           />
                         ) : null}
                       </div>
@@ -105,15 +119,15 @@ export default function NewsPage() {
                         <h2 className="mt-2 font-heading text-3xl font-normal text-[#1A1A1A] transition-colors group-hover:text-[#0C2686] md:text-4xl">
                           {lang === 'bg' ? item.titleBg : item.title}
                         </h2>
-                        <p className="mt-3 max-w-xl font-sans text-sm font-light leading-relaxed text-[#1A1A1A]/65 md:text-base">
+                        <p className="mt-3 max-w-xl line-clamp-2 font-sans text-sm font-light leading-relaxed text-[#1A1A1A]/65 md:text-base">
                           {item.excerpt}
                         </p>
-                        {(item.location || item.locationBg) && (
+                        {((lang === 'bg' ? item.locationBg : item.location) || '').trim() ? (
                           <p className="mt-4 inline-flex items-center gap-1.5 font-sans text-[11px] uppercase tracking-[0.18em] text-[#1A1A1A]/45">
                             <MapPin className="size-3 text-[#0C2686]" />
                             {lang === 'bg' ? item.locationBg : item.location}
                           </p>
-                        )}
+                        ) : null}
                       </div>
                     </Link>
                   </motion.div>

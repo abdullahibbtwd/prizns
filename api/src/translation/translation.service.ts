@@ -9,6 +9,7 @@ import {
   type TranslateJobData,
 } from '../jobs/queue.constants'
 import { PrismaService } from '../prisma/prisma.service'
+import { translationLooksReady } from '../common/translation-quality'
 
 const CHUNK_SIZE = 25
 const CHUNK_DELAY_MS = 700
@@ -188,11 +189,16 @@ export class TranslationService {
       return
     }
 
+    const ready = translationLooksReady(title.bg, title.en)
     await this.prisma.article.update({
       where: { id: articleId },
       data: {
-        translationStatus: TranslationStatus.READY,
-        translationError: null,
+        translationStatus: ready
+          ? TranslationStatus.READY
+          : TranslationStatus.FAILED,
+        translationError: ready
+          ? null
+          : 'English translation matched the Bulgarian source (or was empty). Re-run translation.',
         sourceLang,
         categoryBg: category.bg,
         categoryEn: category.en,
@@ -222,7 +228,9 @@ export class TranslationService {
       },
     })
     this.logger.log(
-      `Translated article ${articleId} (${sourceLang}→${targetLang})`,
+      ready
+        ? `Translated article ${articleId} (${sourceLang}→${targetLang})`
+        : `Article ${articleId} translation rejected — EN did not differ from BG`,
     )
   }
 
@@ -275,11 +283,16 @@ export class TranslationService {
       return
     }
 
+    const ready = translationLooksReady(name.bg, name.en)
     await this.prisma.author.update({
       where: { id: authorId },
       data: {
-        translationStatus: TranslationStatus.READY,
-        translationError: null,
+        translationStatus: ready
+          ? TranslationStatus.READY
+          : TranslationStatus.FAILED,
+        translationError: ready
+          ? null
+          : 'English translation matched the Bulgarian source (or was empty). Re-run translation.',
         sourceLang,
         nameBg: name.bg,
         nameEn: name.en || null,
@@ -294,7 +307,9 @@ export class TranslationService {
       },
     })
     this.logger.log(
-      `Translated author ${authorId} (${sourceLang}→${targetLang})`,
+      ready
+        ? `Translated author ${authorId} (${sourceLang}→${targetLang})`
+        : `Author ${authorId} translation rejected — EN did not differ from BG`,
     )
   }
 
@@ -333,11 +348,16 @@ export class TranslationService {
       return
     }
 
+    const ready = translationLooksReady(title.bg, title.en)
     await this.prisma.series.update({
       where: { id: seriesId },
       data: {
-        translationStatus: TranslationStatus.READY,
-        translationError: null,
+        translationStatus: ready
+          ? TranslationStatus.READY
+          : TranslationStatus.FAILED,
+        translationError: ready
+          ? null
+          : 'English translation matched the Bulgarian source (or was empty). Re-run translation.',
         sourceLang,
         titleBg: title.bg,
         titleEn: title.en || null,
@@ -346,7 +366,9 @@ export class TranslationService {
       },
     })
     this.logger.log(
-      `Translated series ${seriesId} (${sourceLang}→${targetLang})`,
+      ready
+        ? `Translated series ${seriesId} (${sourceLang}→${targetLang})`
+        : `Series ${seriesId} translation rejected — EN did not differ from BG`,
     )
   }
 
@@ -385,11 +407,16 @@ export class TranslationService {
       return
     }
 
+    const ready = translationLooksReady(name.bg, name.en)
     await this.prisma.category.update({
       where: { id: categoryId },
       data: {
-        translationStatus: TranslationStatus.READY,
-        translationError: null,
+        translationStatus: ready
+          ? TranslationStatus.READY
+          : TranslationStatus.FAILED,
+        translationError: ready
+          ? null
+          : 'English translation matched the Bulgarian source (or was empty). Re-run translation.',
         sourceLang,
         nameBg: name.bg,
         nameEn: name.en || null,
@@ -398,7 +425,9 @@ export class TranslationService {
       },
     })
     this.logger.log(
-      `Translated category ${categoryId} (${sourceLang}→${targetLang})`,
+      ready
+        ? `Translated category ${categoryId} (${sourceLang}→${targetLang})`
+        : `Category ${categoryId} translation rejected — EN did not differ from BG`,
     )
   }
 

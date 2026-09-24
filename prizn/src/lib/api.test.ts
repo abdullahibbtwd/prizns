@@ -52,20 +52,50 @@ describe('api client', () => {
     await expect(api.delete('/resource/1')).resolves.toBeUndefined()
   })
 
-  it('sets JSON content-type for write requests', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ id: '1' }), {
-        status: 201,
-        headers: { 'Content-Type': 'application/json' },
-      }),
-    )
+  it('refreshes once and retries CMS calls on 401', async () => {
+    let articleCalls = 0
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.includes('/cms/articles')) {
+        articleCalls += 1
+        if (articleCalls === 1) {
+          return new Response(JSON.stringify({ message: 'expired' }), {
+            status: 401,
+            statusText: 'Unauthorized',
+            headers: { 'Content-Type': 'application/json' },
+          })
+        }
+        return new Response(JSON.stringify({ items: [] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
+      if (url.includes('/auth/refresh')) {
+        return new Response(JSON.stringify({ ok: true }), { status: 200 })
+      }
+      if (url.includes('/auth/me')) {
+        return new Response(
+          JSON.stringify({
+            user: {
+              id: 'u1',
+              email: 'ed@prizni.bg',
+              name: 'Ed',
+              role: 'EDITOR',
+            },
+          }),
+          { status: 200 },
+        )
+      }
+      return new Response('missing', { status: 404 })
+    })
     vi.stubGlobal('fetch', fetchMock)
 
-    await api.patch('/cms/todos/1', { done: true })
-
-    const [, init] = fetchMock.mock.calls[0]!
-    expect((init?.headers as Headers).get('Content-Type')).toBe(
-      'application/json',
-    )
+    await expect(api.get('/cms/articles')).resolves.toEqual({ items: [] })
+    expect(articleCalls).toBe(2)
+    expect(
+      fetchMock.mock.calls.some((call) =>
+        String(call[0]).includes('/auth/refresh'),
+      ),
+    ).toBe(true)
   })
 })

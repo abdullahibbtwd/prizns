@@ -1,37 +1,12 @@
 import { useState, useRef, type MouseEvent } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from '@/components/LocaleLink'
+import { useLocalizedNavigate } from '@/hooks/useLocalizedNavigate'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Play, Pause, Volume2, Headphones, Sparkles, ArrowUpRight } from 'lucide-react'
-import { articlePath } from '@/lib/public-content'
-import type { CmsArticle } from '@/lib/cms-types'
+import { type VoiceItem } from '@/lib/voice-item'
 
-export type VoiceItem = {
-  id: string
-  title: string
-  titleBg: string
-  speaker: string
-  speakerBg: string
-  duration: string
-  audioUrl: string
-  quote: string
-  image: string
-  path?: string
-}
-
-export function toVoiceItem(article: CmsArticle): VoiceItem {
-  return {
-    id: article.slug || article.id,
-    title: article.title || article.titleBg,
-    titleBg: article.titleBg,
-    speaker: article.speaker || article.author || '',
-    speakerBg: article.speakerBg || article.authorBg || '',
-    duration: article.audioDuration || article.readTime || '',
-    audioUrl: article.audioUrl || '',
-    quote: article.subtitle || article.subtitleBg || '',
-    image: article.image || '',
-    path: articlePath(article),
-  }
-}
+export type { VoiceItem } from '@/lib/voice-item'
+export { toVoiceItem } from '@/lib/voice-item'
 
 interface VoicesPlayerGridProps {
   lang: 'bg' | 'en'
@@ -45,7 +20,7 @@ export function VoicesPlayerGrid({
   voices,
   animateOnMount = false,
 }: VoicesPlayerGridProps) {
-  const navigate = useNavigate()
+  const navigate = useLocalizedNavigate()
   const [activeVoiceId, setActiveVoiceId] = useState<string | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
@@ -82,14 +57,14 @@ export function VoicesPlayerGrid({
           return (
             <motion.article
               key={item.id}
-              initial={{ opacity: 0, y: 24 }}
+              initial={false}
               {...(animateOnMount
                 ? { animate: { opacity: 1, y: 0 } }
                 : {
                     whileInView: { opacity: 1, y: 0 },
                     viewport: { once: true },
                   })}
-              transition={{ duration: 0.7, delay: index * 0.08 }}
+              transition={{ duration: 0.35, delay: index * 0.04 }}
               role="link"
               tabIndex={0}
               onClick={() => navigate(href)}
@@ -149,7 +124,7 @@ export function VoicesPlayerGrid({
                       transition={
                         isThisPlaying
                           ? {
-                              duration: 0.6,
+                              duration: 0.35,
                               repeat: Infinity,
                               repeatType: 'reverse',
                               delay: i * 0.08,

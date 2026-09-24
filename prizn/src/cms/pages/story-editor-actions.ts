@@ -1,25 +1,20 @@
 import type { ArticleStatus } from '@/lib/cms-types'
+import { toSofiaDatetimeLocal } from '@/lib/format-date'
 
 export type EditorSaveAction = Extract<
   ArticleStatus,
   'DRAFT' | 'REVIEW' | 'SCHEDULED' | 'PUBLISHED' | 'ARCHIVED'
 >
 
-function pad(value: number) {
-  return String(value).padStart(2, '0')
-}
-
 export function toDatetimeLocalValue(
   iso?: string | null,
   now = new Date(),
 ): string {
-  const date = iso ? new Date(iso) : now
-  if (Number.isNaN(date.getTime())) return ''
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+  return toSofiaDatetimeLocal(iso, now)
 }
 
 export function defaultScheduleLocal(now = new Date()): string {
-  return toDatetimeLocalValue(null, new Date(now.getTime() + 60 * 60 * 1000))
+  return toSofiaDatetimeLocal(null, new Date(now.getTime() + 60 * 60 * 1000))
 }
 
 export function splitDatetimeLocal(value: string): { date: string; time: string } {
@@ -32,18 +27,34 @@ export function joinDatetimeLocal(date: string, time: string): string {
   return `${date}T${time || '09:00'}`
 }
 
+/**
+ * Interpret datetime-local as Europe/Sofia wall time and store UTC ISO.
+ * Avoids browser-local TZ drift for editors outside Sofia.
+ */
 export function publishedAtPayload(
   status: ArticleStatus,
   scheduledAt: string,
 ): string | undefined {
   if (status !== 'SCHEDULED' || !scheduledAt.trim()) return undefined
-  const date = new Date(scheduledAt)
-  if (Number.isNaN(date.getTime())) return undefined
-  return date.toISOString()
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(scheduledAt.trim())
+  if (!match) return undefined
+  const [, y, mo, d, h, mi] = match
+  const asUtc = new Date(`${y}-${mo}-${d}T${h}:${mi}:00.000Z`)
+  if (Number.isNaN(asUtc.getTime())) return undefined
+  const sofiaAsIfLocal = new Date(
+    asUtc.toLocaleString('en-US', { timeZone: 'Europe/Sofia' }),
+  )
+  const utcAsIfLocal = new Date(
+    asUtc.toLocaleString('en-US', { timeZone: 'UTC' }),
+  )
+  const offsetMs = sofiaAsIfLocal.getTime() - utcAsIfLocal.getTime()
+  return new Date(asUtc.getTime() - offsetMs).toISOString()
 }
 
 export function isScheduleDueNow(scheduledAt: string, now = new Date()): boolean {
-  const date = new Date(scheduledAt)
+  const iso = publishedAtPayload('SCHEDULED', scheduledAt)
+  if (!iso) return false
+  const date = new Date(iso)
   return !Number.isNaN(date.getTime()) && date.getTime() <= now.getTime()
 }
 

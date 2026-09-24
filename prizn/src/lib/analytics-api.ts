@@ -13,13 +13,13 @@ export type AnalyticsSummary = {
   totalDwellLabel: string
   loggedInSessions?: number
   anonymousSessions?: number
-  visitorsTrendPct: number
-  pageviewsTrendPct: number
+  visitorsTrendPct: number | null
+  pageviewsTrendPct: number | null
   previous: {
     visitors: number
     pageviews: number
     avgDwellMs: number
-    avgDwellLabel: string
+    avgDwellLabel: string | null
   }
   topPages: Array<{
     path: string
@@ -30,6 +30,8 @@ export type AnalyticsSummary = {
   topStories: Array<{
     articleId: string | null
     title: string
+    titleBg?: string
+    titleEn?: string | null
     path: string | null
     views: number
     avgDwellMs: number

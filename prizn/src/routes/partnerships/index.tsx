@@ -15,6 +15,7 @@ import {
   Users,
 } from 'lucide-react'
 import { JournalShell } from '@/components/concept-3/JournalShell'
+import { PageMeta } from '@/components/PageMeta'
 import {
   ContributeHero,
   FieldLabel,
@@ -149,6 +150,16 @@ export default function PartnershipsPage() {
     <JournalShell>
       {({ lang }) => (
         <main>
+          <PageMeta
+            lang={lang}
+            title={lang === 'bg' ? 'Партньорства' : 'Partnerships'}
+            description={
+              lang === 'bg'
+                ? 'Нека заедно разкажем историите на Северозападна България.'
+                : "Let's tell the stories of Northwestern Bulgaria together."
+            }
+            path="/partnerships"
+          />
           <ContributeHero
             lang={lang}
             eyebrow="Partnerships"

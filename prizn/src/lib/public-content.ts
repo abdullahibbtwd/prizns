@@ -140,6 +140,7 @@ export function usePublicArticleListing(
     category?: string;
     categorySlug?: string;
     hasAudio?: boolean;
+    q?: string;
     page?: number;
     pageSize?: number;
     enabled?: boolean;
@@ -147,6 +148,7 @@ export function usePublicArticleListing(
 ) {
   const page = Math.max(1, opts?.page ?? 1);
   const pageSize = opts?.pageSize ?? PUBLIC_LISTING_PAGE_SIZE;
+  const q = opts?.q?.trim() || "";
   const query = useQuery({
     queryKey: [
       "public-articles-listing",
@@ -157,6 +159,7 @@ export function usePublicArticleListing(
       opts?.category || "",
       opts?.categorySlug || "",
       opts?.hasAudio ? "audio" : "",
+      q,
       page,
       pageSize,
     ],
@@ -168,10 +171,13 @@ export function usePublicArticleListing(
         category: opts?.category,
         categorySlug: opts?.categorySlug,
         hasAudio: opts?.hasAudio,
+        q: q || undefined,
         page,
         pageSize,
       }),
-    enabled: opts?.enabled ?? true,
+    enabled:
+      (opts?.enabled ?? true) &&
+      (q.length === 0 || q.length >= 2),
     placeholderData: keepPreviousData,
     staleTime: 60_000,
     retry: 1,
@@ -190,7 +196,12 @@ export function usePublicArticleSearch(q: string) {
   const trimmed = q.trim()
   return useQuery({
     queryKey: ["public-article-search", trimmed],
-    queryFn: () => listPublicArticles(undefined, { q: trimmed, limit: 12 }),
+    queryFn: () =>
+      listPublicArticlesPage(undefined, {
+        q: trimmed,
+        page: 1,
+        pageSize: 8,
+      }),
     enabled: trimmed.length >= 2,
     staleTime: 30_000,
     retry: 1,
@@ -245,6 +256,7 @@ export function usePublicSeries() {
 export type PublicMediaItem = {
   id: string
   url: string
+  thumbnailUrl?: string | null
   kind: string
   originalName?: string | null
   titleBg?: string | null

@@ -54,6 +54,12 @@ function formatDuration(ms: number) {
   return `${seconds}s`;
 }
 
+/** null when there is no prior baseline (avoid fake +100% / "Prev 0s"). */
+function trendPct(curr: number, prev: number): number | null {
+  if (prev <= 0) return null;
+  return Math.round(((curr - prev) / prev) * 1000) / 10;
+}
+
 /** Decode percent-encoded paths so Cyrillic slugs stay readable. */
 function normalizePath(raw: string) {
   const trimmed = raw.trim().slice(0, 500);
@@ -75,14 +81,44 @@ function referrerHost(referrer: string | null | undefined): string | null {
   }
 }
 
+export type BeaconContext = {
+  /** Present when the request carries a CMS staff session cookie. */
+  cmsAccessToken?: string | null;
+  clientIp?: string | null;
+};
+
+function parseExcludeIps(): Set<string> {
+  const raw = process.env.ANALYTICS_EXCLUDE_IPS?.trim() ?? '';
+  if (!raw) return new Set();
+  return new Set(
+    raw
+      .split(/[,\s]+/)
+      .map((part) => part.trim())
+      .filter(Boolean),
+  );
+}
+
 @Injectable()
 export class AnalyticsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async beacon(dto: AnalyticsBeaconDto, userAgent?: string) {
+  async beacon(
+    dto: AnalyticsBeaconDto,
+    userAgent?: string,
+    context?: BeaconContext,
+  ) {
     const now = new Date();
     const path = normalizePath(dto.path);
     if (path.startsWith('/cms')) {
+      return { ignored: true as const };
+    }
+    // Staff browsing the public site while logged into the CMS must not inflate reader stats.
+    if (context?.cmsAccessToken?.trim()) {
+      return { ignored: true as const };
+    }
+    const excludeIps = parseExcludeIps();
+    const ip = context?.clientIp?.trim();
+    if (ip && excludeIps.has(ip)) {
       return { ignored: true as const };
     }
 
@@ -345,11 +381,6 @@ export class AnalyticsService {
       : [];
     const articleMap = new Map(articles.map((a) => [a.id, a]));
 
-    const trendPct = (curr: number, prev: number) => {
-      if (prev <= 0) return curr > 0 ? 100 : 0;
-      return Math.round(((curr - prev) / prev) * 1000) / 10;
-    };
-
     const sourceCounts = new Map<string, number>();
     for (const row of sourceRows) {
       const label =
@@ -397,7 +428,10 @@ export class AnalyticsService {
         visitors: previous.visitors,
         pageviews: previous.pageviews,
         avgDwellMs: previous.avgDwellMs,
-        avgDwellLabel: formatDuration(previous.avgDwellMs),
+        avgDwellLabel:
+          previous.avgDwellMs > 0
+            ? formatDuration(previous.avgDwellMs)
+            : null,
       },
       topPages: topPagesRaw.map((row) => ({
         path: normalizePath(row.path),
@@ -412,6 +446,8 @@ export class AnalyticsService {
         return {
           articleId: row.articleId,
           title: article?.titleEn || article?.titleBg || 'Untitled story',
+          titleBg: article?.titleBg || 'Untitled story',
+          titleEn: article?.titleEn ?? null,
           path: article?.path ? normalizePath(article.path) : null,
           views: row._count._all,
           avgDwellMs: Math.round(row._avg.dwellMs ?? 0),

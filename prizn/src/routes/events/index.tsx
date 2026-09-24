@@ -1,7 +1,8 @@
-import { Link } from 'react-router-dom'
+import { Link } from '@/components/LocaleLink'
 import { motion } from 'framer-motion'
 import { CalendarDays } from 'lucide-react'
 import { JournalShell } from '@/components/concept-3/JournalShell'
+import { PageMeta } from '@/components/PageMeta'
 import { ListingHeader } from '@/components/concept-3/ListingHeader'
 import { ListingPagination } from '@/components/concept-3/ListingPagination'
 import { ListingBody, listingCountLabel } from '@/components/concept-3/ListingBody'
@@ -12,6 +13,8 @@ import {
 } from '@/lib/public-content'
 import { useListingFilters } from '@/lib/listing-filters'
 import type { CmsArticle } from '@/lib/cms-types'
+import { joinMetaParts } from '@/lib/text-format'
+import { formatArticleDate } from '@/lib/format-date'
 
 function toEventsCard(article: CmsArticle) {
   return {
@@ -39,21 +42,35 @@ export default function EventsPage() {
 
         return (
           <main>
-            <ListingHeader
+            <PageMeta
               lang={lang}
-              eyebrow={lang === 'bg' ? 'Календар' : 'Calendar'}
-              title={lang === 'bg' ? 'Събития' : 'Events'}
+              title={
+                lang === 'bg' ? 'Събития и репортажи' : 'Events & reports'
+              }
               description={
                 lang === 'bg'
-                  ? 'Панаири, нощни пътеки и пазари — живият календар на Северозапада.'
-                  : 'Fairs, night paths, and markets — the living calendar of the Northwest.'
+                  ? 'Репортажи от панаири, пътеки и събирания из Северозападна България.'
+                  : 'Reports from fairs, trails, and gatherings across Northwestern Bulgaria.'
+              }
+              path="/events"
+            />
+            <ListingHeader
+              lang={lang}
+              eyebrow={lang === 'bg' ? 'От терена' : 'From the field'}
+              title={
+                lang === 'bg' ? 'Събития и репортажи' : 'Events & reports'
+              }
+              description={
+                lang === 'bg'
+                  ? 'Репортажи от панаири, пътеки и събирания — не жив календар, а истории от мястото.'
+                  : 'Reports from fairs, trails, and gatherings — field stories, not a live calendar.'
               }
               countLabel={listingCountLabel(
                 lang,
                 listing.isLoading,
                 lang === 'bg'
-                  ? `${listing.total} събития`
-                  : `${listing.total} events`,
+                  ? `${listing.total} материала`
+                  : `${listing.total} pieces`,
               )}
             />
 
@@ -71,41 +88,57 @@ export default function EventsPage() {
                 gridClassName="grid grid-cols-1 gap-8 md:grid-cols-2"
                 cardClassName="aspect-[16/10]"
               >
-              <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
-                {items.map((item, index) => {
-                  return (
-                    <motion.div
-                      key={item.id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.6, delay: Math.min(index, 8) * 0.06 }}
-                    >
-                      <Link to={item.path} className="group block">
-                        <div className="aspect-[16/10] overflow-hidden rounded-[14px] bg-[#1A1A1A]">
-                          <img
-                            src={item.image}
-                            alt={lang === 'bg' ? item.titleBg : item.title}
-                            loading="lazy"
-                            className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
-                          />
-                        </div>
-                        <p className="mt-4 inline-flex items-center gap-1.5 font-sans text-[11px] uppercase tracking-[0.18em] text-[#0C2686]">
-                          <CalendarDays className="size-3.5" />
-                          {lang === 'bg' ? item.dateBg : item.date}
-                          {' · '}
-                          {lang === 'bg' ? item.locationBg : item.location}
-                        </p>
-                        <h2 className="mt-2 font-heading text-2xl font-normal text-[#1A1A1A] transition-colors group-hover:text-[#0C2686] md:text-3xl">
-                          {lang === 'bg' ? item.titleBg : item.title}
-                        </h2>
-                        <p className="mt-2 font-sans text-sm font-light leading-relaxed text-[#1A1A1A]/60">
-                          {item.excerpt}
-                        </p>
-                      </Link>
-                    </motion.div>
-                  )
-                })}
-              </div>
+                <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
+                  {items.map((item, index) => {
+                    const date = formatArticleDate(
+                      lang,
+                      item.date,
+                      item.dateBg,
+                    ).trim()
+                    const location = (
+                      lang === 'bg' ? item.locationBg : item.location
+                    ).trim()
+                    const meta = joinMetaParts(date, location)
+                    return (
+                      <motion.div
+                        key={item.id}
+                        initial={false}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{
+                          duration: 0.35,
+                          delay: Math.min(index, 8) * 0.03,
+                        }}
+                      >
+                        <Link to={item.path} className="group block">
+                          <div className="aspect-[16/10] overflow-hidden rounded-[14px] bg-[#1A1A1A]">
+                            <img
+                              src={item.image}
+                              alt={lang === 'bg' ? item.titleBg : item.title}
+                              loading="lazy"
+                              className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+                            />
+                          </div>
+                          {meta ? (
+                            <p className="mt-4 inline-flex items-center gap-1.5 font-sans text-[11px] uppercase tracking-[0.18em] text-[#0C2686]">
+                              {date ? (
+                                <CalendarDays className="size-3.5" />
+                              ) : null}
+                              {meta}
+                            </p>
+                          ) : null}
+                          <h2 className="mt-2 font-heading text-2xl font-normal text-[#1A1A1A] transition-colors group-hover:text-[#0C2686] md:text-3xl">
+                            {lang === 'bg' ? item.titleBg : item.title}
+                          </h2>
+                          {item.excerpt?.trim() ? (
+                            <p className="mt-2 line-clamp-2 font-sans text-sm font-light leading-relaxed text-[#1A1A1A]/60">
+                              {item.excerpt}
+                            </p>
+                          ) : null}
+                        </Link>
+                      </motion.div>
+                    )
+                  })}
+                </div>
               </ListingBody>
               <ListingPagination
                 lang={lang}

@@ -8,6 +8,10 @@ import {
 } from '@/lib/ai-api'
 import type { JournalLang } from '@/components/concept-3/JournalShell'
 
+/**
+ * Regional context aside — only the dashed content block appears when
+ * real context has been loaded. No generic placeholder copy is shown as content.
+ */
 export function RegionalContextExplainer({
   section,
   slug,
@@ -27,8 +31,14 @@ export function RegionalContextExplainer({
     setLoading(true)
     try {
       const data = await fetchRegionalContext({ section, slug, lang })
+      if (!data.context?.trim()) {
+        setResult(null)
+        setError(t('regionalContextError'))
+        return
+      }
       setResult(data)
     } catch (err) {
+      setResult(null)
       setError(
         err instanceof ApiError
           ? err.message
@@ -41,34 +51,16 @@ export function RegionalContextExplainer({
     }
   }
 
-  return (
-    <aside
-      className="mt-10 rounded-[16px] border border-dashed border-[#0C2686]/25 bg-[#0C2686]/5 px-6 py-6 md:px-8 print-hidden"
-      data-print-hide
-    >
-      <span className="mb-2 flex items-center gap-2 font-sans text-[11px] font-medium uppercase tracking-[0.22em] text-[#0C2686]">
-        <Compass className="size-3.5" strokeWidth={1.5} />
-        {t('regionalContextTitle')}
-      </span>
-      <p className="mb-4 max-w-xl font-sans text-sm font-light leading-relaxed text-[#1A1A1A]/65">
-        {t('regionalContextBody')}
-      </p>
-
-      {!result ? (
-        <>
-          {error ? (
-            <p className="mb-3 font-sans text-sm text-rose-700">{error}</p>
-          ) : null}
-          <button
-            type="button"
-            disabled={loading}
-            onClick={() => void onExplain()}
-            className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-[#0C2686]/35 px-5 py-2.5 font-sans text-[11px] uppercase tracking-[0.18em] text-[#0C2686] transition-colors hover:border-[#0C2686] hover:bg-white disabled:opacity-60"
-          >
-            {loading ? t('regionalContextLoading') : t('regionalContextCta')}
-          </button>
-        </>
-      ) : (
+  if (result?.context?.trim()) {
+    return (
+      <aside
+        className="mt-10 rounded-[16px] border border-dashed border-[#0C2686]/25 bg-[#0C2686]/5 px-6 py-6 md:px-8 print-hidden"
+        data-print-hide
+      >
+        <span className="mb-2 flex items-center gap-2 font-sans text-[11px] font-medium uppercase tracking-[0.22em] text-[#0C2686]">
+          <Compass className="size-3.5" strokeWidth={1.5} />
+          {t('regionalContextTitle')}
+        </span>
         <div className="space-y-4">
           <p className="whitespace-pre-line font-sans text-sm font-light leading-relaxed text-[#1A1A1A]/80 md:text-[15px]">
             {result.context}
@@ -99,7 +91,24 @@ export function RegionalContextExplainer({
             {loading ? t('regionalContextLoading') : t('regionalContextRefresh')}
           </button>
         </div>
-      )}
-    </aside>
+      </aside>
+    )
+  }
+
+  return (
+    <div className="mt-10 print-hidden" data-print-hide>
+      {error ? (
+        <p className="mb-3 font-sans text-sm text-rose-700">{error}</p>
+      ) : null}
+      <button
+        type="button"
+        disabled={loading}
+        onClick={() => void onExplain()}
+        className="inline-flex cursor-pointer items-center gap-2 font-sans text-[11px] uppercase tracking-[0.18em] text-[#0C2686]/70 transition-colors hover:text-[#0C2686] disabled:opacity-60"
+      >
+        <Compass className="size-3.5" strokeWidth={1.5} />
+        {loading ? t('regionalContextLoading') : t('regionalContextCta')}
+      </button>
+    </div>
   )
 }

@@ -1,6 +1,7 @@
 import type { Role } from '@prisma/client';
 import { primaryRole } from '../auth/role-access';
 import { slugify } from '../common/slug.util';
+import { canonicalAuthorSlug } from './author-slug-aliases';
 import type { WpUser } from './types';
 
 const WP_ROLE_MAP: Record<string, Role> = {
@@ -54,7 +55,8 @@ export function mapWpRole(roles: string[] | undefined): Role {
 }
 
 export function mapWpUser(user: WpUser): MappedWpUser {
-  const slug = (user.slug || slugify(user.name || `user-${user.id}`)).trim();
+  const rawSlug = (user.slug || slugify(user.name || `user-${user.id}`)).trim();
+  const slug = canonicalAuthorSlug(rawSlug);
   const email = (user.email || `${slug}@imported.prizni.local`).toLowerCase().trim();
   const avatars = user.avatar_urls ?? {};
   const imageUrl =

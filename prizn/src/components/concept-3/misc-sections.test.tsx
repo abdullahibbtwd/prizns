@@ -18,7 +18,7 @@ vi.mock('framer-motion', () => ({
   },
 }))
 
-vi.mock('./LuxuryVideoPlayer', () => ({
+vi.mock('@/components/concept-3/LuxuryVideoPlayer', () => ({
   LuxuryVideoPlayer: ({ title }: { title: string }) => (
     <div data-testid="video-player">{title}</div>
   ),
@@ -36,6 +36,19 @@ vi.mock('@/lib/public-content', async () => {
   }
 })
 
+vi.mock('@/hooks/useSectionPresence', () => ({
+  useSectionPresence: () => ({
+    hasStories: true,
+    hasPlaces: true,
+    hasEvents: true,
+    hasTraditions: true,
+    hasSports: true,
+    hasDiscover: true,
+    hasVoices: true,
+    isPathVisible: () => true,
+  }),
+}))
+
 function renderSection(ui: React.ReactElement) {
   return render(<MemoryRouter>{ui}</MemoryRouter>)
 }
@@ -52,7 +65,7 @@ describe('misc concept-3 sections', () => {
     expect(screen.getByRole('navigation', { name: 'Primary' })).toBeInTheDocument()
   })
 
-  it('VideoSection renders featured and side videos', () => {
+  it('VideoSection renders featured and side videos', async () => {
     usePublicArticles.mockReturnValue({
       data: [
         buildCmsArticle({
@@ -74,15 +87,13 @@ describe('misc concept-3 sections', () => {
 
     renderSection(<VideoSection lang="en" />)
     expect(screen.getByText('Film desk')).toBeInTheDocument()
-    expect(screen.getAllByTestId('video-player')).toHaveLength(2)
+    expect(await screen.findAllByTestId('video-player')).toHaveLength(2)
     expect(screen.getByRole('link', { name: 'Side film' })).toBeInTheDocument()
   })
 
-  it('VoicesAudioSection shows a continue-below cue', () => {
+  it('VoicesAudioSection hides entirely when there are no audio stories', () => {
     usePublicArticles.mockReturnValue({ data: [], isLoading: false })
-    renderSection(<VoicesAudioSection lang="en" />)
-    expect(
-      screen.getByRole('button', { name: 'More content below' }),
-    ).toBeInTheDocument()
+    const { container } = renderSection(<VoicesAudioSection lang="en" />)
+    expect(container).toBeEmptyDOMElement()
   })
 })

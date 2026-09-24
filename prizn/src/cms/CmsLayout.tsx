@@ -94,7 +94,7 @@ export function CmsLayout() {
                 {t('cms.editorialOs')}
               </Link>
               <ChevronRight className="hidden size-3 text-stone-400 md:block" />
-              <span className="truncate rounded-md border border-stone-200/80 bg-stone-100 px-2.5 py-1 font-semibold capitalize text-stone-900">
+              <span className="truncate rounded-md border border-stone-200/80 bg-stone-100 px-2.5 py-1 font-semibold text-stone-900">
                 {crumbLabel}
               </span>
             </nav>
@@ -104,11 +104,13 @@ export function CmsLayout() {
             {/* Quick Search Button */}
             <button
               onClick={() => setSearchOpen(true)}
-              className="group hidden items-center gap-3 rounded-xl border border-[#E8E4DC] bg-stone-50/80 px-3.5 py-2 text-xs font-medium text-stone-500 transition-all hover:border-[#0C2686]/40 hover:bg-white hover:text-stone-900 shadow-2xs sm:flex"
+              className="group hidden max-w-[min(100%,18rem)] items-center gap-3 rounded-xl border border-[#E8E4DC] bg-stone-50/80 px-3.5 py-2 text-xs font-medium text-stone-500 transition-all hover:border-[#0C2686]/40 hover:bg-white hover:text-stone-900 shadow-2xs sm:flex"
             >
-              <Search className="size-4 text-[#0C2686] group-hover:scale-110 transition-transform" />
-              <span>{t('cms.searchPlaceholder')}</span>
-              <kbd className="rounded-md border border-stone-200 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-stone-500 shadow-2xs">
+              <Search className="size-4 shrink-0 text-[#0C2686] group-hover:scale-110 transition-transform" />
+              <span className="min-w-0 truncate whitespace-nowrap">
+                {t('cms.searchPlaceholder')}
+              </span>
+              <kbd className="shrink-0 rounded-md border border-stone-200 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-stone-500 shadow-2xs">
                 ⌘K
               </kbd>
             </button>

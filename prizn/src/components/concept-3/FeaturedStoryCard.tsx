@@ -1,13 +1,15 @@
-import { Link } from 'react-router-dom'
+import { Link } from '@/components/LocaleLink'
 import { motion } from 'framer-motion'
 import { Clock, MapPin } from 'lucide-react'
 import { SponsoredBadge } from '@/components/concept-3/SponsoredBadge'
 import { SectionLoading } from '@/components/concept-3/SectionLoading'
+import { ResponsiveImage } from '@/components/ResponsiveImage'
 import {
   articlePath,
   preferApi,
   usePublicArticles,
 } from '@/lib/public-content'
+import { formatArticleDate } from '@/lib/format-date'
 
 interface FeaturedStoryCardProps {
   lang: 'bg' | 'en'
@@ -43,9 +45,10 @@ export function FeaturedStoryCard({ lang }: FeaturedStoryCardProps) {
     readTime: apiStory.readTime,
     readTimeBg: apiStory.readTimeBg,
     author: lang === 'bg' ? apiStory.authorBg : apiStory.author,
-    date: lang === 'bg' ? apiStory.dateBg : apiStory.date,
+    date: formatArticleDate(lang, apiStory.date, apiStory.dateBg),
     location: lang === 'bg' ? apiStory.locationBg : apiStory.location,
     image: apiStory.image,
+    imageThumb: apiStory.imageThumb,
     href: articlePath(apiStory),
     sponsored: Boolean(apiStory.sponsored),
     sponsorName: apiStory.sponsorName,
@@ -65,17 +68,19 @@ export function FeaturedStoryCard({ lang }: FeaturedStoryCardProps) {
 
         <Link to={story.href} className="block">
           <motion.div
-            initial={{ opacity: 0, y: 30 }}
+            initial={false}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            transition={{ duration: 1 }}
+            transition={{ duration: 0.4 }}
             className="group relative overflow-hidden rounded-[16px] border border-[#EAE6DF] bg-white shadow-[0_4px_24px_rgba(0,0,0,0.03)] transition-all duration-500 hover:shadow-[0_12px_40px_rgba(0,0,0,0.08)]"
           >
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-0">
               <div className="lg:col-span-7 relative min-h-[380px] sm:min-h-[480px] lg:min-h-[580px] overflow-hidden bg-[#1A1A1A]">
-                <motion.img
+                <ResponsiveImage
                   src={story.image}
+                  thumbSrc={story.imageThumb}
                   alt={story.title}
+                  sizes="featured"
                   className="absolute inset-0 h-full w-full object-cover transition-transform duration-1000 ease-out group-hover:scale-105"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-60" />
@@ -88,10 +93,12 @@ export function FeaturedStoryCard({ lang }: FeaturedStoryCardProps) {
                     />
                   </div>
                 ) : null}
-                <div className="absolute bottom-6 left-6 flex items-center gap-2 rounded-full bg-white/90 backdrop-blur-md px-3.5 py-1.5 text-xs text-[#1A1A1A] font-sans font-medium">
-                  <MapPin className="size-3.5 text-[#0C2686]" />
-                  <span>{story.location}</span>
-                </div>
+                {story.location?.trim() ? (
+                  <div className="absolute bottom-6 left-6 flex items-center gap-2 rounded-full bg-white/90 backdrop-blur-md px-3.5 py-1.5 text-xs text-[#1A1A1A] font-sans font-medium">
+                    <MapPin className="size-3.5 text-[#0C2686]" />
+                    <span>{story.location}</span>
+                  </div>
+                ) : null}
               </div>
 
               <div className="lg:col-span-5 p-8 md:p-12 lg:p-16 flex flex-col justify-between bg-white">

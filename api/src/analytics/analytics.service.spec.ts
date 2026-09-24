@@ -59,6 +59,41 @@ describe('AnalyticsService', () => {
     expect(result).toEqual({ ignored: true });
   });
 
+  it('ignores beacons from authenticated CMS staff', async () => {
+    const result = await service.beacon(
+      {
+        path: '/stories/test',
+        visitorKey: 'visitor-1',
+        event: 'pageview',
+      },
+      'jest-agent',
+      { cmsAccessToken: 'cms-jwt' },
+    );
+    expect(result).toEqual({ ignored: true });
+    expect(prisma.pageView.create).not.toHaveBeenCalled();
+  });
+
+  it('ignores beacons from excluded internal IPs', async () => {
+    const prev = process.env.ANALYTICS_EXCLUDE_IPS;
+    process.env.ANALYTICS_EXCLUDE_IPS = '10.0.0.5, 192.168.1.10';
+    try {
+      const result = await service.beacon(
+        {
+          path: '/stories/test',
+          visitorKey: 'visitor-1',
+          event: 'pageview',
+        },
+        'jest-agent',
+        { clientIp: '10.0.0.5' },
+      );
+      expect(result).toEqual({ ignored: true });
+      expect(prisma.pageView.create).not.toHaveBeenCalled();
+    } finally {
+      if (prev === undefined) delete process.env.ANALYTICS_EXCLUDE_IPS;
+      else process.env.ANALYTICS_EXCLUDE_IPS = prev;
+    }
+  });
+
   it('records public page beacon', async () => {
     const result = await service.beacon({
       path: '/stories/test',

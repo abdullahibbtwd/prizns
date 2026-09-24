@@ -1,9 +1,11 @@
-import { useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { X } from 'lucide-react'
 import { useReaderAuth } from '@/lib/reader-auth'
 import { useJournalLang } from '@/hooks/useJournalLang'
+import { isValidEmail } from '@/lib/email'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 
 export function ReaderSignInModal() {
   const { t } = useTranslation()
@@ -15,18 +17,38 @@ export function ReaderSignInModal() {
     'idle' | 'sending' | 'sent' | 'signedIn' | 'error'
   >('idle')
   const [error, setError] = useState<string | null>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
+  const open = Boolean(enabled && modalOpen)
 
-  if (!enabled || !modalOpen) return null
-
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     setStatus('idle')
     setError(null)
     setEmail('')
     closeSignIn()
-  }
+  }, [closeSignIn])
+
+  useEffect(() => {
+    if (!open) return
+    const previous = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        handleClose()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => {
+      document.body.style.overflow = previous
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [open, handleClose])
+
+  useFocusTrap(open, panelRef)
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault()
+    if (!isValidEmail(email)) return
     setStatus('sending')
     setError(null)
     try {
@@ -52,6 +74,10 @@ export function ReaderSignInModal() {
     }
   }
 
+  if (!open) return null
+
+  const emailOk = isValidEmail(email)
+
   return (
     <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/40 p-4 sm:items-center">
       <button
@@ -59,8 +85,10 @@ export function ReaderSignInModal() {
         className="absolute inset-0 cursor-pointer"
         aria-label={t('close')}
         onClick={handleClose}
+        tabIndex={-1}
       />
       <div
+        ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="reader-signin-title"
@@ -100,7 +128,7 @@ export function ReaderSignInModal() {
               <input
                 type="email"
                 required
-                autoFocus
+                data-autofocus
                 autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -113,7 +141,7 @@ export function ReaderSignInModal() {
             )}
             <button
               type="submit"
-              disabled={status === 'sending' || !email.trim()}
+              disabled={status === 'sending' || !emailOk}
               className="w-full cursor-pointer rounded-full bg-[#0C2686] px-5 py-3 font-sans text-xs font-semibold uppercase tracking-[0.18em] text-white transition hover:bg-[#0a1f6b] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {status === 'sending'

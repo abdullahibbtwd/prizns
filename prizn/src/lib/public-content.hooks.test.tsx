@@ -107,9 +107,13 @@ describe('public content hooks', () => {
   })
 
   it('searches public articles when the query is at least two characters', async () => {
-    vi.mocked(articlesApi.listPublicArticles).mockResolvedValue([
-      { id: '1', slug: 'vidin', section: 'places' } as never,
-    ])
+    vi.mocked(articlesApi.listPublicArticlesPage).mockResolvedValue({
+      items: [{ id: '1', slug: 'vidin', section: 'places' } as never],
+      total: 1,
+      page: 1,
+      pageSize: 8,
+      totalPages: 1,
+    })
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
 
     const { result } = renderHook(() => usePublicArticleSearch('Vidin'), {
@@ -120,9 +124,10 @@ describe('public content hooks', () => {
       expect(result.current.isSuccess).toBe(true)
     })
 
-    expect(articlesApi.listPublicArticles).toHaveBeenCalledWith(undefined, {
+    expect(articlesApi.listPublicArticlesPage).toHaveBeenCalledWith(undefined, {
       q: 'Vidin',
-      limit: 12,
+      page: 1,
+      pageSize: 8,
     })
   })
 

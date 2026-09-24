@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link } from '@/components/LocaleLink'
 import { motion } from 'framer-motion'
 import { PenLine } from 'lucide-react'
 import { journalContent } from '@/data/concept-3/content'
@@ -13,10 +13,10 @@ export function WriteForUsSection({ lang }: WriteForUsSectionProps) {
   return (
     <section id="write-for-us" className="border-t border-[#EAE6DF] bg-[#FDFBF7] px-6 py-24 md:px-12 md:py-32">
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
+        initial={false}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
-        transition={{ duration: 0.8 }}
+        transition={{ duration: 0.35 }}
         className="mx-auto max-w-3xl text-center"
       >
         <span className="mb-4 block font-sans text-xs font-medium uppercase tracking-[0.3em] text-[#0C2686]">

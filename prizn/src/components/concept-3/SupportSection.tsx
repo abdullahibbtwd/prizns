@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link } from '@/components/LocaleLink'
 import { motion } from 'framer-motion'
 import { Handshake, Heart } from 'lucide-react'
 import { journalContent } from '@/data/concept-3/content'
@@ -14,10 +14,10 @@ export function SupportSection({ lang }: SupportSectionProps) {
     <>
       <section id="support" className="bg-[#FDFBF7] px-6 py-20 md:px-12 md:py-28">
         <motion.div
-          initial={{ opacity: 0, y: 24 }}
+          initial={false}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          transition={{ duration: 0.8 }}
+          transition={{ duration: 0.35 }}
           className="relative mx-auto max-w-5xl overflow-hidden rounded-[24px] border border-[#EAE6DF] bg-[#1A1A1A] px-8 py-16 text-center text-white md:px-16 md:py-20"
         >
           <div

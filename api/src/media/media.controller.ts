@@ -27,9 +27,17 @@ export class MediaController {
   constructor(private readonly media: MediaService) {}
 
   @Get()
-  list(@Query('kind') kind?: string) {
+  list(
+    @Query('kind') kind?: string,
+    @Query('q') q?: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+  ) {
     return this.media.list({
       kind: this.parseKind(kind),
+      q,
+      page: page ? Number(page) : undefined,
+      pageSize: pageSize ? Number(pageSize) : undefined,
     });
   }
 

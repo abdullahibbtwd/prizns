@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { ArrowRight } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Alert, type AlertVariant } from '@/components/ui/Alert'
 import { journalContent } from '@/data/concept-3/content'
 import { ApiError } from '@/lib/api'
@@ -15,6 +16,7 @@ export function NewsletterSection({
   lang,
   variant = 'page',
 }: NewsletterSectionProps) {
+  const { t } = useTranslation()
   const newsletter = journalContent.newsletter
   const [email, setEmail] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -92,10 +94,10 @@ export function NewsletterSection({
     >
       <div className={panel ? 'w-full' : 'mx-auto max-w-xl text-center'}>
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={false}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          transition={{ duration: 0.8 }}
+          transition={{ duration: 0.35 }}
         >
           <span
             className={
@@ -124,7 +126,7 @@ export function NewsletterSection({
                 : 'mb-10 font-sans text-xs font-light leading-relaxed text-[#1A1A1A]/60 md:text-sm'
             }
           >
-            {newsletter.subtitle}
+            {t('newsletterNoSpam')}
           </p>
 
           <form
@@ -145,7 +147,7 @@ export function NewsletterSection({
                 value={email}
                 disabled={submitting}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder={newsletter.emailPlaceholder}
+                placeholder={t('newsletterEmailPlaceholder')}
                 className={
                   panel
                     ? 'w-full bg-transparent font-sans text-sm text-white outline-none placeholder:text-white/40 disabled:opacity-60'

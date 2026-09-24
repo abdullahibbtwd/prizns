@@ -1,4 +1,5 @@
-import { Link, useNavigate } from 'react-router-dom'
+import {useNavigate } from 'react-router-dom'
+import { Link } from '@/components/LocaleLink'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { useEffect, useMemo, useState } from 'react'

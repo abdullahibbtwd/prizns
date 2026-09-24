@@ -73,7 +73,11 @@ export default function CmsSeriesPage() {
       <CmsPageHeader
         title={t('cms.series.title')}
         description={t('cms.series.description')}
-        badge={t('cms.series.items', { count: series.length })}
+        badge={
+          seriesQuery.isLoading
+            ? t('cms.series.itemsLoading')
+            : t('cms.series.items', { count: series.length })
+        }
         actions={
           <Link to="/cms/series/new">
             <PrimaryButton>

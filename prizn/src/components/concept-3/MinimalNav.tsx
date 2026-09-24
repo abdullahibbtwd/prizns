@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef } from 'react'
-import { Link } from 'react-router-dom'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
+import { Link } from '@/components/LocaleLink'
 import { Search, Globe, Heart, ChevronDown, PenLine, Handshake, Bookmark, Users } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Logo } from '@/components/Logo'
@@ -8,6 +9,7 @@ import { getPrimaryNavLinks } from '@/data/concept-3/nav'
 import { useReaderAuth } from '@/lib/reader-auth'
 import { MobileNavMenu } from '@/components/concept-3/MobileNavMenu'
 import { JournalSearchOverlay } from '@/components/concept-3/JournalSearchOverlay'
+import { useSectionPresence } from '@/hooks/useSectionPresence'
 
 interface MinimalNavProps {
   lang: 'bg' | 'en'
@@ -16,12 +18,25 @@ interface MinimalNavProps {
 }
 
 export function MinimalNav({ lang, setLang, variant = 'hero' }: MinimalNavProps) {
+  const { t } = useTranslation()
   const [scrolled, setScrolled] = useState(variant === 'solid')
   const [searchOpen, setSearchOpen] = useState(false)
   const [contributeOpen, setContributeOpen] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
   const contributeRef = useRef<HTMLDivElement>(null)
-  const isSolid = variant === 'solid' || scrolled
+  const contributeButtonRef = useRef<HTMLButtonElement>(null)
+  const isSolid = variant === 'solid' || scrolled || menuOpen
   const { reader, enabled: readerAuthEnabled, openSignIn } = useReaderAuth()
+  const { isPathVisible } = useSectionPresence()
+
+  const closeContribute = useCallback((restoreFocus = false) => {
+    setContributeOpen((wasOpen) => {
+      if (wasOpen && restoreFocus) {
+        queueMicrotask(() => contributeButtonRef.current?.focus())
+      }
+      return false
+    })
+  }, [])
 
   useEffect(() => {
     if (variant === 'solid') {
@@ -38,16 +53,33 @@ export function MinimalNav({ lang, setLang, variant = 'hero' }: MinimalNavProps)
   }, [variant])
 
   useEffect(() => {
-    const onPointerDown = (event: MouseEvent) => {
-      if (!contributeRef.current?.contains(event.target as Node)) {
-        setContributeOpen(false)
+    closeContribute(false)
+  }, [lang, closeContribute])
+
+  useEffect(() => {
+    if (!contributeOpen) return
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        closeContribute(true)
       }
     }
+    const onPointerDown = (event: MouseEvent) => {
+      if (!contributeRef.current?.contains(event.target as Node)) {
+        closeContribute(true)
+      }
+    }
+    window.addEventListener('keydown', onKey)
     document.addEventListener('mousedown', onPointerDown)
-    return () => document.removeEventListener('mousedown', onPointerDown)
-  }, [])
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      document.removeEventListener('mousedown', onPointerDown)
+    }
+  }, [contributeOpen, closeContribute])
 
-  const navLinks = getPrimaryNavLinks(lang)
+  const navLinks = getPrimaryNavLinks(lang).filter((link) =>
+    isPathVisible(link.to),
+  )
 
   const contributeLinks = [
     {
@@ -100,14 +132,21 @@ export function MinimalNav({ lang, setLang, variant = 'hero' }: MinimalNavProps)
             />
           </Link>
 
-          <nav className="hidden lg:flex items-center gap-7 xl:gap-10">
+          <nav
+            className={cn(
+              'hidden lg:flex items-center',
+              // BG labels are longer; keep a single row without mid-label wraps.
+              lang === 'bg' ? 'gap-4 xl:gap-6' : 'gap-7 xl:gap-10',
+            )}
+          >
             {navLinks.map((link) => (
               <Link
                 key={link.to}
                 to={link.to}
                 className={cn(
-                  'text-xs uppercase tracking-[0.25em] transition-colors font-sans duration-300',
-                  navItemClass
+                  'whitespace-nowrap text-xs uppercase transition-colors font-sans duration-300',
+                  lang === 'bg' ? 'tracking-[0.14em]' : 'tracking-[0.25em]',
+                  navItemClass,
                 )}
               >
                 {link.label}
@@ -117,24 +156,34 @@ export function MinimalNav({ lang, setLang, variant = 'hero' }: MinimalNavProps)
 
           <div className="flex items-center gap-3 md:gap-4">
             <button
+              type="button"
               onClick={() => setSearchOpen(true)}
               className={cn(
-                'flex items-center gap-2 text-xs uppercase tracking-[0.2em] transition-colors py-1 px-2.5 rounded-full duration-300',
+                'inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-full text-xs uppercase tracking-[0.2em] transition-colors duration-300 sm:min-h-0 sm:min-w-0 sm:px-2.5 sm:py-1',
                 isSolid
                   ? 'text-[#1A1A1A]/70 hover:text-[#0C2686] hover:bg-black/5'
                   : 'text-white/85 hover:text-white hover:bg-white/10'
               )}
-              aria-label="Search"
+              aria-label={t('search')}
             >
               <Search className="size-3.5 stroke-[1.5]" />
-              <span className="hidden sm:inline font-sans">{lang === 'bg' ? 'Търсене' : 'Search'}</span>
+              <span className="hidden sm:inline font-sans">{t('search')}</span>
             </button>
 
             {/* Contribute dropdown */}
             <div ref={contributeRef} className="relative hidden sm:block">
               <button
+                ref={contributeButtonRef}
                 type="button"
-                onClick={() => setContributeOpen((open) => !open)}
+                onClick={() =>
+                  setContributeOpen((open) => {
+                    if (open) {
+                      queueMicrotask(() => contributeButtonRef.current?.focus())
+                      return false
+                    }
+                    return true
+                  })
+                }
                 className={cn(
                   'inline-flex cursor-pointer items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[11px] font-sans uppercase tracking-[0.18em] font-medium transition-all duration-300',
                   isSolid
@@ -177,7 +226,7 @@ export function MinimalNav({ lang, setLang, variant = 'hero' }: MinimalNavProps)
                             key={item.href}
                             to={item.href}
                             role="menuitem"
-                            onClick={() => setContributeOpen(false)}
+                            onClick={() => closeContribute(false)}
                             className={cn(
                               'group flex items-center gap-3 px-4 py-3 transition-colors hover:bg-black/[0.03]',
                               index < contributeLinks.length - 1 && 'border-b border-[#EAE6DF]/80',
@@ -248,6 +297,7 @@ export function MinimalNav({ lang, setLang, variant = 'hero' }: MinimalNavProps)
               lang={lang}
               setLang={setLang}
               onSearch={() => setSearchOpen(true)}
+              onOpenChange={setMenuOpen}
               className={isSolid ? 'text-journal-ink' : 'text-white'}
             />
           </div>

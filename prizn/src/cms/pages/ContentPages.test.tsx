@@ -16,18 +16,24 @@ vi.mock('@/lib/articles-api', () => ({
 
 describe('CmsMediaPage', () => {
   beforeEach(() => {
-    listCmsMedia.mockResolvedValue([
-      {
-        id: 'media-1',
-        kind: 'IMAGE',
-        status: 'DONE',
-        url: '/media/one.jpg',
-        thumbnailUrl: '/media/one-thumb.jpg',
-        titleBg: 'Sunset',
-        locationBg: 'Vidin',
-        originalName: 'sunset.jpg',
-      },
-    ])
+    listCmsMedia.mockResolvedValue({
+      items: [
+        {
+          id: 'media-1',
+          kind: 'IMAGE',
+          status: 'DONE',
+          url: '/media/one.jpg',
+          thumbnailUrl: '/media/one-thumb.jpg',
+          titleBg: 'Sunset',
+          locationBg: 'Vidin',
+          originalName: 'sunset.jpg',
+        },
+      ],
+      total: 1,
+      page: 1,
+      pageSize: 24,
+      totalPages: 1,
+    })
     deleteCmsMedia.mockResolvedValue({ ok: true, id: 'media-1' })
   })
 

@@ -1,7 +1,12 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { ChevronLeft, ChevronRight, Expand } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { ImageLightbox } from '@/components/concept-3/ImageLightbox'
+
+const ImageLightbox = lazy(() =>
+  import('@/components/concept-3/ImageLightbox').then((m) => ({
+    default: m.ImageLightbox,
+  })),
+)
 
 export type HeroSlide = {
   id: string
@@ -46,6 +51,7 @@ export function ArticleHeroGallery({
 }) {
   const { t } = useTranslation()
   const [active, setActive] = useState(0)
+  const [lightboxOpen, setLightboxOpen] = useState(false)
 
   useEffect(() => {
     if (slides.length === 0) {
@@ -57,7 +63,6 @@ export function ArticleHeroGallery({
 
   if (slides.length === 0) return null
 
-  const [lightboxOpen, setLightboxOpen] = useState(false)
   const current = slides[active] ?? slides[0]!
   const hasMany = slides.length > 1
   const lightboxSlides = slides.map((slide) => ({
@@ -166,13 +171,17 @@ export function ArticleHeroGallery({
         </div>
       ) : null}
 
-      <ImageLightbox
-        open={lightboxOpen}
-        slides={lightboxSlides}
-        index={active}
-        onIndexChange={setActive}
-        onClose={() => setLightboxOpen(false)}
-      />
+      {lightboxOpen ? (
+        <Suspense fallback={null}>
+          <ImageLightbox
+            open={lightboxOpen}
+            slides={lightboxSlides}
+            index={active}
+            onIndexChange={setActive}
+            onClose={() => setLightboxOpen(false)}
+          />
+        </Suspense>
+      ) : null}
     </div>
   )
 }

@@ -4,8 +4,17 @@
  * Local — fetch WP, write a migration package (no database):
  *   npm run import:wordpress:export --prefix api
  *
+ * Re-download images missing a local `file`, and upgrade WordPress sized
+ * derivatives (e.g. -150x150) to full-size originals before download:
+ *   npm run import:wordpress:repair-images --prefix api
+ *   npm run import:wordpress:repair-images --prefix api -- --dry-run
+ *
  * Coolify / VPS Docker — copy wordpress-export onto the API container, then:
  *   docker compose exec api node dist/wordpress-import/import-wordpress.js --package=/app/wordpress-export --users
+ * Re-import media only: keep articles + MinIO URLs that already work; fix WordPress hotlinks:
+ *   ... --package=/app/wordpress-export --users --fix-media
+ * Full rewrite of existing article rows (rare):
+ *   ... --package=/app/wordpress-export --users --update
  * Skip CMS category records:
  *   ... --package=/app/wordpress-export --users --skip-categories
  *
@@ -21,7 +30,7 @@
 import { createHash } from 'crypto';
 import { setDefaultResultOrder } from 'dns';
 import { config } from 'dotenv';
-import { access, mkdir, readFile, unlink, writeFile } from 'fs/promises';
+import { access, mkdir, readdir, readFile, unlink, writeFile } from 'fs/promises';
 import { dirname, join, relative, resolve, sep } from 'path';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient, type ArticleSection } from '@prisma/client';
@@ -30,6 +39,7 @@ import * as Minio from 'minio';
 import {
   CATEGORY_PARENT,
   HIDDEN_CMS_CATEGORY_SLUGS,
+  canonicalizeLocationSlug,
   resolveCategoryPlacement,
 } from '../categories/canonical-categories';
 import { mapWpPost, parseWpPostsJson } from './map';
@@ -51,6 +61,14 @@ import {
   wpUserAlias,
   type MappedWpUser,
 } from './users';
+import {
+  applyDownloadedFiles,
+  collectMissingPackageImages,
+  isUsableMediaAsset,
+  upgradeWordpressThumbnails,
+} from './repair-images';
+import { preferShareImageUrl } from '../common/share-image.util';
+import { previousAuthorSlugs } from './author-slug-aliases';
 
 config({ path: resolve(__dirname, '../../../.env') });
 config({ path: resolve(process.cwd(), '../.env') });
@@ -61,6 +79,7 @@ setDefaultResultOrder('ipv4first');
 
 const UA = 'PriznsWordpressImport/1.0';
 const FETCH_ATTEMPTS = 8;
+const IMAGE_FETCH_ATTEMPTS = 5;
 const PAGE_GAP_MS = 800;
 const POSTS_PER_PAGE = 25;
 
@@ -88,6 +107,8 @@ type Flags = {
   package?: string;
   images?: string;
   'skip-categories'?: boolean;
+  'repair-images'?: boolean | string;
+  'fix-media'?: boolean;
 };
 
 type MediaDirs = {
@@ -135,6 +156,7 @@ function errorCode(error: unknown): string {
 function isRetryable(error: unknown, status?: number): boolean {
   if (status && [408, 429, 500, 502, 503, 504].includes(status)) return true;
   const code = errorCode(error);
+  if (code === 'ENOTFOUND') return false;
   if (
     [
       'ECONNRESET',
@@ -224,6 +246,52 @@ async function fetchJson(
   }
 
   throw new Error(formatNetworkError(url, lastError));
+}
+
+async function fetchBinary(
+  url: string,
+  attempts = IMAGE_FETCH_ATTEMPTS,
+): Promise<{ buffer: Buffer; contentType: string | null }> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      const response = await fetch(url, {
+        headers: { 'User-Agent': UA },
+        signal: AbortSignal.timeout(90_000),
+      });
+      if (!response.ok) {
+        const err = new Error(`download ${response.status}`);
+        if (attempt < attempts && isRetryable(err, response.status)) {
+          const retryAfter = Number(response.headers.get('Retry-After'));
+          const waitMs =
+            Number.isFinite(retryAfter) && retryAfter > 0
+              ? retryAfter * 1000
+              : Math.min(15_000, 800 * 2 ** (attempt - 1));
+          console.warn(
+            `  image ${response.status} attempt ${attempt}/${attempts}; retrying in ${Math.round(waitMs / 1000)}s`,
+          );
+          await sleep(waitMs);
+          continue;
+        }
+        throw err;
+      }
+      return {
+        buffer: Buffer.from(await response.arrayBuffer()),
+        contentType: response.headers.get('content-type'),
+      };
+    } catch (error) {
+      lastError = error;
+      if (attempt >= attempts || !isRetryable(error)) {
+        throw error instanceof Error ? error : new Error(String(error));
+      }
+      const waitMs = Math.min(15_000, 800 * 2 ** (attempt - 1));
+      console.warn(
+        `  image network (${errorCode(error) || 'error'}) attempt ${attempt}/${attempts}; retrying in ${Math.round(waitMs / 1000)}s`,
+      );
+      await sleep(waitMs);
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
 }
 
 async function loadUsers(origin: string): Promise<WpUser[]> {
@@ -438,6 +506,23 @@ function createMinio() {
   };
 }
 
+function hostedMediaUrlPrefixes(): string[] {
+  const prefixes: string[] = [];
+  const minio = createMinio();
+  if (minio) {
+    prefixes.push(`${minio.publicUrl}/${minio.bucket}/`);
+    prefixes.push(`${minio.publicUrl}/`);
+  }
+  for (const raw of [
+    process.env.MINIO_PUBLIC_URL,
+    process.env.MEDIA_PUBLIC_URL,
+  ]) {
+    if (!raw) continue;
+    prefixes.push(`${raw.replace(/\/$/, '')}/`);
+  }
+  return [...new Set(prefixes)];
+}
+
 async function importImage(
   prisma: PrismaClient,
   image: WpInlineImage,
@@ -445,12 +530,15 @@ async function importImage(
 ): Promise<{ id: string; url: string } | null> {
   const key = mediaKey(image, opts.hintId);
   const existing = await prisma.mediaAsset.findUnique({ where: { key } });
-  if (existing) return { id: existing.id, url: existing.url };
+  if (existing && isUsableMediaAsset(existing, hostedMediaUrlPrefixes())) {
+    return { id: existing.id, url: existing.url };
+  }
 
   const originalName = key.split('/').pop() ?? 'image.jpg';
   let url = image.src || '';
   let size: number | null = null;
   let mimeType = mimeFromName(originalName);
+  let downloaded = false;
 
   if (!opts.skipMedia) {
     const minio = createMinio();
@@ -460,12 +548,12 @@ async function importImage(
         buffer = await readFile(await resolvePackagedImage(image.file, opts.mediaDirs));
         mimeType = mimeFromName(originalName, mimeType);
       } else {
-        const response = await fetch(image.src, { headers: { 'User-Agent': UA } });
-        if (!response.ok) throw new Error(`download ${response.status}`);
-        buffer = Buffer.from(await response.arrayBuffer());
-        mimeType = response.headers.get('content-type')?.split(';')[0] || mimeType;
+        const fetched = await fetchBinary(image.src);
+        buffer = fetched.buffer;
+        mimeType = fetched.contentType?.split(';')[0] || mimeType;
       }
       size = buffer.length;
+      downloaded = true;
       if (minio) {
         await minio.client.putObject(minio.bucket, key, buffer, size, {
           'Content-Type': mimeType,
@@ -490,7 +578,24 @@ async function importImage(
           error instanceof Error ? error.message : String(error)
         }`,
       );
+      if (existing) return { id: existing.id, url: existing.url };
     }
+  }
+
+  if (existing) {
+    if (!downloaded) return { id: existing.id, url: existing.url };
+    const updated = await prisma.mediaAsset.update({
+      where: { id: existing.id },
+      data: {
+        url,
+        mimeType,
+        originalName,
+        size,
+        titleBg: originalName,
+        creditBg: image.caption || existing.creditBg,
+      },
+    });
+    return { id: updated.id, url: updated.url };
   }
 
   const created = await prisma.mediaAsset.create({
@@ -537,7 +642,7 @@ async function upsertAuthor(
       },
     }));
 
-  const translationStatus = opts.skipTranslate ? 'READY' : 'PENDING';
+  const translationStatus = 'PENDING' as const;
 
   if (existing) {
     const aliases = new Set(existing.aliases);
@@ -611,17 +716,30 @@ async function importWpUser(
   const existingAuthor =
     user.author ||
     (await prisma.author.findFirst({ where: { aliases: { has: alias } } })) ||
-    (await prisma.author.findUnique({ where: { slug: mapped.slug } }));
+    (await prisma.author.findUnique({ where: { slug: mapped.slug } })) ||
+    (await prisma.author.findFirst({
+      where: {
+        OR: [
+          { slug: { in: previousAuthorSlugs(mapped.slug) } },
+          { aliases: { hasSome: previousAuthorSlugs(mapped.slug) } },
+        ],
+      },
+    }));
 
-  const translationStatus = opts.skipTranslate ? 'READY' : 'PENDING';
+  const translationStatus = 'PENDING' as const;
   const aliases = new Set(existingAuthor?.aliases ?? []);
   aliases.add(alias);
+  for (const previous of previousAuthorSlugs(mapped.slug)) {
+    aliases.add(previous);
+  }
 
   const author = existingAuthor
     ? await prisma.author.update({
         where: { id: existingAuthor.id },
         data: {
           userId: existingAuthor.userId ?? user.id,
+          slug: mapped.slug,
+          nameBg: existingAuthor.nameBg || mapped.name,
           bioBg: existingAuthor.bioBg || mapped.bioBg,
           imageUrl: existingAuthor.imageUrl || mapped.imageUrl,
           aliases: [...aliases],
@@ -705,6 +823,8 @@ async function syncTags(
 ) {
   const ids: string[] = [];
   for (const tag of tags) {
+    // City names belong on LOCATION tags — skip TOPIC duplicates (F-14).
+    if (canonicalizeLocationSlug(tag.slug)) continue;
     const row = await prisma.tag.upsert({
       where: { kind_slug: { kind: 'TOPIC', slug: tag.slug } },
       update: { nameBg: tag.nameBg },
@@ -712,7 +832,12 @@ async function syncTags(
     });
     ids.push(row.id);
   }
-  await prisma.articleTag.deleteMany({ where: { articleId } });
+  await prisma.articleTag.deleteMany({
+    where: {
+      articleId,
+      tag: { kind: 'TOPIC' },
+    },
+  });
   if (ids.length === 0) return;
   await prisma.articleTag.createMany({
     data: ids.map((tagId) => ({ articleId, tagId })),
@@ -725,6 +850,7 @@ async function saveArticle(
   mapped: MappedWpArticle,
   opts: {
     update: boolean;
+    fixMedia: boolean;
     draft: boolean;
     skipMedia: boolean;
     skipTranslate: boolean;
@@ -757,6 +883,17 @@ async function saveArticle(
     }
   }
 
+  const existing = await prisma.article.findUnique({
+    where: { section_slug: { section: mapped.section, slug: mapped.slug } },
+    select: { id: true, heroMediaId: true, body: true },
+  });
+
+  // Default re-import: keep article text as-is. importImage above already
+  // refreshed any mediaAsset whose URL is still a WordPress hotlink.
+  if (existing && !opts.update && !opts.fixMedia) {
+    return { id: existing.id, action: 'skipped' as const };
+  }
+
   const body = mapped.body.map((block) => {
     if (block.type !== 'image') return block;
     const mediaId = block.url ? srcToMediaId.get(block.url) : block.mediaId;
@@ -767,6 +904,31 @@ async function saveArticle(
       captionBg: block.captionBg ?? '',
     };
   });
+
+  // --fix-media: only attach/replace media links; leave copy and SEO alone.
+  if (existing && opts.fixMedia && !opts.update) {
+    const patchedBody = patchExistingBodyMedia(existing.body, srcToMediaId);
+    await prisma.article.update({
+      where: { id: existing.id },
+      data: {
+        heroMediaId: existing.heroMediaId || heroMediaId,
+        ...(patchedBody ? { body: patchedBody as object[] } : {}),
+      },
+    });
+    if (galleryIds.length > 0) {
+      await prisma.articleGalleryItem.deleteMany({
+        where: { articleId: existing.id },
+      });
+      await prisma.articleGalleryItem.createMany({
+        data: galleryIds.map((mediaId, sortOrder) => ({
+          articleId: existing.id,
+          mediaId,
+          sortOrder,
+        })),
+      });
+    }
+    return { id: existing.id, action: 'media-fixed' as const };
+  }
 
   const data = {
     section: mapped.section as ArticleSection,
@@ -787,17 +949,8 @@ async function saveArticle(
     seoTitleBg: mapped.seoTitleBg,
     seoDescriptionBg: mapped.seoDescriptionBg,
     sourceLang: 'bg',
-    translationStatus: opts.skipTranslate ? ('READY' as const) : ('PENDING' as const),
+    translationStatus: 'PENDING' as const,
   };
-
-  const existing = await prisma.article.findUnique({
-    where: { section_slug: { section: mapped.section, slug: mapped.slug } },
-    select: { id: true },
-  });
-
-  if (existing && !opts.update) {
-    return { id: existing.id, action: 'skipped' as const };
-  }
 
   const row = existing
     ? await prisma.article.update({ where: { id: existing.id }, data })
@@ -827,6 +980,29 @@ async function saveArticle(
   return { id: row.id, action: existing ? ('updated' as const) : ('created' as const) };
 }
 
+function patchExistingBodyMedia(
+  body: unknown,
+  srcToMediaId: Map<string, string>,
+): unknown[] | null {
+  if (!Array.isArray(body) || srcToMediaId.size === 0) return null;
+  let changed = false;
+  const next = body.map((block) => {
+    if (!block || typeof block !== 'object') return block;
+    const record = block as Record<string, unknown>;
+    if (record.type !== 'image') return block;
+    const url = typeof record.url === 'string' ? record.url : '';
+    const mappedId = url ? srcToMediaId.get(url) : undefined;
+    if (!mappedId) return block;
+    changed = true;
+    return {
+      ...record,
+      mediaId: mappedId,
+      url: undefined,
+    };
+  });
+  return changed ? next : null;
+}
+
 async function upsertPackageCategories(
   prisma: PrismaClient,
   categories: PackagedCategory[],
@@ -841,7 +1017,7 @@ async function upsertPackageCategories(
         slug: category.slug,
         nameBg: category.nameBg,
         sourceLang: 'bg',
-        translationStatus: 'READY',
+        translationStatus: 'PENDING',
       },
     });
   }
@@ -853,9 +1029,7 @@ async function downloadToPackage(
   used: Set<string>,
 ): Promise<string | undefined> {
   try {
-    const response = await fetch(src, { headers: { 'User-Agent': UA } });
-    if (!response.ok) throw new Error(`download ${response.status}`);
-    const buffer = Buffer.from(await response.arrayBuffer());
+    const { buffer } = await fetchBinary(src);
     const name = uniqueImageName(src, used);
     used.add(name);
     await writeFile(join(imagesDir, name), buffer);
@@ -878,21 +1052,32 @@ async function attachLocalImages(
 
   const download = async (src: string) => {
     if (!src) return undefined;
-    if (cache.has(src)) return cache.get(src);
-    const file = await downloadToPackage(src, imagesDir, used);
-    cache.set(src, file);
+    const preferred = preferShareImageUrl(src) || src;
+    if (cache.has(preferred)) return cache.get(preferred);
+    const file = await downloadToPackage(preferred, imagesDir, used);
+    cache.set(preferred, file);
+    if (preferred !== src) cache.set(src, file);
     return file;
   };
 
   for (const article of articles) {
     if (article.heroImage) {
-      const file = await download(article.heroImage.src);
-      if (file) article.heroImage = { ...article.heroImage, file };
+      const preferred =
+        preferShareImageUrl(article.heroImage.src) || article.heroImage.src;
+      const file = await download(preferred);
+      article.heroImage = {
+        ...article.heroImage,
+        src: preferred,
+        ...(file ? { file } : {}),
+      };
     }
     article.galleryImages = await Promise.all(
       article.galleryImages.map(async (image) => {
-        const file = await download(image.src);
-        return file ? { ...image, file } : image;
+        const preferred = preferShareImageUrl(image.src) || image.src;
+        const file = await download(preferred);
+        return file
+          ? { ...image, src: preferred, file }
+          : { ...image, src: preferred };
       }),
     );
   }
@@ -950,6 +1135,137 @@ async function writeExportPackage(
   await writeFile(
     join(exportDir, 'categories.json'),
     JSON.stringify({ categories: pkg.categories }, null, 2),
+  );
+}
+
+async function repairMissingPackageImages(flags: Flags) {
+  const packageDir = resolve(
+    flags.package ||
+      (typeof flags['repair-images'] === 'string'
+        ? flags['repair-images']
+        : '../wordpress-export'),
+  );
+  const articlesPath = join(packageDir, 'articles.json');
+  const authorsPath = join(packageDir, 'authors.json');
+  const imagesDir = resolve(flags.images || join(packageDir, 'images'));
+
+  const articlesDoc = JSON.parse(await readFile(articlesPath, 'utf8')) as {
+    articles?: unknown[];
+  };
+  const articlesRaw = Array.isArray(articlesDoc.articles)
+    ? articlesDoc.articles
+    : Array.isArray(articlesDoc)
+      ? (articlesDoc as unknown as unknown[])
+      : [];
+
+  let authorsDoc: { authors?: unknown[] } = { authors: [] };
+  let authorsRaw: unknown[] = [];
+  if (await pathExists(authorsPath)) {
+    authorsDoc = JSON.parse(await readFile(authorsPath, 'utf8')) as {
+      authors?: unknown[];
+    };
+    authorsRaw = Array.isArray(authorsDoc.authors)
+      ? authorsDoc.authors
+      : Array.isArray(authorsDoc)
+        ? (authorsDoc as unknown as unknown[])
+        : [];
+  }
+
+  const thumbUpgrade = upgradeWordpressThumbnails(articlesRaw, authorsRaw);
+  if (thumbUpgrade.upgraded > 0) {
+    console.log(
+      `Upgraded ${thumbUpgrade.upgraded} WordPress sized derivative(s) (e.g. -150x150) to full-size URLs.`,
+    );
+  }
+
+  const missing = collectMissingPackageImages(articlesRaw, authorsRaw);
+  const uniqueSrcs = [...new Set(missing.map((item) => item.src))];
+  console.log(
+    `Package ${packageDir}: ${missing.length} image reference(s) missing local file (${uniqueSrcs.length} unique URL(s)).`,
+  );
+
+  if (flags['dry-run']) {
+    for (const item of missing) {
+      console.log(`[dry-run] ${item.kind} ${item.slug} ← ${item.src}`);
+    }
+    return;
+  }
+
+  if (thumbUpgrade.upgraded > 0) {
+    await writeFile(articlesPath, JSON.stringify(articlesDoc, null, 2));
+    if (await pathExists(authorsPath)) {
+      await writeFile(authorsPath, JSON.stringify(authorsDoc, null, 2));
+    }
+  }
+
+  if (uniqueSrcs.length === 0) {
+    console.log(
+      thumbUpgrade.upgraded > 0
+        ? 'Thumbnail URLs upgraded; no further downloads needed.'
+        : 'Nothing to repair.',
+    );
+    return;
+  }
+
+  await mkdir(imagesDir, { recursive: true });
+  const used = new Set<string>(
+    (await readdir(imagesDir)).filter((name) => !name.startsWith('.')),
+  );
+  const fileBySrc = new Map<string, string>();
+  const failed: { src: string; error: string }[] = [];
+
+  for (let i = 0; i < uniqueSrcs.length; i += 1) {
+    const src = uniqueSrcs[i]!;
+    process.stdout.write(
+      `  [${i + 1}/${uniqueSrcs.length}] ${src.split('/').pop() || src} ... `,
+    );
+    const file = await downloadToPackage(src, imagesDir, used);
+    if (file) {
+      fileBySrc.set(src, file);
+      console.log(`ok → ${file}`);
+    } else {
+      failed.push({
+        src,
+        error: 'download failed after retries',
+      });
+      console.log('FAILED');
+    }
+  }
+
+  const patched = applyDownloadedFiles(articlesRaw, authorsRaw, fileBySrc);
+  if (patched > 0) {
+    await writeFile(articlesPath, JSON.stringify(articlesDoc, null, 2));
+    if (await pathExists(authorsPath)) {
+      await writeFile(authorsPath, JSON.stringify(authorsDoc, null, 2));
+    }
+  }
+
+  const stillMissing = collectMissingPackageImages(articlesRaw, authorsRaw);
+  const reportPath = join(packageDir, 'missing-images.json');
+  await writeFile(
+    reportPath,
+    JSON.stringify(
+      {
+        repairedAt: new Date().toISOString(),
+        downloaded: fileBySrc.size,
+        patched,
+        stillMissing: stillMissing.map((item) => ({
+          kind: item.kind,
+          slug: item.slug,
+          src: item.src,
+        })),
+        failed,
+      },
+      null,
+      2,
+    ),
+  );
+
+  console.log(
+    `Repaired ${patched} reference(s); downloaded ${fileBySrc.size}/${uniqueSrcs.length}; still missing ${stillMissing.length}. Report: ${reportPath}`,
+  );
+  console.log(
+    'Next: re-import with --update so mediaAsset rows with size=null are re-uploaded to MinIO.',
   );
 }
 
@@ -1097,6 +1413,7 @@ async function importMappedPackage(
     for (const article of loaded.articles) {
       const result = await saveArticle(prisma, article, {
         update: Boolean(flags.update),
+        fixMedia: Boolean(flags['fix-media']),
         draft: Boolean(flags.draft),
         skipMedia: Boolean(flags['skip-media']),
         skipTranslate,
@@ -1160,6 +1477,14 @@ async function exportFromWordpress(flags: Flags, origin: string) {
 async function main() {
   const flags = parseFlags(process.argv.slice(2));
   const skipTranslate = !flags.translate;
+
+  if (flags['repair-images']) {
+    if (!flags.package && typeof flags['repair-images'] !== 'string') {
+      flags.package = '../wordpress-export';
+    }
+    await repairMissingPackageImages(flags);
+    return;
+  }
 
   if (flags.export) {
     const origin = wpOrigin(
@@ -1269,6 +1594,7 @@ async function main() {
       const mapped = mapWpPost(post);
       const result = await saveArticle(prisma, mapped, {
         update: Boolean(flags.update),
+        fixMedia: Boolean(flags['fix-media']),
         draft: Boolean(flags.draft),
         skipMedia: Boolean(flags['skip-media']),
         skipTranslate,

@@ -311,24 +311,36 @@ export default function CmsUsersPage() {
       {items.length > 0 && (
         <CmsCard hover={false} className="overflow-hidden p-0">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[880px] text-left text-sm">
+            <table className="w-full min-w-[36rem] text-left text-sm">
               <thead className="border-b border-[#E8E4DC] bg-stone-50 text-xs uppercase tracking-wider text-stone-500">
                 <tr>
-                  <th className="px-4 py-3">{t('cms.users.colUser')}</th>
-                  <th className="px-4 py-3">{t('cms.users.colRole')}</th>
-                  <th className="px-4 py-3">{t('cms.users.colStatus')}</th>
-                  <th className="px-4 py-3">{t('cms.users.colVerified')}</th>
-                  <th className="px-4 py-3">{t('cms.users.colJoined')}</th>
-                  {isAdmin && <th className="px-4 py-3" />}
+                  <th className="px-3 py-3 sm:px-4">{t('cms.users.colUser')}</th>
+                  <th className="hidden px-3 py-3 sm:table-cell sm:px-4">
+                    {t('cms.users.colRole')}
+                  </th>
+                  <th className="hidden px-3 py-3 md:table-cell md:px-4">
+                    {t('cms.users.colStatus')}
+                  </th>
+                  <th className="hidden px-3 py-3 lg:table-cell lg:px-4">
+                    {t('cms.users.colVerified')}
+                  </th>
+                  <th className="hidden px-3 py-3 xl:table-cell xl:px-4">
+                    {t('cms.users.colJoined')}
+                  </th>
+                  {isAdmin && (
+                    <th className="sticky right-0 z-10 bg-stone-50 px-3 py-3 text-right sm:px-4">
+                      <span className="sr-only">{t('cms.users.edit')}</span>
+                    </th>
+                  )}
                 </tr>
               </thead>
               <tbody>
                 {items.map((item) => (
                   <tr
                     key={item.id}
-                    className="border-b border-[#E8E4DC]/70 transition-colors hover:bg-stone-50/80"
+                    className="group border-b border-[#E8E4DC]/70 transition-colors hover:bg-stone-50/80"
                   >
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-3 sm:px-4">
                       <p className="font-medium text-stone-900">
                         {item.name || '—'}
                         {me?.id === item.id && (
@@ -337,7 +349,19 @@ export default function CmsUsersPage() {
                           </span>
                         )}
                       </p>
-                      <p className="text-xs text-stone-500">{item.email}</p>
+                      <p className="max-w-[14rem] truncate text-xs text-stone-500 sm:max-w-none">
+                        {item.email}
+                      </p>
+                      <div className="mt-1.5 flex flex-wrap gap-1.5 sm:hidden">
+                        {itemRoles(item).map((role) => (
+                          <span
+                            key={role}
+                            className="rounded-full border border-[#E8E4DC] bg-stone-50 px-2 py-0.5 text-[11px] font-semibold text-stone-700"
+                          >
+                            {t(cmsRoleI18nKey(role))}
+                          </span>
+                        ))}
+                      </div>
                       {item.authorId && (
                         <Link
                           to={`/cms/authors/${item.authorId}`}
@@ -347,7 +371,7 @@ export default function CmsUsersPage() {
                         </Link>
                       )}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="hidden px-3 py-3 sm:table-cell sm:px-4">
                       <div className="flex flex-wrap gap-1.5">
                         {itemRoles(item).map((role) => (
                           <span
@@ -364,7 +388,7 @@ export default function CmsUsersPage() {
                         </p>
                       ) : null}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="hidden px-3 py-3 md:table-cell md:px-4">
                       {isAdmin ? (
                         <button
                           type="button"
@@ -392,7 +416,7 @@ export default function CmsUsersPage() {
                         <StatusPill status={item.isActive ? 'active' : 'archived'} />
                       )}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="hidden px-3 py-3 lg:table-cell lg:px-4">
                       <span
                         className={cn(
                           'rounded-full border px-2.5 py-1 text-xs font-semibold',
@@ -406,9 +430,11 @@ export default function CmsUsersPage() {
                           : t('cms.users.unverified')}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-stone-500">{item.joinedAt}</td>
+                    <td className="hidden px-3 py-3 text-stone-500 xl:table-cell xl:px-4">
+                      {item.joinedAt}
+                    </td>
                     {isAdmin && (
-                      <td className="px-4 py-3 text-right">
+                      <td className="sticky right-0 z-10 bg-white px-3 py-3 text-right shadow-[-6px_0_8px_-6px_rgba(0,0,0,0.12)] group-hover:bg-stone-50 sm:px-4">
                         <div className="flex items-center justify-end gap-2">
                           <button
                             type="button"
@@ -424,7 +450,7 @@ export default function CmsUsersPage() {
                             className="inline-flex items-center gap-1 rounded-xl border border-[#E8E4DC] bg-stone-50 px-2.5 py-1.5 text-xs font-semibold text-stone-700 transition hover:bg-white"
                           >
                             <Pencil className="size-3.5" />
-                            {t('cms.users.edit')}
+                            <span className="hidden sm:inline">{t('cms.users.edit')}</span>
                           </button>
                           <button
                             type="button"
@@ -435,9 +461,11 @@ export default function CmsUsersPage() {
                             className="inline-flex items-center gap-1 rounded-xl border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-40"
                           >
                             <Trash2 className="size-3.5" />
-                            {deleteMutation.isPending
-                              ? t('cms.users.deleting')
-                              : t('cms.users.delete')}
+                            <span className="hidden sm:inline">
+                              {deleteMutation.isPending
+                                ? t('cms.users.deleting')
+                                : t('cms.users.delete')}
+                            </span>
                           </button>
                         </div>
                       </td>

@@ -19,17 +19,22 @@ describe('journal nav links', () => {
     expect(getPrimaryNavLinks('en').some((l) => l.to === '/events')).toBe(true)
   })
 
-  it('includes Discover and Sport in the footer, without news', () => {
+  it('includes Discover, Sport, News, and more in the footer', () => {
     const secondary = getFooterSecondaryLinks('en')
     expect(secondary.map((l) => l.to)).toEqual([
       '/discover',
       '/sports',
+      '/news',
+      '/gallery',
+      '/video',
+      '/voices',
       '/shop',
       '/authors',
+      '/contact',
     ])
     expect(getFooterSecondaryLinks('bg')[0]?.label).toBe('Открийте')
     expect(getFooterSecondaryLinks('bg')[1]?.label).toBe('Спорт')
-    expect(secondary.some((l) => l.to === '/news')).toBe(false)
+    expect(secondary.some((l) => l.to === '/news')).toBe(true)
     expect(getContributeNavLinks('en').map((l) => l.to)).toEqual([
       '/write-for-us',
       '/support',

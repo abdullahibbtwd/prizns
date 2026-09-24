@@ -7,6 +7,9 @@ import {
   sectionFromCategorySlugs,
 } from '../categories/category-section';
 import { decodeHtmlEntities, htmlToBlocks, stripHtml, toHttps } from './html';
+import { preferShareImageUrl } from '../common/share-image.util';
+import { fixMixedScriptLookalikes } from '../common/cyrillic-latin-fold';
+import { canonicalAuthorSlug } from './author-slug-aliases';
 import type {
   MappedWpArticle,
   WpEmbeddedAuthor,
@@ -130,17 +133,27 @@ export function pickAuthor(post: WpPost): {
   if (embedded?.name) {
     return {
       nameBg: embedded.name.trim(),
-      slug: embedded.slug?.trim() || slugify(embedded.name),
+      slug: canonicalAuthorSlug(embedded.slug?.trim() || slugify(embedded.name)),
       bioBg: embedded.description?.trim() || null,
     };
   }
 
   const yoastPerson = personFromYoast(post);
-  if (yoastPerson) return { nameBg: yoastPerson.name, slug: yoastPerson.slug, bioBg: yoastPerson.bio };
+  if (yoastPerson) {
+    return {
+      nameBg: yoastPerson.name,
+      slug: canonicalAuthorSlug(yoastPerson.slug),
+      bioBg: yoastPerson.bio,
+    };
+  }
 
   const yoastName = post.yoast_head_json?.author?.trim();
   if (yoastName) {
-    return { nameBg: yoastName, slug: slugify(yoastName), bioBg: null };
+    return {
+      nameBg: yoastName,
+      slug: canonicalAuthorSlug(slugify(yoastName)),
+      bioBg: null,
+    };
   }
 
   return { nameBg: 'Редакция', slug: 'redakcia', bioBg: null };
@@ -158,16 +171,111 @@ export function featuredImage(post: WpPost): WpInlineImage | null {
   );
   if (!media?.source_url) return null;
   return {
-    src: toHttps(media.source_url),
+    src: preferShareImageUrl(toHttps(media.source_url)) || toHttps(media.source_url),
     caption: captionFromMedia(media),
     alt: media.alt_text?.trim() ?? '',
   };
 }
 
+function cleanBgText(value: string): string {
+  return fixMixedScriptLookalikes(value) ?? value;
+}
+
+/** WP auto-excerpts often end mid-sentence with an ellipsis or dangling word. */
+export function excerptLooksTruncated(raw: string, cleaned: string): boolean {
+  const source = raw.trim();
+  const text = cleaned.trim();
+  if (!text) return false;
+  if (/…|\.\.\.|&#8230;/i.test(source)) return true;
+  const endsSentence = /[.!?]["»')\]]*$/u.test(text);
+  if (endsSentence) return false;
+  // Mid-cut: dangling conjunction/preposition, or longer text without a stop.
+  if (
+    /\b(да|и|на|за|с|в|от|към|по|че|се|the|a|an|of|to|and|or|in|for|with)\s*$/iu.test(
+      text,
+    )
+  ) {
+    return true;
+  }
+  if (text.length >= 40) return true;
+  return false;
+}
+
+/** Prefer complete sentences up to maxLen; fall back to a word boundary. */
+export function truncateAtSentenceBoundary(
+  text: string,
+  maxLen = 240,
+): string {
+  const normalized = text.replace(/\s+/g, ' ').trim();
+  if (!normalized) return '';
+  if (normalized.length <= maxLen) return normalized;
+
+  const sentences = normalized.split(/(?<=[.!?])\s+/);
+  const kept: string[] = [];
+  for (const sentence of sentences) {
+    const next = kept.length ? `${kept.join(' ')} ${sentence}` : sentence;
+    if (next.length > maxLen && kept.length > 0) break;
+    kept.push(sentence);
+    if (kept.join(' ').length >= Math.min(120, maxLen) && /[.!?]$/.test(sentence)) {
+      break;
+    }
+  }
+  let result = kept.join(' ').trim() || normalized.slice(0, maxLen);
+  if (result.length > maxLen) {
+    const cut = result.slice(0, maxLen);
+    const space = cut.lastIndexOf(' ');
+    result = (space > 80 ? cut.slice(0, space) : cut).replace(/[,;:—\-\s]+$/u, '');
+    if (!/[.!?]$/.test(result)) result = `${result}…`;
+  }
+  return result;
+}
+
+function firstBodyPlainText(
+  blocks: Array<{ type?: string; textBg?: string; captionBg?: string }>,
+): string {
+  for (const block of blocks) {
+    if (block.type === 'paragraph' && block.textBg?.trim()) {
+      return stripHtml(block.textBg);
+    }
+  }
+  return blocks
+    .map((block) =>
+      block.type === 'image' ? block.captionBg ?? '' : block.textBg ?? '',
+    )
+    .join(' ');
+}
+
+export function buildSubtitleBg(opts: {
+  excerptHtml: string;
+  yoastDescription?: string | null;
+  bodyPlain: string;
+}): string {
+  const rawExcerpt = stripHtml(opts.excerptHtml).trim();
+  const excerpt = cleanBgText(
+    rawExcerpt.replace(/…+$/g, '').replace(/\.{3}$/g, '').trim(),
+  );
+  const yoast = cleanBgText((opts.yoastDescription ?? '').trim());
+
+  if (excerpt && !excerptLooksTruncated(rawExcerpt, excerpt)) {
+    return excerpt;
+  }
+  const fromBody = truncateAtSentenceBoundary(
+    cleanBgText(opts.bodyPlain),
+    240,
+  );
+  if (fromBody) return fromBody;
+  if (yoast && !excerptLooksTruncated(yoast, yoast)) {
+    return yoast;
+  }
+  return excerpt || yoast;
+}
+
 function seoTitle(post: WpPost, titleBg: string): string | null {
   const raw = post.yoast_head_json?.title?.trim();
   if (!raw) return titleBg || null;
-  return raw.replace(/\s*\|\s*Prizni\.bg\s*$/i, '').trim() || titleBg;
+  const cleaned =
+    raw.replace(/\s*\|\s*Prizni\.bg\s*$/i, '').trim() || titleBg;
+  return cleanBgText(cleaned);
 }
 
 export function parseWpPostsJson(raw: unknown): WpPost[] {
@@ -181,8 +289,7 @@ export function parseWpPostsJson(raw: unknown): WpPost[] {
 }
 
 export function mapWpPost(post: WpPost): MappedWpArticle {
-  const titleBg = stripHtml(renderedText(post.title));
-  const excerpt = stripHtml(renderedText(post.excerpt)).replace(/…+$/g, '').trim();
+  const titleBg = cleanBgText(stripHtml(renderedText(post.title)));
   const contentHtml = renderedText(post.content);
   const categories = categoryTerms(post);
   const section = pickSection(categories);
@@ -199,12 +306,19 @@ export function mapWpPost(post: WpPost): MappedWpArticle {
     hero?.caption || galleryImages.find((image) => image.caption)?.caption || '';
   const publishedAtRaw = post.date_gmt || post.date;
   const publishedAt = publishedAtRaw ? new Date(publishedAtRaw) : null;
-  const bodyText = body
-    .map((block) => {
-      if (block.type === 'image') return block.captionBg ?? '';
-      return 'textBg' in block ? block.textBg : '';
-    })
-    .join(' ');
+  const bodyText = firstBodyPlainText(body);
+  const subtitleBg = buildSubtitleBg({
+    excerptHtml: renderedText(post.excerpt),
+    yoastDescription: post.yoast_head_json?.description,
+    bodyPlain: bodyText,
+  });
+  const seoDescriptionRaw =
+    post.yoast_head_json?.description?.trim() || subtitleBg || null;
+  const seoDescriptionBg = seoDescriptionRaw
+    ? excerptLooksTruncated(seoDescriptionRaw, seoDescriptionRaw)
+      ? subtitleBg
+      : cleanBgText(seoDescriptionRaw)
+    : null;
 
   return {
     wpId: post.id,
@@ -218,7 +332,7 @@ export function mapWpPost(post: WpPost): MappedWpArticle {
       .map((term) => term.slug?.trim())
       .filter((slug): slug is string => Boolean(slug)),
     titleBg,
-    subtitleBg: excerpt,
+    subtitleBg,
     readTimeBg: estimateReadTimeBg(
       bodyText,
       post.yoast_head_json?.twitter_misc?.['Est. reading time'],
@@ -226,7 +340,7 @@ export function mapWpPost(post: WpPost): MappedWpArticle {
     dateBg: formatDateBg(publishedAtRaw),
     photoCreditBg,
     seoTitleBg: seoTitle(post, titleBg),
-    seoDescriptionBg: post.yoast_head_json?.description?.trim() || excerpt || null,
+    seoDescriptionBg,
     body,
     authorNameBg: author.nameBg,
     authorSlug: author.slug,

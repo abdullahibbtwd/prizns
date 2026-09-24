@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link } from '@/components/LocaleLink'
 import { motion } from 'framer-motion'
 import { ViewAllLink } from '@/components/concept-3/ViewAllLink'
 import { SectionLoading } from '@/components/concept-3/SectionLoading'
@@ -9,6 +9,7 @@ import {
   usePublicArticles,
 } from '@/lib/public-content'
 import { toTraditionCard } from '@/lib/section-cards'
+import { ResponsiveImage } from '@/components/ResponsiveImage'
 
 interface TraditionsSectionProps {
   lang: 'bg' | 'en'
@@ -22,6 +23,8 @@ export function TraditionsSection({ lang }: TraditionsSectionProps) {
       path: articlePath(article),
     })),
   ).slice(0, 3)
+
+  if (!isLoading && traditions.length === 0) return null
 
   return (
     <section id="traditions" className="bg-[#FDFBF7] py-16 md:py-24 px-6 md:px-12 border-t border-[#EAE6DF]">
@@ -50,17 +53,18 @@ export function TraditionsSection({ lang }: TraditionsSectionProps) {
             return (
               <motion.div
                 key={item.id}
-                initial={{ opacity: 0, y: 20 }}
+                initial={false}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ duration: 0.7, delay: index * 0.08 }}
+                transition={{ duration: 0.35, delay: index * 0.04 }}
               >
                 <Link to={item.path} className="group block">
                   <div className="relative mb-4 aspect-[16/11] w-full overflow-hidden rounded-[14px] bg-[#1A1A1A]">
-                    <img
+                    <ResponsiveImage
                       src={item.image}
+                      thumbSrc={item.imageThumb}
                       alt={item.title}
-                      loading="lazy"
+                      sizes="grid3"
                       className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent" />

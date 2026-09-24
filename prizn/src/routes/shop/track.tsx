@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import {useSearchParams } from 'react-router-dom'
+import { Link } from '@/components/LocaleLink'
 import { useMutation } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { JournalShell } from '@/components/concept-3/JournalShell'

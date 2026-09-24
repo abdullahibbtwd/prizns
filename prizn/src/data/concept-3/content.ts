@@ -667,6 +667,7 @@ export const journalContent = {
   newsletter: {
     title: "Receive one story every Sunday.",
     titleBg: "Получавайте по една история всяка неделя.",
+    /** @deprecated Use i18n `newsletterNoSpam` / `newsletterEmailPlaceholder` */
     subtitle:
       "No spam. No daily noise. Just a calm weekly letter with one deep story from Northwestern Bulgaria.",
     emailPlaceholder: "Enter your email address...",

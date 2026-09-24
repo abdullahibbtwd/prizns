@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom'
+import { useLocalizedNavigate } from '@/hooks/useLocalizedNavigate'
 import { ArrowLeft } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -20,7 +20,7 @@ export function ListingHeader({
   tone = 'light',
 }: ListingHeaderProps) {
   const dark = tone === 'dark'
-  const navigate = useNavigate()
+  const navigate = useLocalizedNavigate()
 
   const goBack = () => {
     const idx = (window.history.state as { idx?: number } | null)?.idx

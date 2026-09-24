@@ -27,7 +27,12 @@ describe('MediaController', () => {
 
   it('lists media with parsed kind', () => {
     controller.list('image');
-    expect(media.list).toHaveBeenCalledWith({ kind: 'IMAGE' });
+    expect(media.list).toHaveBeenCalledWith({
+      kind: 'IMAGE',
+      q: undefined,
+      page: undefined,
+      pageSize: undefined,
+    });
   });
 
   it('loads a single media record for polling', () => {

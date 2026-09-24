@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Maximize2, X, MapPin, Camera } from 'lucide-react'
 import { ViewAllLink } from '@/components/concept-3/ViewAllLink'
 import { SectionLoading } from '@/components/concept-3/SectionLoading'
+import { ResponsiveImage } from '@/components/ResponsiveImage'
 import { preferApi, usePublicMedia } from '@/lib/public-content'
 import { getSectionPublicLabel } from '@/lib/section-i18n'
 
@@ -11,6 +12,7 @@ interface PhotoItem {
   title: string
   caption: string
   image: string
+  imageThumb?: string
   location: string
   aspect: string
   span: string
@@ -34,19 +36,19 @@ function aspectForIndex(index: number): { aspect: string; span: string } {
 
 export function PhotographyGallery({ lang }: PhotographyGalleryProps) {
   const { data, isLoading } = usePublicMedia('IMAGE', { limit: 6 })
-  const photos = preferApi(
+  const mapped = preferApi(
     data?.map((item, index) => {
       const layout = aspectForIndex(index)
       const title =
         item.titleBg ||
         item.titleEn ||
-        item.originalName?.replace(/\.[^.]+$/, '') ||
-        (lang === 'bg' ? 'Кадър' : 'Frame')
+        (lang === 'bg' ? 'Снимка от Prizni' : 'Photo from Prizni')
       return {
         id: item.id,
         title,
         caption: item.creditBg || item.creditEn || '',
         image: item.url,
+        imageThumb: item.thumbnailUrl || undefined,
         location:
           item.locationBg ||
           item.locationEn ||
@@ -54,9 +56,15 @@ export function PhotographyGallery({ lang }: PhotographyGalleryProps) {
         ...layout,
       } satisfies PhotoItem
     }),
+  )
+  // Dedupe by media asset id (API also dedupes; this catches any client doubles).
+  const photos = Array.from(
+    new Map(mapped.map((photo) => [photo.id, photo])).values(),
   ).slice(0, 6)
 
   const [selectedPhoto, setSelectedPhoto] = useState<PhotoItem | null>(null)
+
+  if (!isLoading && photos.length === 0) return null
 
   return (
     <section
@@ -85,28 +93,23 @@ export function PhotographyGallery({ lang }: PhotographyGalleryProps) {
 
         {isLoading ? (
           <SectionLoading lang={lang} count={6} cardClassName="aspect-square" />
-        ) : photos.length === 0 ? (
-          <p className="text-center font-sans text-sm text-[#1A1A1A]/50">
-            {lang === 'bg'
-              ? 'Качете изображения от CMS → Медия библиотека.'
-              : 'Upload images from CMS → Media Library.'}
-          </p>
         ) : (
           <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
             {photos.map((item, index) => (
               <motion.div
                 key={item.id}
-                initial={{ opacity: 0, y: 20 }}
+                initial={false}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ duration: 0.8, delay: index * 0.1 }}
+                transition={{ duration: 0.35, delay: index * 0.04 }}
                 onClick={() => setSelectedPhoto(item)}
                 className={`group relative cursor-pointer overflow-hidden rounded-[16px] border border-[#EAE6DF] bg-[#1A1A1A] ${item.aspect} ${item.span}`}
               >
-                <img
+                <ResponsiveImage
                   src={item.image}
+                  thumbSrc={item.imageThumb}
                   alt={item.title}
-                  loading="lazy"
+                  sizes="gallery"
                   className="h-full w-full object-cover transition-transform duration-1000 ease-out group-hover:scale-105 filter grayscale-[15%] group-hover:grayscale-0"
                 />
                 <div className="absolute inset-0 flex items-center justify-center bg-black/40 p-6 text-center opacity-0 transition-opacity duration-300 group-hover:opacity-100">
@@ -164,10 +167,12 @@ export function PhotographyGallery({ lang }: PhotographyGalleryProps) {
                   {selectedPhoto.caption}
                 </p>
               ) : null}
-              <div className="inline-flex items-center gap-1.5 font-sans text-[11px] uppercase tracking-widest text-white/50">
-                <MapPin className="size-3 text-[#4051C7]" />
-                <span>{selectedPhoto.location}</span>
-              </div>
+              {selectedPhoto.location?.trim() ? (
+                <div className="inline-flex items-center gap-1.5 font-sans text-[11px] uppercase tracking-widest text-white/50">
+                  <MapPin className="size-3 text-[#4051C7]" />
+                  <span>{selectedPhoto.location}</span>
+                </div>
+              ) : null}
             </div>
           </motion.div>
         )}

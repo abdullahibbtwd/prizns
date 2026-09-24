@@ -12,6 +12,7 @@ import {
   updateCmsPartnership,
   type PartnershipStatus,
 } from '@/lib/partnerships-api'
+import { truncateAtWord } from '@/lib/text-format'
 
 const STATUS_OPTIONS: PartnershipStatus[] = [
   'NEW',
@@ -21,9 +22,7 @@ const STATUS_OPTIONS: PartnershipStatus[] = [
 ]
 
 function excerpt(text: string, max = 140) {
-  const trimmed = text.trim()
-  if (trimmed.length <= max) return trimmed
-  return `${trimmed.slice(0, max).trimEnd()}…`
+  return truncateAtWord(text, max)
 }
 
 export default function CmsPartnershipsPage() {

@@ -1,4 +1,5 @@
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from '@/components/LocaleLink'
+import { useLocalizedNavigate } from '@/hooks/useLocalizedNavigate'
 import { motion } from 'framer-motion'
 import { ArrowUpRight } from 'lucide-react'
 import { ViewAllLink } from '@/components/concept-3/ViewAllLink'
@@ -11,13 +12,14 @@ import {
 } from '@/lib/public-content'
 import { toPlaceCard } from '@/lib/section-cards'
 import { SectionLoading } from '@/components/concept-3/SectionLoading'
+import { ResponsiveImage } from '@/components/ResponsiveImage'
 
 interface OurPlacesSectionProps {
   lang: 'bg' | 'en'
 }
 
 export function OurPlacesSection({ lang }: OurPlacesSectionProps) {
-  const navigate = useNavigate()
+  const navigate = useLocalizedNavigate()
   const { data, isLoading } = usePublicArticles('places', { limit: 2 })
   const places = preferApi(
     data?.map((article) => ({
@@ -25,6 +27,8 @@ export function OurPlacesSection({ lang }: OurPlacesSectionProps) {
       path: articlePath(article),
     })),
   ).slice(0, 2)
+
+  if (!isLoading && places.length === 0) return null
 
   return (
     <section id="places" className="bg-[#FDFBF7] py-24 md:py-36 px-6 md:px-12 border-t border-[#EAE6DF]">
@@ -68,19 +72,20 @@ export function OurPlacesSection({ lang }: OurPlacesSectionProps) {
             return (
               <motion.div
                 key={place.id}
-                initial={{ opacity: 0, y: 30 }}
+                initial={false}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ duration: 0.8, delay: index * 0.15 }}
+                transition={{ duration: 0.35, delay: index * 0.04 }}
               >
                 <Link
                   to={place.path}
                   className="group relative block h-[480px] overflow-hidden rounded-[16px] border border-[#EAE6DF] bg-[#1A1A1A] shadow-[0_4px_24px_rgba(0,0,0,0.03)] transition-all duration-500 hover:shadow-[0_12px_40px_rgba(0,0,0,0.09)] md:h-[540px]"
                 >
-                  <img
+                  <ResponsiveImage
                     src={place.image}
+                    thumbSrc={place.imageThumb}
                     alt={place.name}
-                    loading="lazy"
+                    sizes="grid2"
                     className="h-full w-full object-cover transition-transform duration-1000 ease-out group-hover:scale-105"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />

@@ -89,7 +89,10 @@ export class AuthorsService {
 
   async getPublicBySlug(slug: string) {
     const row = await this.prisma.author.findFirst({
-      where: { slug, ...publicListingFilter },
+      where: {
+        ...publicListingFilter,
+        OR: [{ slug }, { aliases: { has: slug } }],
+      },
       select: publicAuthorSelect,
     });
     return row ? this.toPublicDto(row) : null;

@@ -31,6 +31,11 @@ describe('formatTrendPct', () => {
   it('shows zero without sign', () => {
     expect(formatTrendPct(0)).toBe('0%')
   })
+
+  it('shows an empty label when there is no baseline', () => {
+    expect(formatTrendPct(null)).toBe('—')
+    expect(formatTrendPct(null, 'Ново')).toBe('Ново')
+  })
 })
 
 describe('formatPath', () => {

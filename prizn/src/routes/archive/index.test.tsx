@@ -51,7 +51,7 @@ describe('ArchivePage', () => {
     expect(await screen.findByText('Kukeri are winter masquerades.')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Kukeri' })).toHaveAttribute(
       'href',
-      '/traditions/kukeri',
+      '/en/traditions/kukeri',
     )
   })
 

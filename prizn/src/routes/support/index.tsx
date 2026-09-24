@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import {useSearchParams } from 'react-router-dom'
+import { Link } from '@/components/LocaleLink'
 import { motion } from 'framer-motion'
 import {
   ChevronDown,
@@ -9,6 +10,7 @@ import {
   Share2,
 } from 'lucide-react'
 import { JournalShell } from '@/components/concept-3/JournalShell'
+import { PageMeta } from '@/components/PageMeta'
 import {
   ContributeHero,
   FieldLabel,
@@ -149,6 +151,16 @@ export default function SupportUsPage() {
     <JournalShell>
       {({ lang }) => (
         <main>
+          <PageMeta
+            lang={lang}
+            title={lang === 'bg' ? 'Подкрепете ни' : 'Support Us'}
+            description={
+              lang === 'bg'
+                ? 'Помогнете да се съхранят историите на Северозападна България.'
+                : 'Help preserve the stories of Northwestern Bulgaria.'
+            }
+            path="/support"
+          />
           <ContributeHero
             lang={lang}
             eyebrow="Support Us"

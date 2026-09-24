@@ -13,10 +13,10 @@ export function EditorsLetter({ lang }: EditorsLetterProps) {
       <div className="max-w-3xl mx-auto text-center">
         {/* Subtle Category Badge */}
         <motion.div
-          initial={{ opacity: 0, y: 15 }}
+          initial={false}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          transition={{ duration: 0.8 }}
+          transition={{ duration: 0.35 }}
           className="mb-8"
         >
           <span className="font-sans text-[11px] uppercase tracking-[0.3em] text-[#0C2686] font-medium">
@@ -27,10 +27,10 @@ export function EditorsLetter({ lang }: EditorsLetterProps) {
 
         {/* Quote Lines */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={false}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          transition={{ duration: 1, delay: 0.2 }}
+          transition={{ duration: 0.4, delay: 0.2 }}
           className="space-y-3 font-heading text-3xl sm:text-4xl md:text-5xl text-[#1A1A1A] font-light leading-snug"
         >
           {lang === 'bg' ? (
@@ -46,10 +46,10 @@ export function EditorsLetter({ lang }: EditorsLetterProps) {
 
         {/* Welcome Text */}
         <motion.p
-          initial={{ opacity: 0 }}
+          initial={false}
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
-          transition={{ duration: 1, delay: 0.4 }}
+          transition={{ duration: 0.35, delay: 0.1 }}
           className="mt-10 font-sans text-base md:text-lg text-[#1A1A1A]/70 font-light leading-relaxed max-w-xl mx-auto italic"
         >
           {lang === 'bg'
@@ -59,10 +59,10 @@ export function EditorsLetter({ lang }: EditorsLetterProps) {
 
         {/* Signature */}
         <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
+          initial={false}
           whileInView={{ opacity: 1, scale: 1 }}
           viewport={{ once: true }}
-          transition={{ duration: 0.8, delay: 0.6 }}
+          transition={{ duration: 0.35, delay: 0.15 }}
           className="mt-8"
         >
           <span className="font-script text-3xl md:text-4xl text-[#1A1A1A]/90 block tracking-wide">

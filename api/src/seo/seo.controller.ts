@@ -36,7 +36,7 @@ export class SeoController {
   @Get('bot-shell')
   @Header('Content-Type', 'text/html; charset=utf-8')
   async botShell(@Query('path') path: string | undefined, @Res() res: Response) {
-    const html = await this.seo.botShellHtml(path);
-    res.type('text/html').send(html);
+    const { html, status } = await this.seo.botShellHtml(path);
+    res.status(status).type('text/html').send(html);
   }
 }

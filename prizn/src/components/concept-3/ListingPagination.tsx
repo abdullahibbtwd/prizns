@@ -2,7 +2,8 @@ import { useEffect, useRef } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-function pageWindow(page: number, totalPages: number, maxButtons = 5) {
+/** Sliding window of page numbers around the current page. */
+export function pageWindow(page: number, totalPages: number, maxButtons = 5) {
   if (totalPages <= maxButtons) {
     return Array.from({ length: totalPages }, (_, i) => i + 1)
   }
@@ -40,8 +41,55 @@ export function ListingPagination({
 
   const dark = tone === 'dark'
   const pages = pageWindow(page, totalPages)
+  const showEdges = totalPages > pages.length
+  const showLeadingEllipsis = showEdges && (pages[0] ?? 1) > 2
+  const showTrailingEllipsis =
+    showEdges && (pages[pages.length - 1] ?? totalPages) < totalPages - 1
   const prevLabel = lang === 'bg' ? 'Предишна' : 'Previous'
   const nextLabel = lang === 'bg' ? 'Следваща' : 'Next'
+  const firstLabel = lang === 'bg' ? 'Първа' : 'First'
+  const lastLabel = lang === 'bg' ? 'Последна' : 'Last'
+
+  const pageBtn = (n: number) => (
+    <button
+      key={n}
+      type="button"
+      onClick={() => onPage(n)}
+      aria-current={n === page ? 'page' : undefined}
+      className={cn(
+        'min-w-10 rounded-full px-3 py-2 font-sans text-xs transition-colors',
+        n === page
+          ? dark
+            ? 'bg-white text-[#1A1A1A]'
+            : 'bg-[#0C2686] text-white'
+          : dark
+            ? 'text-white/60 hover:bg-white/10 hover:text-white'
+            : 'text-[#1A1A1A]/55 hover:bg-[#0C2686]/8 hover:text-[#0C2686]',
+      )}
+    >
+      {n}
+    </button>
+  )
+
+  const edgeBtn = (
+    label: string,
+    target: number,
+    disabled: boolean,
+  ) => (
+    <button
+      type="button"
+      onClick={() => onPage(target)}
+      disabled={disabled}
+      className={cn(
+        'rounded-full px-3 py-2 font-sans text-[11px] uppercase tracking-[0.16em] transition-colors disabled:cursor-not-allowed disabled:opacity-35',
+        dark
+          ? 'border border-white/15 text-white/80 hover:bg-white/10'
+          : 'border border-[#EAE6DF] text-[#1A1A1A]/70 hover:border-[#0C2686]/40 hover:text-[#0C2686]',
+      )}
+    >
+      {label}
+    </button>
+  )
 
   return (
     <nav
@@ -49,6 +97,7 @@ export function ListingPagination({
       className="mt-14 flex flex-col items-center gap-4"
     >
       <div className="flex flex-wrap items-center justify-center gap-2">
+        {edgeBtn(firstLabel, 1, page <= 1)}
         <button
           type="button"
           onClick={() => onPage(page - 1)}
@@ -64,26 +113,38 @@ export function ListingPagination({
           {prevLabel}
         </button>
 
-        {pages.map((n) => (
-          <button
-            key={n}
-            type="button"
-            onClick={() => onPage(n)}
-            aria-current={n === page ? 'page' : undefined}
+        {showEdges && (pages[0] ?? 1) > 1 ? pageBtn(1) : null}
+        {showLeadingEllipsis ? (
+          <span
             className={cn(
-              'min-w-10 rounded-full px-3 py-2 font-sans text-xs transition-colors',
-              n === page
-                ? dark
-                  ? 'bg-white text-[#1A1A1A]'
-                  : 'bg-[#0C2686] text-white'
-                : dark
-                  ? 'text-white/60 hover:bg-white/10 hover:text-white'
-                  : 'text-[#1A1A1A]/55 hover:bg-[#0C2686]/8 hover:text-[#0C2686]',
+              'px-1 font-sans text-xs',
+              dark ? 'text-white/35' : 'text-[#1A1A1A]/35',
             )}
+            aria-hidden
           >
-            {n}
-          </button>
-        ))}
+            …
+          </span>
+        ) : null}
+
+        {(showEdges
+          ? pages.filter((n) => n !== 1 && n !== totalPages)
+          : pages
+        ).map((n) => pageBtn(n))}
+
+        {showTrailingEllipsis ? (
+          <span
+            className={cn(
+              'px-1 font-sans text-xs',
+              dark ? 'text-white/35' : 'text-[#1A1A1A]/35',
+            )}
+            aria-hidden
+          >
+            …
+          </span>
+        ) : null}
+        {showEdges && (pages[pages.length - 1] ?? totalPages) < totalPages
+          ? pageBtn(totalPages)
+          : null}
 
         <button
           type="button"
@@ -99,6 +160,7 @@ export function ListingPagination({
           {nextLabel}
           <ChevronRight className="size-3.5" />
         </button>
+        {edgeBtn(lastLabel, totalPages, page >= totalPages)}
       </div>
       <p
         className={cn(

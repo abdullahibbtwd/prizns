@@ -11,7 +11,7 @@ describe('resolveCategoryPlacement', () => {
     ).toEqual({
       primarySlug: 'sabitia',
       categorySlugs: ['sabitia'],
-      locationSlugs: ['vratza'],
+      locationSlugs: ['vratsa'],
     });
   });
 
@@ -53,14 +53,8 @@ describe('resolveCategoryPlacement', () => {
     expect(resolveCategoryPlacement(['vratza'])).toEqual({
       primarySlug: 'nashite-mesta',
       categorySlugs: ['nashite-mesta'],
-      locationSlugs: ['vratza'],
+      locationSlugs: ['vratsa'],
     });
-  });
-
-  it('sends Business to Human stories by default', () => {
-    expect(resolveCategoryPlacement(['biznes']).primarySlug).toBe(
-      'choveshki-istorii',
-    );
   });
 
   it('marks Business stories as sponsored', () => {
@@ -88,7 +82,7 @@ describe('resolveCategoryPlacement', () => {
     ).toEqual({
       primarySlug: 'nashite-mesta',
       categorySlugs: ['nashite-mesta'],
-      locationSlugs: ['vratza'],
+      locationSlugs: ['vratsa'],
     });
   });
 

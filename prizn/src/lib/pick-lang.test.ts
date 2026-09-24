@@ -18,6 +18,10 @@ describe('pickLang', () => {
     expect(pickLang('en', null, 'Български')).toBe('Български')
   })
 
+  it('falls back to Bulgarian when English is a copy of Bulgarian', () => {
+    expect(pickLang('en', 'Български', 'Български')).toBe('Български')
+  })
+
   it('trims whitespace', () => {
     expect(pickLang('en', '  Title  ', '  ')).toBe('Title')
   })

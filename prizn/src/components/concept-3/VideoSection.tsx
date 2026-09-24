@@ -1,14 +1,19 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { lazy, Suspense, useState } from 'react'
+import { Link } from '@/components/LocaleLink'
 import { motion } from 'framer-motion'
 import { ViewAllLink } from '@/components/concept-3/ViewAllLink'
-import { LuxuryVideoPlayer } from '@/components/concept-3/LuxuryVideoPlayer'
 import {
   articlePath,
   preferApi,
   usePublicArticles,
 } from '@/lib/public-content'
 import type { CmsArticle } from '@/lib/cms-types'
+
+const LuxuryVideoPlayer = lazy(() =>
+  import('@/components/concept-3/LuxuryVideoPlayer').then((m) => ({
+    default: m.LuxuryVideoPlayer,
+  })),
+)
 
 interface VideoSectionProps {
   lang: 'bg' | 'en'
@@ -68,31 +73,44 @@ export function VideoSection({ lang }: VideoSectionProps) {
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 lg:gap-8">
           {featured && (
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
+              initial={false}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ duration: 0.75 }}
+              transition={{ duration: 0.35 }}
               className="lg:col-span-7"
             >
               <div className="relative overflow-hidden rounded-[16px]">
-                <LuxuryVideoPlayer
-                  src={featured.videoUrl}
-                  poster={featured.image}
-                  title={lang === 'bg' ? featured.titleBg : featured.title}
-                  aspectClassName="aspect-[16/10]"
-                  size="featured"
-                  tone="cinema"
-                  playing={activeId === featured.id}
-                  onPlayingChange={(playing) =>
-                    setActiveId(playing ? featured.id : null)
+                <Suspense
+                  fallback={
+                    <div
+                      className="aspect-[16/10] w-full animate-pulse bg-white/10"
+                      aria-hidden
+                    />
                   }
-                />
+                >
+                  <LuxuryVideoPlayer
+                    src={featured.videoUrl}
+                    poster={featured.image}
+                    title={lang === 'bg' ? featured.titleBg : featured.title}
+                    aspectClassName="aspect-[16/10]"
+                    size="featured"
+                    tone="cinema"
+                    playing={activeId === featured.id}
+                    onPlayingChange={(playing) =>
+                      setActiveId(playing ? featured.id : null)
+                    }
+                  />
+                </Suspense>
                 {activeId !== featured.id && (
                   <div className="pointer-events-none absolute inset-x-0 bottom-0 p-6 md:p-8">
                     <span className="font-sans text-[11px] uppercase tracking-[0.22em] text-white/65">
-                      {featured.duration}
-                      {' · '}
-                      {lang === 'bg' ? featured.locationBg : featured.location}
+                      {[
+                        featured.duration,
+                        lang === 'bg' ? featured.locationBg : featured.location,
+                      ]
+                        .map((part) => (part || '').trim())
+                        .filter(Boolean)
+                        .join(' · ')}
                     </span>
                     <h3 className="mt-2 font-heading text-3xl font-light md:text-4xl">
                       {lang === 'bg' ? featured.titleBg : featured.title}
@@ -114,25 +132,34 @@ export function VideoSection({ lang }: VideoSectionProps) {
             {side.map((item, index) => (
               <motion.div
                 key={item.id}
-                initial={{ opacity: 0, y: 16 }}
+                initial={false}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ duration: 0.65, delay: 0.1 + index * 0.08 }}
+                transition={{ duration: 0.35, delay: 0.1 + index * 0.08 }}
                 className="grid grid-cols-1 gap-4 sm:grid-cols-[160px_1fr] sm:gap-5"
               >
-                <LuxuryVideoPlayer
-                  src={item.videoUrl}
-                  poster={item.image}
-                  title={lang === 'bg' ? item.titleBg : item.title}
-                  aspectClassName="aspect-[4/3] sm:aspect-[4/3]"
-                  size="card"
-                  tone="cinema"
-                  className="rounded-[12px]"
-                  playing={activeId === item.id}
-                  onPlayingChange={(playing) =>
-                    setActiveId(playing ? item.id : null)
+                <Suspense
+                  fallback={
+                    <div
+                      className="aspect-[4/3] w-full animate-pulse rounded-[12px] bg-white/10"
+                      aria-hidden
+                    />
                   }
-                />
+                >
+                  <LuxuryVideoPlayer
+                    src={item.videoUrl}
+                    poster={item.image}
+                    title={lang === 'bg' ? item.titleBg : item.title}
+                    aspectClassName="aspect-[4/3] sm:aspect-[4/3]"
+                    size="card"
+                    tone="cinema"
+                    className="rounded-[12px]"
+                    playing={activeId === item.id}
+                    onPlayingChange={(playing) =>
+                      setActiveId(playing ? item.id : null)
+                    }
+                  />
+                </Suspense>
                 <div className="flex flex-col justify-center">
                   <span className="font-sans text-[10px] uppercase tracking-[0.2em] text-[#9FACE6]">
                     {item.duration}

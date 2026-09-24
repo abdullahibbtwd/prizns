@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { Search, X } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import { Link } from '@/components/LocaleLink'
+import { ArrowRight, Search, X } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { Logo } from '@/components/Logo'
+import { ResponsiveImage } from '@/components/ResponsiveImage'
 import type { JournalLang } from '@/components/concept-3/JournalShell'
 import {
   articlePath,
@@ -19,6 +21,7 @@ export function JournalSearchOverlay({
   lang: JournalLang
   onClose: () => void
 }) {
+  const { t } = useTranslation()
   const [query, setQuery] = useState('')
   const [debounced, setDebounced] = useState('')
 
@@ -42,9 +45,12 @@ export function JournalSearchOverlay({
 
   const searchQuery = usePublicArticleSearch(debounced)
   const popularQuery = usePopularStories(5)
-  const results = searchQuery.data ?? []
+  const page = searchQuery.data
+  const results = page?.items ?? []
+  const total = page?.total ?? 0
   const popular = popularQuery.data ?? []
   const canSearch = debounced.length >= 2
+  const seeAllTo = `/stories?q=${encodeURIComponent(debounced)}`
 
   return (
     <motion.div
@@ -54,7 +60,7 @@ export function JournalSearchOverlay({
       className="fixed inset-0 z-50 flex flex-col bg-[#FDFBF7]/98 p-6 backdrop-blur-xl md:p-16"
       role="dialog"
       aria-modal="true"
-      aria-label={lang === 'bg' ? 'Търсене' : 'Search'}
+      aria-label={t('search')}
     >
       <div className="mx-auto flex w-full max-w-5xl items-center justify-between">
         <Logo className="h-7" sloganClassName="text-[10px]" />
@@ -127,43 +133,66 @@ export function JournalSearchOverlay({
                 : `No stories for “${debounced}”.`}
             </p>
           ) : (
-            <ul className="space-y-2">
-              {results.map((article) => {
-                const title = pickLang(lang, article.title, article.titleBg)
-                const category = pickLang(
-                  lang,
-                  article.category,
-                  article.categoryBg,
-                )
-                return (
-                  <li key={article.id}>
-                    <Link
-                      to={articlePath(article)}
-                      onClick={onClose}
-                      className="flex items-center gap-4 rounded-[12px] border border-transparent px-2 py-2 transition-colors hover:border-[#EAE6DF] hover:bg-white"
-                    >
-                      <div className="size-16 shrink-0 overflow-hidden rounded-[8px] bg-[#EAE6DF]">
-                        {article.image ? (
-                          <img
-                            src={article.image}
-                            alt=""
-                            className="h-full w-full object-cover"
-                          />
-                        ) : null}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="font-sans text-[10px] uppercase tracking-[0.18em] text-[#0C2686]">
-                          {category || getSectionLabel(article.section, lang)}
-                        </p>
-                        <p className="truncate font-heading text-xl text-[#1A1A1A]">
-                          {title}
-                        </p>
-                      </div>
-                    </Link>
-                  </li>
-                )
-              })}
-            </ul>
+            <div className="space-y-4">
+              <p className="text-center font-sans text-xs uppercase tracking-[0.18em] text-[#1A1A1A]/45">
+                {lang === 'bg'
+                  ? `Показани ${results.length} от ${total}`
+                  : `Showing ${results.length} of ${total}`}
+              </p>
+              <ul className="space-y-2">
+                {results.map((article) => {
+                  const title = pickLang(lang, article.title, article.titleBg)
+                  const category = pickLang(
+                    lang,
+                    article.category,
+                    article.categoryBg,
+                  )
+                  return (
+                    <li key={article.id}>
+                      <Link
+                        to={articlePath(article)}
+                        onClick={onClose}
+                        className="flex items-center gap-4 rounded-[12px] border border-transparent px-2 py-2 transition-colors hover:border-[#EAE6DF] hover:bg-white"
+                      >
+                        <div className="size-16 shrink-0 overflow-hidden rounded-[8px] bg-[#EAE6DF]">
+                          {article.image ? (
+                            <ResponsiveImage
+                              src={article.image}
+                              thumbSrc={article.imageThumb}
+                              alt=""
+                              sizes="compact"
+                              className="h-full w-full object-cover"
+                            />
+                          ) : null}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-sans text-[10px] uppercase tracking-[0.18em] text-[#0C2686]">
+                            {category || getSectionLabel(article.section, lang)}
+                          </p>
+                          <p className="truncate font-heading text-xl text-[#1A1A1A]">
+                            {title}
+                          </p>
+                        </div>
+                      </Link>
+                    </li>
+                  )
+                })}
+              </ul>
+              {total > results.length ? (
+                <div className="pt-2 text-center">
+                  <Link
+                    to={seeAllTo}
+                    onClick={onClose}
+                    className="inline-flex items-center gap-2 font-sans text-sm font-medium text-[#0C2686] underline-offset-4 hover:underline"
+                  >
+                    {lang === 'bg'
+                      ? `Виж всички резултати (${total})`
+                      : `See all results (${total})`}
+                    <ArrowRight className="size-4" />
+                  </Link>
+                </div>
+              ) : null}
+            </div>
           )}
         </div>
       </div>

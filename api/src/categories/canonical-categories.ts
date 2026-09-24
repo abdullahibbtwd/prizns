@@ -40,10 +40,11 @@ export const ROOT_CATEGORY_SLUGS = [
   'tvoyata-duma',
 ] as const;
 
-/** WordPress leftover slugs → the CMS dropdown category they belong under. */
+/** City leftovers and OPIK — WP used "vratza"; official BG is "vratsa". */
 export const DEFAULT_CATEGORY_MERGE: Record<string, string> = {
   vidin: 'nashite-mesta',
   vratza: 'nashite-mesta',
+  vratsa: 'nashite-mesta',
   montana: 'nashite-mesta',
   opik: 'kampanii',
   biznes: 'choveshki-istorii',
@@ -56,17 +57,36 @@ export const HIDDEN_CMS_CATEGORY_SLUGS = new Set(
   Object.keys(DEFAULT_CATEGORY_MERGE),
 );
 
-export const LOCATION_CATEGORY_SLUGS = ['vidin', 'vratza', 'montana'] as const;
+/** Canonical location tag/category slugs (official Bulgarian transliteration). */
+export const LOCATION_CATEGORY_SLUGS = ['vidin', 'vratsa', 'montana'] as const;
 
 export type LocationCategorySlug = (typeof LOCATION_CATEGORY_SLUGS)[number];
+
+/** Legacy / alternate spellings → canonical slug. */
+export const LOCATION_SLUG_ALIASES: Record<string, LocationCategorySlug> = {
+  vidin: 'vidin',
+  vratsa: 'vratsa',
+  vratza: 'vratsa',
+  montana: 'montana',
+};
 
 export const LOCATION_CATEGORY_NAMES: Record<
   LocationCategorySlug,
   { nameBg: string; nameEn: string }
 > = {
   vidin: { nameBg: 'Видин', nameEn: 'Vidin' },
-  vratza: { nameBg: 'Враца', nameEn: 'Vratsa' },
+  vratsa: { nameBg: 'Враца', nameEn: 'Vratsa' },
   montana: { nameBg: 'Монтана', nameEn: 'Montana' },
+};
+
+/** Approximate city centres for PLACE tags when Nominatim is unavailable. */
+export const LOCATION_KNOWN_COORDS: Record<
+  LocationCategorySlug,
+  { lat: number; lng: number }
+> = {
+  vidin: { lat: 43.9967, lng: 22.872 },
+  vratsa: { lat: 43.2102, lng: 23.5625 },
+  montana: { lat: 43.4125, lng: 23.225 },
 };
 
 export const CANONICAL_CATEGORY_SLUGS = new Set<string>([...ROOT_CATEGORY_SLUGS]);
@@ -86,8 +106,16 @@ export type ResolvePlacementOptions = {
   alsoLinkCities?: boolean;
 };
 
+export function canonicalizeLocationSlug(
+  slug: string,
+): LocationCategorySlug | null {
+  const key = slug.trim().toLowerCase();
+  if (!key) return null;
+  return LOCATION_SLUG_ALIASES[key] ?? null;
+}
+
 export function isLocationCategorySlug(slug: string): slug is LocationCategorySlug {
-  return (LOCATION_CATEGORY_SLUGS as readonly string[]).includes(slug);
+  return canonicalizeLocationSlug(slug) != null;
 }
 
 export function shouldMarkSponsored(
@@ -150,9 +178,10 @@ export function resolveCategoryPlacement(
   for (const raw of slugs) {
     const key = raw?.trim();
     if (!key) continue;
-    if (isLocationCategorySlug(key) && !locationSeen.has(key)) {
-      locationSeen.add(key);
-      locationSlugs.push(key);
+    const locationSlug = canonicalizeLocationSlug(key);
+    if (locationSlug && !locationSeen.has(locationSlug)) {
+      locationSeen.add(locationSlug);
+      locationSlugs.push(locationSlug);
     }
     const mapped = applyMerge(key, merge);
     if (!CANONICAL_CATEGORY_SLUGS.has(mapped) || isLocationCategorySlug(mapped)) {
@@ -161,7 +190,7 @@ export function resolveCategoryPlacement(
     if (topicSeen.has(mapped)) continue;
     topicSeen.add(mapped);
     topicSlugs.push(mapped);
-    if (isLocationCategorySlug(key)) fromCity.add(mapped);
+    if (locationSlug) fromCity.add(mapped);
   }
 
   const ranked = topicSlugs.slice().sort((a, b) => {

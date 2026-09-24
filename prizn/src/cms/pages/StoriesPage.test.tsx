@@ -106,7 +106,7 @@ describe('CmsStoriesPage', () => {
       items: [article],
       total: 1,
       page: 1,
-      pageSize: 9,
+      pageSize: 20,
       totalPages: 1,
     })
     deleteCmsArticle.mockResolvedValue(undefined)

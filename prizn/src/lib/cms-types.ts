@@ -102,6 +102,8 @@ export type CmsArticle = {
   speaker?: string;
   speakerBg?: string;
   image: string;
+  /** 480px WebP thumb when the hero was processed by our sharp pipeline. */
+  imageThumb?: string;
   heroKind?: 'image' | 'video';
   photoCredit: string;
   photoCreditBg: string;

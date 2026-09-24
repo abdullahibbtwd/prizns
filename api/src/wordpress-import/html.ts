@@ -1,4 +1,5 @@
 import type { StoredArticleBlock } from '../articles/article.types';
+import { preferShareImageUrl } from '../common/share-image.util';
 import type { WpInlineImage } from './types';
 
 const NAMED_ENTITIES: Record<string, string> = {
@@ -77,7 +78,7 @@ function isStrongOnly(html: string): boolean {
 function imageFromHtml(html: string): WpInlineImage | null {
   const img = html.match(/<img\b[^>]*>/i)?.[0];
   if (!img) return null;
-  const src = toHttps(attr(img, 'src'));
+  const src = preferShareImageUrl(toHttps(attr(img, 'src'))) || '';
   if (!src) return null;
   const caption =
     stripHtml(html.match(/<figcaption\b[^>]*>([\s\S]*?)<\/figcaption>/i)?.[1] ?? '') ||

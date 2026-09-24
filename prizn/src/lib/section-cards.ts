@@ -14,6 +14,7 @@ export type PlaceCard = {
   sub: string
   subBg: string
   image: string
+  imageThumb?: string
   readTime: string
   action: string
   actionBg: string
@@ -28,6 +29,7 @@ export type TraditionCard = {
   titleBg: string
   sub: string
   image: string
+  imageThumb?: string
   description: string
   sponsored?: boolean
   sponsorName?: string | null
@@ -42,6 +44,7 @@ export type HumanStoryCard = {
   readTimeBg: string
   location: string
   image: string
+  imageThumb?: string
   excerpt: string
   sponsored?: boolean
   sponsorName?: string | null
@@ -78,6 +81,7 @@ export function toPlaceCard(article: CmsArticle): PlaceCard {
     sub: article.subtitle || article.subtitleBg,
     subBg: article.subtitleBg,
     image: article.image || '',
+    imageThumb: article.imageThumb || '',
     readTime: article.readTime || article.readTimeBg,
     action: 'Discover',
     actionBg: 'Открийте',
@@ -98,6 +102,7 @@ export function toTraditionCard(article: CmsArticle): TraditionCard {
     titleBg: article.titleBg,
     sub: article.subtitle || article.subtitleBg,
     image: article.image || '',
+    imageThumb: article.imageThumb || '',
     description:
       firstParagraphBg(article.bodyRaw) ||
       firstParagraphBg(article.body) ||
@@ -119,6 +124,7 @@ export function toHumanStoryCard(article: CmsArticle): HumanStoryCard {
     readTimeBg: article.readTimeBg,
     location: article.location || article.locationBg,
     image: article.image || '',
+    imageThumb: article.imageThumb || '',
     excerpt: article.subtitle || article.subtitleBg,
     sponsored: Boolean(article.sponsored),
     sponsorName: article.sponsorName ?? null,

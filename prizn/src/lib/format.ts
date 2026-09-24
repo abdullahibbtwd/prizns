@@ -14,7 +14,11 @@ export function formatDuration(ms: number): string {
   return `${seconds}s`
 }
 
-export function formatTrendPct(pct: number): string {
+export function formatTrendPct(
+  pct: number | null | undefined,
+  emptyLabel = '—',
+): string {
+  if (pct == null) return emptyLabel
   if (pct === 0) return '0%'
   const sign = pct > 0 ? '+' : ''
   return `${sign}${pct}%`

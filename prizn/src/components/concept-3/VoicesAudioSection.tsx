@@ -1,11 +1,15 @@
+import { lazy, Suspense } from 'react'
 import { ArrowDown, Headphones, Radio } from 'lucide-react'
 import { ViewAllLink } from '@/components/concept-3/ViewAllLink'
 import { SectionLoading } from '@/components/concept-3/SectionLoading'
-import {
-  VoicesPlayerGrid,
-  toVoiceItem,
-} from '@/components/concept-3/VoicesPlayerGrid'
+import { toVoiceItem } from '@/lib/voice-item'
 import { preferApi, usePublicArticles } from '@/lib/public-content'
+
+const VoicesPlayerGrid = lazy(() =>
+  import('@/components/concept-3/VoicesPlayerGrid').then((m) => ({
+    default: m.VoicesPlayerGrid,
+  })),
+)
 
 interface VoicesAudioSectionProps {
   lang: 'bg' | 'en'
@@ -23,6 +27,8 @@ export function VoicesAudioSection({ lang }: VoicesAudioSectionProps) {
   const voices = preferApi(
     data?.filter((article) => Boolean(article.audioUrl)).map(toVoiceItem),
   ).slice(0, 3)
+
+  if (!isLoading && voices.length === 0) return null
 
   return (
     <section id="voices" className="relative overflow-hidden bg-[#1A1A1A] pt-24 text-white md:pt-36">
@@ -67,7 +73,18 @@ export function VoicesAudioSection({ lang }: VoicesAudioSectionProps) {
             cardClassName="h-36"
           />
         ) : voices.length > 0 ? (
-          <VoicesPlayerGrid lang={lang} voices={voices} />
+          <Suspense
+            fallback={
+              <SectionLoading
+                lang={lang}
+                count={3}
+                tone="dark"
+                cardClassName="h-36"
+              />
+            }
+          >
+            <VoicesPlayerGrid lang={lang} voices={voices} />
+          </Suspense>
         ) : null}
 
         <div className="mt-16 flex justify-center md:mt-20">

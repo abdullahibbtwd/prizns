@@ -10,16 +10,18 @@ import {
 } from './story-editor-actions'
 
 describe('story editor schedule helpers', () => {
-  it('formats an ISO timestamp as a local datetime-local value', () => {
-    const iso = '2026-09-01T10:30:00.000Z'
-    const local = toDatetimeLocalValue(iso)
-    const roundTrip = new Date(local)
-    expect(roundTrip.toISOString()).toBe(new Date(iso).toISOString())
+  it('formats an ISO timestamp as a Sofia datetime-local value', () => {
+    // 10:30 UTC = 13:30 Europe/Sofia in September (EEST, UTC+3)
+    expect(toDatetimeLocalValue('2026-09-01T10:30:00.000Z')).toBe(
+      '2026-09-01T13:30',
+    )
   })
 
-  it('defaults schedule to one hour from now', () => {
-    const now = new Date('2026-08-15T12:00:00')
-    expect(defaultScheduleLocal(now)).toBe(toDatetimeLocalValue(null, new Date('2026-08-15T13:00:00')))
+  it('defaults schedule to one hour from now (Sofia wall clock)', () => {
+    const now = new Date('2026-08-15T12:00:00.000Z')
+    expect(defaultScheduleLocal(now)).toBe(
+      toDatetimeLocalValue(null, new Date('2026-08-15T13:00:00.000Z')),
+    )
   })
 
   it('splits and joins date and time', () => {
@@ -32,18 +34,19 @@ describe('story editor schedule helpers', () => {
     expect(joinDatetimeLocal('', '08:15')).toBe('')
   })
 
-  it('only sends publishedAt when the story is scheduled', () => {
+  it('only sends publishedAt when the story is scheduled (Sofia wall time)', () => {
     expect(publishedAtPayload('DRAFT', '2026-09-01T08:15')).toBeUndefined()
     expect(publishedAtPayload('SCHEDULED', '')).toBeUndefined()
+    // 08:15 Sofia in September = 05:15 UTC
     expect(publishedAtPayload('SCHEDULED', '2026-09-01T08:15')).toBe(
-      new Date('2026-09-01T08:15').toISOString(),
+      '2026-09-01T05:15:00.000Z',
     )
   })
 
   it('treats a past schedule as due now', () => {
-    const now = new Date('2026-08-15T12:00:00')
+    const now = new Date('2026-08-15T12:00:00.000Z')
     expect(isScheduleDueNow('2026-08-15T11:00', now)).toBe(true)
-    expect(isScheduleDueNow('2026-08-15T13:00', now)).toBe(false)
+    expect(isScheduleDueNow('2026-08-16T13:00', now)).toBe(false)
   })
 
   it('disables Publish when the saved story is already live and clean', () => {

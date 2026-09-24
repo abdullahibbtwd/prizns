@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import {useNavigate, useSearchParams } from 'react-router-dom'
+import { Link } from '@/components/LocaleLink'
 import { useTranslation } from 'react-i18next'
 import { JournalShell } from '@/components/concept-3/JournalShell'
 import { PageMeta } from '@/components/PageMeta'

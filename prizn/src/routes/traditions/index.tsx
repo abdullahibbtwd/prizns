@@ -1,6 +1,7 @@
-import { Link } from 'react-router-dom'
+import { Link } from '@/components/LocaleLink'
 import { motion } from 'framer-motion'
 import { JournalShell } from '@/components/concept-3/JournalShell'
+import { PageMeta } from '@/components/PageMeta'
 import { ListingHeader } from '@/components/concept-3/ListingHeader'
 import { ListingPagination } from '@/components/concept-3/ListingPagination'
 import { SponsoredBadge } from '@/components/concept-3/SponsoredBadge'
@@ -33,6 +34,16 @@ export default function TraditionsPage() {
 
         return (
           <main>
+            <PageMeta
+              lang={lang}
+              title={lang === 'bg' ? 'Традиции' : 'Traditions'}
+              description={
+                lang === 'bg'
+                  ? 'Живи обичаи, занаяти и ритуали — паметта, която регионът все още пази в ръцете си.'
+                  : 'Living customs, crafts, and rituals — the memory the region still holds in its hands.'
+              }
+              path="/traditions"
+            />
             <ListingHeader
               lang={lang}
               eyebrow={lang === 'bg' ? 'Памет & Култура' : 'Cultural Heritage'}

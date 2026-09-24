@@ -4,6 +4,7 @@ import { NestFactory } from '@nestjs/core';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { JsonExceptionFilter } from './common/json-exception.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { rawBody: true });
@@ -23,6 +24,7 @@ async function bootstrap() {
       transform: true,
     }),
   );
+  app.useGlobalFilters(new JsonExceptionFilter());
 
   app.enableCors({
     origin: config.get<string>('CORS_ORIGIN', 'http://localhost:5173'),

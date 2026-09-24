@@ -1,18 +1,26 @@
-import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
+import { Link } from '@/components/LocaleLink'
 import { Heart, PenLine } from 'lucide-react'
 import {
   getContributeNavLinks,
   getFooterSecondaryLinks,
   getPrimaryNavLinks,
 } from '@/data/concept-3/nav'
+import { useSectionPresence } from '@/hooks/useSectionPresence'
 
 interface JournalFooterProps {
   lang: 'bg' | 'en'
 }
 
 export function JournalFooter({ lang }: JournalFooterProps) {
-  const primaryLinks = getPrimaryNavLinks(lang)
-  const secondaryLinks = getFooterSecondaryLinks(lang)
+  const { t } = useTranslation()
+  const { isPathVisible } = useSectionPresence()
+  const primaryLinks = getPrimaryNavLinks(lang).filter((link) =>
+    isPathVisible(link.to),
+  )
+  const secondaryLinks = getFooterSecondaryLinks(lang).filter((link) =>
+    isPathVisible(link.to),
+  )
   const contributeLinks = getContributeNavLinks(lang)
 
   return (
@@ -103,7 +111,7 @@ export function JournalFooter({ lang }: JournalFooterProps) {
 
         <div className="mt-16 flex w-full flex-col items-center justify-between gap-4 border-t border-[#EAE6DF] pt-8 font-sans text-[11px] uppercase tracking-widest text-[#1A1A1A]/40 sm:flex-row">
           <span>© 2026 PRIZNI</span>
-          <span>The Living Journal of Northwestern Bulgaria</span>
+          <span>{t('livingJournalTagline')}</span>
         </div>
       </div>
     </footer>

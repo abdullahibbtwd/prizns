@@ -1,10 +1,9 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { lazy, Suspense, useState } from 'react'
+import { Link } from '@/components/LocaleLink'
 import { motion } from 'framer-motion'
 import { JournalShell } from '@/components/concept-3/JournalShell'
 import { ListingHeader } from '@/components/concept-3/ListingHeader'
 import { ListingPagination } from '@/components/concept-3/ListingPagination'
-import { LuxuryVideoPlayer } from '@/components/concept-3/LuxuryVideoPlayer'
 import { ListingBody, listingCountLabel } from '@/components/concept-3/ListingBody'
 import {
   articlePath,
@@ -13,6 +12,12 @@ import {
 } from '@/lib/public-content'
 import { useListingFilters } from '@/lib/listing-filters'
 import type { CmsArticle } from '@/lib/cms-types'
+
+const LuxuryVideoPlayer = lazy(() =>
+  import('@/components/concept-3/LuxuryVideoPlayer').then((m) => ({
+    default: m.LuxuryVideoPlayer,
+  })),
+)
 
 function toVideoCard(article: CmsArticle) {
   return {
@@ -80,19 +85,28 @@ export default function VideoPage() {
                     transition={{ duration: 0.6, delay: Math.min(index, 8) * 0.06 }}
                     className="space-y-4"
                   >
-                    <LuxuryVideoPlayer
-                      src={item.videoUrl}
-                      poster={item.image}
-                      title={lang === 'bg' ? item.titleBg : item.title}
-                      aspectClassName="aspect-[16/10]"
-                      className="rounded-[14px]"
-                      size="featured"
-                      tone="cinema"
-                      playing={activeId === item.id}
-                      onPlayingChange={(playing) =>
-                        setActiveId(playing ? item.id : null)
+                    <Suspense
+                      fallback={
+                        <div
+                          className="aspect-[16/10] w-full animate-pulse rounded-[14px] bg-[#EAE6DF]"
+                          aria-hidden
+                        />
                       }
-                    />
+                    >
+                      <LuxuryVideoPlayer
+                        src={item.videoUrl}
+                        poster={item.image}
+                        title={lang === 'bg' ? item.titleBg : item.title}
+                        aspectClassName="aspect-[16/10]"
+                        className="rounded-[14px]"
+                        size="featured"
+                        tone="cinema"
+                        playing={activeId === item.id}
+                        onPlayingChange={(playing) =>
+                          setActiveId(playing ? item.id : null)
+                        }
+                      />
+                    </Suspense>
                     <div>
                       <span className="font-sans text-[11px] uppercase tracking-[0.2em] text-[#0C2686]/70">
                         {item.duration}

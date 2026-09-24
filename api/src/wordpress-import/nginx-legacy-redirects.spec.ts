@@ -104,6 +104,7 @@ describe('renderNginxRedirectMap', () => {
     );
     expect(rendered).toContain('# articles: 1');
     expect(rendered).toContain('/village-life /stories/village-life;');
+    expect(rendered).toContain('/authors/ami-tola /authors/eva-ivanova;');
   });
 });
 
@@ -113,7 +114,8 @@ describe('redirect map guards', () => {
       buildLegacyRedirectMap([article()]),
       { articles: 1, generatedAt: '2026-09-16T00:00:00.000Z' },
     );
-    expect(countNginxMapEntries(rendered)).toBe(2);
+    // 4 author-alias lines + village-life (+ trailing slash)
+    expect(countNginxMapEntries(rendered)).toBe(6);
     expect(recommendedMapHashMaxSize(4000)).toBe(8192);
     expect(recommendedMapHashMaxSize(100)).toBe(2048);
   });

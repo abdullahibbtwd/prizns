@@ -170,7 +170,11 @@ export default function CmsCategoriesPage() {
       <CmsPageHeader
         title={t('cms.categories.title')}
         description={t('cms.categories.description')}
-        badge={t('cms.categories.badge', { count: categories.length })}
+        badge={
+          listQuery.isLoading
+            ? t('cms.categories.badgeLoading')
+            : t('cms.categories.badge', { count: categories.length })
+        }
       />
 
       <Alert

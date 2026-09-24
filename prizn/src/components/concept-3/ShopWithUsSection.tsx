@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link } from '@/components/LocaleLink'
 import { motion } from 'framer-motion'
 import { ArrowRight } from 'lucide-react'
 
@@ -23,10 +23,10 @@ export function ShopWithUsSection({ lang }: ShopWithUsSectionProps) {
       />
 
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
+        initial={false}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
-        transition={{ duration: 0.8 }}
+        transition={{ duration: 0.35 }}
         className="relative z-10 mx-auto max-w-3xl text-center"
       >
         <span className="mb-4 block font-sans text-xs font-medium uppercase tracking-[0.3em] text-white/70">

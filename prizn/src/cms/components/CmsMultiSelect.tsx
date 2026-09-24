@@ -1,5 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Check, ChevronsUpDown, Plus, Search, X } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 import { CmsField, CmsInput } from '@/cms/components/CmsFields'
 import { JournalSelect } from '@/components/ui/JournalSelect'
@@ -245,10 +246,10 @@ export function CmsMultiSelect({
   )
 }
 
-const KIND_LABELS: Record<TagKind, string> = {
-  LOCATION: 'Place',
-  TOPIC: 'Topic',
-  CATEGORY: 'Category',
+const KIND_LABEL_KEYS: Record<TagKind, string> = {
+  LOCATION: 'cms.tags.kindLocation',
+  TOPIC: 'cms.tags.kindTopic',
+  CATEGORY: 'cms.tags.kindCategory',
 }
 
 const DEFAULT_PICKER_KINDS: TagKind[] = ['LOCATION', 'TOPIC']
@@ -276,6 +277,7 @@ export function CmsTagPicker({
   onCreateTag,
   className,
 }: CmsTagPickerProps) {
+  const { t } = useTranslation()
   const allowedKinds = kinds
   const [creating, setCreating] = useState(false)
   const [kind, setKind] = useState<TagKind>(allowedKinds[0] ?? 'LOCATION')
@@ -283,13 +285,16 @@ export function CmsTagPicker({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const kindLabel = (value: TagKind) => t(KIND_LABEL_KEYS[value])
+
   const kindOptions = useMemo(
     () =>
       allowedKinds.map((value) => ({
         value,
-        label: KIND_LABELS[value],
+        label: kindLabel(value),
       })),
-    [allowedKinds],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- t/kindLabel stable enough for options
+    [allowedKinds, t],
   )
 
   const tagById = useMemo(() => {
@@ -320,9 +325,10 @@ export function CmsTagPicker({
           value: tag.id,
           label: tag.nameBg,
           hint: tag.nameEn || undefined,
-          group: KIND_LABELS[tag.kind],
+          group: kindLabel(tag.kind),
         })),
-    [tags, allowedKinds],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [tags, allowedKinds, t],
   )
 
   const resetCreate = () => {
@@ -350,7 +356,7 @@ export function CmsTagPicker({
       }
       resetCreate()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create tag')
+      setError(err instanceof Error ? err.message : t('cms.tags.createFailed'))
     } finally {
       setSaving(false)
     }
@@ -363,9 +369,9 @@ export function CmsTagPicker({
         value={editableValue}
         onChange={setEditableValue}
         loading={loading}
-        placeholder="Search places and topics…"
-        searchPlaceholder="Search places or topics…"
-        emptyText="No tags match your search"
+        placeholder={t('cms.tags.searchPlaceholder')}
+        searchPlaceholder={t('cms.tags.searchPlacesOrTopics')}
+        emptyText={t('cms.tags.noMatch')}
       />
 
       {!creating ? (
@@ -375,42 +381,44 @@ export function CmsTagPicker({
           className="inline-flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-dashed border-[#0C2686]/30 bg-white px-3 py-2.5 font-sans text-xs font-semibold uppercase tracking-[0.14em] text-[#0C2686] transition-colors hover:border-[#0C2686]/50 hover:bg-[#0C2686]/[0.03]"
         >
           <Plus className="size-3.5" />
-          Add new tag
+          {t('cms.tags.addNew')}
         </button>
       ) : (
         <div className="space-y-3 rounded-xl border border-[#E8E4DC] bg-white p-3.5 shadow-2xs">
           <div className="flex items-center justify-between gap-2">
             <p className="font-sans text-[11px] font-semibold uppercase tracking-[0.16em] text-stone-500">
-              New tag
+              {t('cms.tags.newTag')}
             </p>
             <button
               type="button"
               onClick={resetCreate}
               className="rounded-lg p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
-              aria-label="Cancel"
+              aria-label={t('cms.common.cancel')}
             >
               <X className="size-4" />
             </button>
           </div>
 
-          <CmsField label="Kind">
+          <CmsField label={t('cms.tags.kind')}>
             <JournalSelect
               name="new-tag-kind"
               variant="boxed"
-              label="Kind"
-              placeholder="Select kind"
+              label={t('cms.tags.kind')}
+              placeholder={t('cms.tags.selectKind')}
               options={kindOptions}
               value={kind}
               onChange={(value) => setKind(value as TagKind)}
             />
           </CmsField>
 
-          <CmsField label="Name">
+          <CmsField label={t('cms.tags.name')}>
             <CmsInput
               value={nameBg}
               onChange={(e) => setNameBg(e.target.value)}
               placeholder={
-                kind === 'LOCATION' ? 'e.g. Лом / Lom' : 'e.g. Килими / Kilims'
+                kind === 'LOCATION'
+                  ? t('cms.tags.nameExampleLocation')
+                  : t('cms.tags.nameExampleTopic')
               }
               autoFocus
               onKeyDown={(e) => {
@@ -423,7 +431,7 @@ export function CmsTagPicker({
           </CmsField>
 
           {error ? (
-            <p className="font-sans text-xs text-rose-600">{error}</p>
+            <p className="text-xs text-rose-600">{error}</p>
           ) : null}
 
           <div className="flex items-center justify-end gap-2">
@@ -432,7 +440,7 @@ export function CmsTagPicker({
               onClick={resetCreate}
               className="rounded-xl px-3 py-2 font-sans text-xs font-medium text-stone-600 hover:bg-stone-100"
             >
-              Cancel
+              {t('cms.common.cancel')}
             </button>
             <button
               type="button"
@@ -441,7 +449,7 @@ export function CmsTagPicker({
               className="inline-flex items-center gap-1.5 rounded-xl bg-[#0C2686] px-3.5 py-2 font-sans text-xs font-semibold text-white transition hover:bg-[#4051C7] disabled:opacity-50"
             >
               <Plus className="size-3.5" />
-              {saving ? 'Saving…' : 'Create & select'}
+              {saving ? t('cms.common.saving') : t('cms.common.create')}
             </button>
           </div>
         </div>

@@ -168,4 +168,44 @@ describe('TranslationService', () => {
       }),
     );
   });
+
+  it('marks article FAILED when English is a copy of Bulgarian', async () => {
+    const article = buildArticleRow({
+      categoryBg: 'Категория',
+      titleBg: 'Заглавие',
+      subtitleBg: 'Подзаглавие',
+      body: [{ type: 'paragraph', text: 'Текст' }],
+    });
+    prisma.article.findUniqueOrThrow = jest.fn().mockResolvedValue(article);
+    prisma.article.findUnique = jest.fn().mockResolvedValue({
+      translationStatus: TranslationStatus.RUNNING,
+    });
+    (translate as jest.Mock).mockResolvedValue({
+      k0: { text: 'Категория' },
+      k1: { text: 'Заглавие' },
+      k2: { text: 'Подзаглавие' },
+      k3: { text: '' },
+      k4: { text: '' },
+      k5: { text: '' },
+      k6: { text: '' },
+      k7: { text: '' },
+      k8: { text: '' },
+      k9: { text: '' },
+      k10: { text: '' },
+      k11: { text: '' },
+      k12: { text: 'Текст' },
+    });
+
+    const promise = service.processArticle('art-1');
+    await jest.runAllTimersAsync();
+    await promise;
+
+    expect(prisma.article.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          translationStatus: TranslationStatus.FAILED,
+        }),
+      }),
+    );
+  });
 });

@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { PageMeta } from './PageMeta'
 
 describe('PageMeta', () => {
-  it('sets title, description, and robots', () => {
+  it('sets title, description, hreflang, and robots', () => {
     render(
       <HelmetProvider>
         <PageMeta
@@ -25,7 +25,12 @@ describe('PageMeta', () => {
     const robots = document.head.querySelector('meta[name="robots"]')
     expect(robots?.getAttribute('content')).toBe('noindex,nofollow')
     const ogImage = document.head.querySelector('meta[property="og:image"]')
+    expect(ogImage?.getAttribute('content')).toMatch(/^https?:\/\//)
     expect(ogImage?.getAttribute('content')).toContain('/hero.jpg')
+    const enAlt = document.head.querySelector('link[hreflang="en"]')
+    const bgAlt = document.head.querySelector('link[hreflang="bg"]')
+    expect(enAlt?.getAttribute('href')).toContain('/en/places/belogradchik')
+    expect(bgAlt?.getAttribute('href')).toMatch(/\/places\/belogradchik$/)
   })
 
   it('falls back to the default share image', () => {
@@ -35,6 +40,7 @@ describe('PageMeta', () => {
       </HelmetProvider>,
     )
     const ogImage = document.head.querySelector('meta[property="og:image"]')
+    expect(ogImage?.getAttribute('content')).toMatch(/^https?:\/\//)
     expect(ogImage?.getAttribute('content')).toContain('/og-default.png')
     expect(
       document.head.querySelector('meta[name="twitter:card"]')?.getAttribute('content'),

@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link } from '@/components/LocaleLink'
 import { motion } from 'framer-motion'
 import { ArrowRight } from 'lucide-react'
 import { ViewAllLink } from '@/components/concept-3/ViewAllLink'
@@ -8,6 +8,7 @@ import {
   usePublicArticles,
 } from '@/lib/public-content'
 import type { CmsArticle } from '@/lib/cms-types'
+import { ResponsiveImage } from '@/components/ResponsiveImage'
 
 interface CampaignsSectionProps {
   lang: 'bg' | 'en'
@@ -21,6 +22,7 @@ function toCampaignsCard(article: CmsArticle) {
     status: article.category || '',
     statusBg: article.categoryBg || '',
     image: article.image || '',
+    imageThumb: article.imageThumb || '',
     excerpt: article.subtitle || article.subtitleBg || '',
     path: articlePath(article),
   }
@@ -57,20 +59,21 @@ export function CampaignsSection({ lang }: CampaignsSectionProps) {
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
           {featured && (
             <motion.div
-              initial={{ opacity: 0, y: 24 }}
+              initial={false}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ duration: 0.75 }}
+              transition={{ duration: 0.35 }}
               className="lg:col-span-7"
             >
               <Link
                 to={featured.path}
                 className="group relative block min-h-[420px] overflow-hidden rounded-[16px] bg-[#1A1A1A] md:min-h-[480px]"
               >
-                <img
+                <ResponsiveImage
                   src={featured.image}
+                  thumbSrc={featured.imageThumb}
                   alt={lang === 'bg' ? featured.titleBg : featured.title}
-                  loading="lazy"
+                  sizes="featured"
                   className="absolute inset-0 h-full w-full object-cover transition-transform duration-1000 group-hover:scale-105"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent" />
@@ -81,7 +84,7 @@ export function CampaignsSection({ lang }: CampaignsSectionProps) {
                   <h3 className="mt-3 font-heading text-3xl font-light text-white md:text-5xl">
                     {lang === 'bg' ? featured.titleBg : featured.title}
                   </h3>
-                  <p className="mt-4 max-w-lg font-sans text-sm font-light leading-relaxed text-white/75 md:text-base">
+                  <p className="mt-4 max-w-lg line-clamp-3 font-sans text-sm font-light leading-relaxed text-white/75 md:text-base">
                     {featured.excerpt}
                   </p>
                   <span className="mt-6 inline-flex items-center gap-2 font-sans text-xs font-medium uppercase tracking-[0.22em] text-white">
@@ -97,17 +100,18 @@ export function CampaignsSection({ lang }: CampaignsSectionProps) {
             {side.map((item, index) => (
               <motion.div
                 key={item.id}
-                initial={{ opacity: 0, y: 16 }}
+                initial={false}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ duration: 0.65, delay: 0.08 + index * 0.08 }}
+                transition={{ duration: 0.35, delay: 0.08 + index * 0.08 }}
               >
                 <Link to={item.path} className="group block">
                   <div className="aspect-[16/10] overflow-hidden rounded-[14px] bg-[#1A1A1A]">
-                    <img
+                    <ResponsiveImage
                       src={item.image}
+                      thumbSrc={item.imageThumb}
                       alt={lang === 'bg' ? item.titleBg : item.title}
-                      loading="lazy"
+                      sizes="grid2"
                       className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
                     />
                   </div>
@@ -117,7 +121,7 @@ export function CampaignsSection({ lang }: CampaignsSectionProps) {
                   <h3 className="mt-1 font-heading text-2xl font-normal text-[#1A1A1A] transition-colors group-hover:text-[#0C2686]">
                     {lang === 'bg' ? item.titleBg : item.title}
                   </h3>
-                  <p className="mt-2 font-sans text-sm font-light leading-relaxed text-[#1A1A1A]/60">
+                  <p className="mt-2 line-clamp-2 font-sans text-sm font-light leading-relaxed text-[#1A1A1A]/60">
                     {item.excerpt}
                   </p>
                 </Link>

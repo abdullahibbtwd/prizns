@@ -9,7 +9,7 @@ describe('SeoController', () => {
     rssXml: jest.fn().mockResolvedValue('<rss/>'),
     jsonFeed: jest.fn().mockResolvedValue('{}'),
     robotsTxt: jest.fn().mockReturnValue('User-agent: *'),
-    botShellHtml: jest.fn().mockResolvedValue('<html/>'),
+    botShellHtml: jest.fn().mockResolvedValue({ html: '<html/>', status: 200 }),
   };
 
   beforeEach(async () => {
@@ -32,5 +32,17 @@ describe('SeoController', () => {
     controller.robots(res as never);
     expect(seo.robotsTxt).toHaveBeenCalled();
     expect(res.send).toHaveBeenCalledWith('User-agent: *');
+  });
+
+  it('sends bot shell with status', async () => {
+    const res = {
+      status: jest.fn().mockReturnThis(),
+      type: jest.fn().mockReturnThis(),
+      send: jest.fn(),
+    };
+    await controller.botShell('/stories/missing', res as never);
+    expect(seo.botShellHtml).toHaveBeenCalledWith('/stories/missing');
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.send).toHaveBeenCalledWith('<html/>');
   });
 });

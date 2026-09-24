@@ -12,6 +12,8 @@ import {
   type AnalyticsRange,
 } from '@/lib/analytics-api'
 import { formatTrendPct, formatPath } from '@/lib/format'
+import { pickLang } from '@/lib/pick-lang'
+import { useJournalLang } from '@/hooks/useJournalLang'
 import { cn } from '@/lib/utils'
 
 const RANGES: AnalyticsRange[] = ['today', 'week', 'month']
@@ -22,8 +24,16 @@ const RANGE_KEYS: Record<AnalyticsRange, string> = {
   month: 'cms.analytics.rangeMonth',
 }
 
+function trendTypeFromPct(
+  pct: number | null | undefined,
+): 'up' | 'down' | 'neutral' {
+  if (pct == null || pct === 0) return 'neutral'
+  return pct > 0 ? 'up' : 'down'
+}
+
 export default function CmsAnalyticsPage() {
   const { t } = useTranslation()
+  const { lang } = useJournalLang()
   const [range, setRange] = useState<AnalyticsRange>('today')
 
   const summaryQuery = useQuery({
@@ -40,6 +50,7 @@ export default function CmsAnalyticsPage() {
     cohortTotal > 0 ? Math.round((signedInSessions / cohortTotal) * 100) : 0
   const anonymousShare =
     cohortTotal > 0 ? Math.round((anonymousSessions / cohortTotal) * 100) : 0
+  const newLabel = t('cms.analytics.trendNew')
 
   return (
     <div>
@@ -78,14 +89,8 @@ export default function CmsAnalyticsPage() {
         <StatCard
           title={t('cms.analytics.visitors')}
           value={(data?.visitors ?? 0).toLocaleString()}
-          trend={formatTrendPct(data?.visitorsTrendPct ?? 0)}
-          trendType={
-            (data?.visitorsTrendPct ?? 0) > 0
-              ? 'up'
-              : (data?.visitorsTrendPct ?? 0) < 0
-                ? 'down'
-                : 'neutral'
-          }
+          trend={formatTrendPct(data?.visitorsTrendPct, newLabel)}
+          trendType={trendTypeFromPct(data?.visitorsTrendPct)}
           hint={t('cms.analytics.visitorsHint')}
           icon={Eye}
           sparklineData={sparkline}
@@ -93,14 +98,8 @@ export default function CmsAnalyticsPage() {
         <StatCard
           title={t('cms.analytics.pageviews')}
           value={(data?.pageviews ?? 0).toLocaleString()}
-          trend={formatTrendPct(data?.pageviewsTrendPct ?? 0)}
-          trendType={
-            (data?.pageviewsTrendPct ?? 0) > 0
-              ? 'up'
-              : (data?.pageviewsTrendPct ?? 0) < 0
-                ? 'down'
-                : 'neutral'
-          }
+          trend={formatTrendPct(data?.pageviewsTrendPct, newLabel)}
+          trendType={trendTypeFromPct(data?.pageviewsTrendPct)}
           hint={t('cms.analytics.pageviewsHint')}
           icon={FileText}
           sparklineData={sparkline}
@@ -108,9 +107,13 @@ export default function CmsAnalyticsPage() {
         <StatCard
           title={t('cms.analytics.avgTime')}
           value={data?.avgDwellLabel ?? '0s'}
-          trend={t('cms.analytics.avgTimePrev', {
-            value: data?.previous.avgDwellLabel ?? '0s',
-          })}
+          trend={
+            data?.previous.avgDwellLabel
+              ? t('cms.analytics.avgTimePrev', {
+                  value: data.previous.avgDwellLabel,
+                })
+              : t('cms.analytics.avgTimePrevNone')
+          }
           trendType="neutral"
           hint={t('cms.analytics.avgTimeHint')}
           icon={Clock3}
@@ -229,7 +232,13 @@ export default function CmsAnalyticsPage() {
                     className="border-b border-[#E8E4DC]/70"
                   >
                     <td className="px-4 py-3">
-                      <p className="font-medium text-stone-900">{row.title}</p>
+                      <p className="font-medium text-stone-900">
+                        {pickLang(
+                          lang,
+                          row.titleEn ?? row.title,
+                          row.titleBg ?? row.title,
+                        )}
+                      </p>
                       {row.path && (
                         <p className="text-xs text-stone-500">
                           {formatPath(row.path)}

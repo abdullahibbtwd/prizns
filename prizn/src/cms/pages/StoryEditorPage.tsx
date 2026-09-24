@@ -84,6 +84,11 @@ import {
   toDatetimeLocalValue,
   type EditorSaveAction,
 } from '@/cms/pages/story-editor-actions'
+import { toSofiaDateIso } from '@/lib/format-date'
+import {
+  stripEmptyBodyBlocks,
+  validateStoryForPublish,
+} from '@/lib/translation-quality'
 import {
   AUTOSAVE_IDLE_MS,
   autosaveStatus,
@@ -293,9 +298,12 @@ function formatReadTimeBg(amount: number, unit: 'minutes' | 'hours') {
 
 function formatDateBg(iso: string) {
   if (!iso) return ''
-  const date = new Date(`${iso}T12:00:00`)
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(iso)
+    ? new Date(`${iso}T12:00:00`)
+    : new Date(iso)
   if (Number.isNaN(date.getTime())) return ''
   return new Intl.DateTimeFormat('bg-BG', {
+    timeZone: 'Europe/Sofia',
     day: 'numeric',
     month: 'long',
     year: 'numeric',
@@ -467,7 +475,7 @@ export default function CmsStoryEditorPage() {
       readTimeUnit:
         article.section === 'video' ? 'minutes' : readTime.unit,
       locationBg: article.locationBg,
-      dateIso: article.publishedAt?.slice(0, 10) || '',
+      dateIso: toSofiaDateIso(article.publishedAt) || '',
       scheduledAt:
         article.status === 'SCHEDULED'
           ? toDatetimeLocalValue(article.publishedAt)
@@ -661,6 +669,38 @@ export default function CmsStoryEditorPage() {
         const sectionProfile = getSectionProfile(values.section)
         const durationSeconds =
           values.readTimeUnit === 'hours' ? minutes * 3600 : minutes * 60
+        const body = stripEmptyBodyBlocks(
+          compactBody(
+            syncBodyImagesWithGallery(
+              remapBodyMediaIds(values.body, idMap),
+              gallery.map((item) => ({
+                id: idMap.get(item.id) || item.id,
+                url: item.url,
+                kind: item.kind,
+              })),
+            ),
+          ),
+        )
+        if (values.body.length !== body.length) {
+          form.setValue('body', body as ArticleFormValues['body'], {
+            shouldDirty: true,
+          })
+        }
+        if (values.status === 'PUBLISHED') {
+          const issues = validateStoryForPublish({
+            titleBg: values.titleBg,
+            titleEn: articleQuery.data?.title ?? null,
+            subtitleBg: values.subtitleBg,
+            subtitleEn: articleQuery.data?.subtitle ?? null,
+            translationStatus: articleQuery.data?.translationStatus,
+            body,
+          })
+          if (issues.length > 0) {
+            throw new Error(
+              issues.map((issue) => t(`cms.editor.publishIssue.${issue.code}`)).join(' '),
+            )
+          }
+        }
         const payload = {
           section:
             values.section === 'featured' ? 'human-stories' : values.section,
@@ -697,16 +737,7 @@ export default function CmsStoryEditorPage() {
           seoDescriptionBg: values.seoDescriptionBg.trim() || null,
           tagIds: values.tagIds,
           categoryIds: values.categoryIds,
-          body: compactBody(
-            syncBodyImagesWithGallery(
-              remapBodyMediaIds(values.body, idMap),
-              gallery.map((item) => ({
-                id: idMap.get(item.id) || item.id,
-                url: item.url,
-                kind: item.kind,
-              })),
-            ),
-          ),
+          body,
           seriesId:
             values.seriesMode === 'series' && values.seriesId
               ? values.seriesId

@@ -39,6 +39,10 @@ vi.mock('@/lib/analytics-api', () => ({
   getAnalyticsSummary: (...args: unknown[]) => getAnalyticsSummary(...args),
 }))
 
+vi.mock('@/hooks/useJournalLang', () => ({
+  useJournalLang: () => ({ lang: 'en', setLang: vi.fn() }),
+}))
+
 describe('CmsDashboard', () => {
   beforeEach(() => {
     authUser.role = 'EDITOR'
