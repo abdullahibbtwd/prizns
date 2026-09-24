@@ -1253,7 +1253,9 @@ export class ArticlesService {
     const path = buildArticlePath(section, slug);
     const galleryIds = dto.galleryMediaIds?.filter(Boolean) ?? [];
     const heroMediaId = this.resolveHeroMediaId(dto.heroMediaId, galleryIds);
-    const body = stripEmptyBodyBlocks(dto.body ?? []);
+    const body = stripEmptyBodyBlocks(
+      (dto.body ?? []) as StoredArticleBlock[],
+    );
     this.assertPublishable({
       status: dto.status,
       titleBg: dto.titleBg,
