@@ -766,7 +766,7 @@ function ArticleContent({
           </p>
         </div>
 
-        <div className="mb-12 flex justify-center print-hidden" data-print-hide>
+        <div className="mb-8 flex justify-center print-hidden" data-print-hide>
           <button
             type="button"
             disabled={hasRelated || relateMutation.isPending}
@@ -788,6 +788,29 @@ function ArticleContent({
             ) : null}
           </button>
         </div>
+
+        {article.audioUrl ? (
+          <div
+            className="mb-10 rounded-[16px] border border-[#EAE6DF] bg-[#F7F5F1] p-5 md:mb-12 md:p-6 print-hidden"
+            data-print-hide
+          >
+            <div className="mb-3 flex items-center gap-2 font-sans text-[11px] uppercase tracking-[0.2em] text-[#0C2686]">
+              <Headphones className="size-3.5" />
+              <span>
+                {t('listen')}
+                {article.audioDuration ? ` · ${article.audioDuration}` : ''}
+              </span>
+            </div>
+            <audio
+              controls
+              className="w-full"
+              src={article.audioUrl}
+              preload="metadata"
+            >
+              <track kind="captions" />
+            </audio>
+          </div>
+        ) : null}
 
         {article.heroKind === 'video' && article.videoUrl ? (
           <div className="relative mb-14 w-full overflow-hidden rounded-[16px] shadow-[0_4px_24px_rgba(0,0,0,0.04)] print-hidden">
@@ -857,21 +880,6 @@ function ArticleContent({
             </Suspense>
           </div>
         ) : null}
-
-        {article.audioUrl && (
-          <div className="mb-12 rounded-[16px] border border-[#EAE6DF] bg-white p-5 md:p-6 print-hidden" data-print-hide>
-            <div className="mb-3 flex items-center gap-2 font-sans text-[11px] uppercase tracking-[0.2em] text-[#0C2686]">
-              <Headphones className="size-3.5" />
-              <span>
-                {t('listen')}
-                {article.audioDuration ? ` · ${article.audioDuration}` : ''}
-              </span>
-            </div>
-            <audio controls className="w-full" src={article.audioUrl} preload="none">
-              <track kind="captions" />
-            </audio>
-          </div>
-        )}
 
         <ArticleBlocks article={article} lang={lang} />
 

@@ -11,13 +11,18 @@ export type CmsConfirmOptions = {
   description?: string
   confirmLabel?: string
   cancelLabel?: string
+  /** Optional third action (e.g. “Narrate & publish”). */
+  altConfirmLabel?: string
   variant?: CmsConfirmVariant
 }
+
+export type CmsConfirmResult = 'confirm' | 'alt' | 'cancel'
 
 type CmsConfirmDialogProps = CmsConfirmOptions & {
   open: boolean
   onClose: () => void
   onConfirm: () => void
+  onAltConfirm?: () => void
   pending?: boolean
 }
 
@@ -25,10 +30,12 @@ export function CmsConfirmDialog({
   open,
   onClose,
   onConfirm,
+  onAltConfirm,
   title,
   description,
   confirmLabel,
   cancelLabel,
+  altConfirmLabel,
   variant = 'danger',
   pending = false,
 }: CmsConfirmDialogProps) {
@@ -47,6 +54,11 @@ export function CmsConfirmDialog({
         <GhostButton type="button" onClick={onClose} disabled={pending}>
           {cancelText}
         </GhostButton>
+        {altConfirmLabel && onAltConfirm ? (
+          <GhostButton type="button" onClick={onAltConfirm} disabled={pending}>
+            {altConfirmLabel}
+          </GhostButton>
+        ) : null}
         <PrimaryButton
           type="button"
           onClick={onConfirm}
@@ -65,18 +77,27 @@ export function CmsConfirmDialog({
 
 export function useCmsConfirm() {
   const { t } = useTranslation()
-  const resolverRef = useRef<((ok: boolean) => void) | null>(null)
+  const resolverRef = useRef<((result: CmsConfirmResult) => void) | null>(null)
   const [options, setOptions] = useState<CmsConfirmOptions | null>(null)
 
-  const close = useCallback((ok: boolean) => {
-    resolverRef.current?.(ok)
+  const close = useCallback((result: CmsConfirmResult) => {
+    resolverRef.current?.(result)
     resolverRef.current = null
     setOptions(null)
   }, [])
 
   const confirm = useCallback((next: CmsConfirmOptions) => {
-    resolverRef.current?.(false)
+    resolverRef.current?.('cancel')
     return new Promise<boolean>((resolve) => {
+      resolverRef.current = (result) => resolve(result === 'confirm')
+      setOptions(next)
+    })
+  }, [])
+
+  /** Like confirm, but can return a third “alt” choice when altConfirmLabel is set. */
+  const confirmChoice = useCallback((next: CmsConfirmOptions) => {
+    resolverRef.current?.('cancel')
+    return new Promise<CmsConfirmResult>((resolve) => {
       resolverRef.current = resolve
       setOptions(next)
     })
@@ -84,7 +105,7 @@ export function useCmsConfirm() {
 
   useEffect(
     () => () => {
-      resolverRef.current?.(false)
+      resolverRef.current?.('cancel')
       resolverRef.current = null
     },
     [],
@@ -102,11 +123,15 @@ export function useCmsConfirm() {
           : t('cms.common.delete'))
       }
       cancelLabel={options?.cancelLabel ?? t('cms.common.cancel')}
+      altConfirmLabel={options?.altConfirmLabel}
       variant={options?.variant ?? 'danger'}
-      onClose={() => close(false)}
-      onConfirm={() => close(true)}
+      onClose={() => close('cancel')}
+      onConfirm={() => close('confirm')}
+      onAltConfirm={
+        options?.altConfirmLabel ? () => close('alt') : undefined
+      }
     />
   )
 
-  return { confirm, dialog }
+  return { confirm, confirmChoice, dialog }
 }

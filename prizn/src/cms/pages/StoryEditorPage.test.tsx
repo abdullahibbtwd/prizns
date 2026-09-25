@@ -1,10 +1,32 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Route, Routes } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
 import { buildCmsArticle } from '@/test/factories'
 import { renderPage } from '@/test/render-page'
 import CmsStoryEditorPage from './StoryEditorPage'
+
+async function confirmPublishWithoutAudio(
+  user: ReturnType<typeof userEvent.setup>,
+) {
+  const dialog = await screen.findByRole('dialog')
+  await user.click(
+    within(dialog).getByRole('button', {
+      name: 'cms.editor.publishWithoutNarrationConfirm',
+    }),
+  )
+}
+
+async function confirmNarrationGenerate(
+  user: ReturnType<typeof userEvent.setup>,
+) {
+  const dialog = await screen.findByRole('dialog')
+  await user.click(
+    within(dialog).getByRole('button', {
+      name: 'cms.editor.narrationGenerate',
+    }),
+  )
+}
 
 const getCmsArticle = vi.fn()
 const listCmsAuthors = vi.fn()
@@ -147,6 +169,7 @@ describe('CmsStoryEditorPage publishing actions', () => {
     renderEditor('/cms/stories/art-1')
     await screen.findByRole('button', { name: 'cms.editor.publish' })
     await user.click(screen.getByRole('button', { name: 'cms.editor.publish' }))
+    await confirmPublishWithoutAudio(user)
 
     await waitFor(() => {
       expect(updateCmsArticle).toHaveBeenCalledWith(
@@ -176,6 +199,7 @@ describe('CmsStoryEditorPage publishing actions', () => {
     renderEditor('/cms/stories/art-1')
     const publish = await screen.findByRole('button', { name: 'cms.editor.publish' })
     await user.click(publish)
+    await confirmPublishWithoutAudio(user)
 
     const busy = await screen.findByRole('button', {
       name: /cms.editor.publishingNow/,
@@ -210,12 +234,43 @@ describe('CmsStoryEditorPage publishing actions', () => {
     renderEditor('/cms/stories/art-1')
     await screen.findByRole('button', { name: 'cms.editor.publish' })
     await user.click(screen.getByRole('button', { name: 'cms.editor.publish' }))
+    await confirmPublishWithoutAudio(user)
 
     await waitFor(() => {
       expect(updateCmsArticle).toHaveBeenCalledWith(
         'art-1',
         expect.objectContaining({ status: 'PUBLISHED' }),
       )
+    })
+  })
+
+  it('queues narration when publishing with the narrate option', async () => {
+    const user = userEvent.setup()
+    const draft = buildCmsArticle({
+      status: 'DRAFT',
+      translationStatus: 'PENDING',
+      bodyRaw: [{ type: 'paragraph', textBg: 'Lead paragraph.' }],
+    })
+    getCmsArticle.mockResolvedValue(draft)
+    updateCmsArticle.mockResolvedValue({ ...draft, status: 'PUBLISHED' })
+
+    renderEditor('/cms/stories/art-1')
+    await screen.findByRole('button', { name: 'cms.editor.publish' })
+    await user.click(screen.getByRole('button', { name: 'cms.editor.publish' }))
+
+    const dialog = await screen.findByRole('dialog')
+    await user.click(
+      within(dialog).getByRole('button', {
+        name: 'cms.editor.publishAndNarrate',
+      }),
+    )
+
+    await waitFor(() => {
+      expect(updateCmsArticle).toHaveBeenCalledWith(
+        'art-1',
+        expect.objectContaining({ status: 'PUBLISHED' }),
+      )
+      expect(queueArticleNarration).toHaveBeenCalledWith('art-1')
     })
   })
 
@@ -237,6 +292,7 @@ describe('CmsStoryEditorPage publishing actions', () => {
     await user.click(
       screen.getByRole('button', { name: /cms.editor.narrationGenerate/ }),
     )
+    await confirmNarrationGenerate(user)
 
     await waitFor(() => {
       expect(

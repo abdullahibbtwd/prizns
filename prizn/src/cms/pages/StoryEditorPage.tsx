@@ -51,6 +51,7 @@ import {
   deleteCmsArticle,
   getCmsArticle,
   listCmsAuthors,
+  queueArticleNarration,
   queueArticleTranslation,
   updateCmsArticle,
   uploadCmsMedia,
@@ -63,6 +64,7 @@ import {
   type ArticleFormValues,
   type ArticleSection,
   type BodyBlock,
+  type CmsArticle,
 } from '@/lib/cms-types'
 import { createCmsTag, listCmsTags } from '@/lib/tags-api'
 import { listCmsCategories } from '@/lib/categories-api'
@@ -340,9 +342,15 @@ export default function CmsStoryEditorPage() {
   const queryClient = useQueryClient()
   const { t } = useTranslation()
   const { lang } = useJournalLang()
-  const { confirm, dialog } = useCmsConfirm()
+  const { confirm, confirmChoice, dialog } = useCmsConfirm()
   const basePath = '/cms/stories'
-  const isNew = !id || id === 'new'
+  const routeIsNew = !id || id === 'new'
+  const [savedArticleId, setSavedArticleId] = useState<string | null>(
+    routeIsNew ? null : id!,
+  )
+  /** Route may still be /new after autosave; prefer the persisted id. */
+  const isNew = !savedArticleId
+  const articleId = savedArticleId
   const querySeriesId = searchParams.get('seriesId') || ''
   const [gallery, setGallery] = useState<GalleryItem[]>([])
   const [activeSlide, setActiveSlide] = useState(0)
@@ -363,7 +371,7 @@ export default function CmsStoryEditorPage() {
   const queuedStatus = useRef<EditorSaveAction | null>(null)
   const restoredDraft = useRef(false)
   const lastSavedSnapshot = useRef('')
-  const createdIdRef = useRef<string | null>(isNew ? null : id ?? null)
+  const createdIdRef = useRef<string | null>(savedArticleId)
   const silentSave = useRef(false)
   const persistSilentDraftRef = useRef<() => Promise<void>>(async () => {})
   const scheduleAutosaveRef = useRef<() => void>(() => {})
@@ -382,9 +390,9 @@ export default function CmsStoryEditorPage() {
   >('idle')
 
   const articleQuery = useQuery({
-    queryKey: ['cms-article', id],
-    queryFn: () => getCmsArticle(id!),
-    enabled: !isNew,
+    queryKey: ['cms-article', articleId],
+    queryFn: () => getCmsArticle(articleId!),
+    enabled: Boolean(articleId),
     refetchInterval: (query) => {
       const translation = query.state.data?.translationStatus
       const narration = query.state.data?.narrationStatus
@@ -396,6 +404,10 @@ export default function CmsStoryEditorPage() {
       return busy ? 2000 : false
     },
   })
+
+  useEffect(() => {
+    if (id && id !== 'new') setSavedArticleId(id)
+  }, [id])
 
   const authorsQuery = useQuery({
     queryKey: ['cms-authors'],
@@ -686,7 +698,10 @@ export default function CmsStoryEditorPage() {
             shouldDirty: true,
           })
         }
-        if (values.status === 'PUBLISHED') {
+        // Publish gates: empty blocks / gibberish still block. Translation readiness
+        // never does — EN often lags (or briefly mirrors BG) while the job finishes,
+        // and blocking publish/republish for that is worse than shipping BG first.
+        if (values.status === 'PUBLISHED' && !silent) {
           const issues = validateStoryForPublish({
             titleBg: values.titleBg,
             titleEn: articleQuery.data?.title ?? null,
@@ -694,10 +709,12 @@ export default function CmsStoryEditorPage() {
             subtitleEn: articleQuery.data?.subtitle ?? null,
             translationStatus: articleQuery.data?.translationStatus,
             body,
-          })
+          }).filter((issue) => issue.code !== 'translation_not_ready')
           if (issues.length > 0) {
             throw new Error(
-              issues.map((issue) => t(`cms.editor.publishIssue.${issue.code}`)).join(' '),
+              issues
+                .map((issue) => t(`cms.editor.publishIssue.${issue.code}`))
+                .join(' '),
             )
           }
         }
@@ -756,6 +773,7 @@ export default function CmsStoryEditorPage() {
       clearStoryDraft('new')
       clearStoryDraft(article.id)
       createdIdRef.current = article.id
+      setSavedArticleId(article.id)
 
       const silent = Boolean(variables.silent) || silentSave.current
       if (silent) {
@@ -1203,25 +1221,69 @@ export default function CmsStoryEditorPage() {
       setSavingAction(statusToSave)
       return
     }
-    savingLock.current = true
-    setSavingAction(statusToSave)
-    void form.handleSubmit(
-      async (values) => {
-        try {
-          await saveMutation.mutateAsync({ ...values, status: statusToSave })
-        } finally {
+
+    const runSave = (status: EditorSaveAction, alsoNarrate: boolean) => {
+      savingLock.current = true
+      setSavingAction(status)
+      void form.handleSubmit(
+        async (values) => {
+          try {
+            const article = await saveMutation.mutateAsync({
+              ...values,
+              status,
+            })
+            if (alsoNarrate && article?.id) {
+              try {
+                await queueArticleNarration(article.id)
+                await queryClient.invalidateQueries({
+                  queryKey: ['cms-article', article.id],
+                })
+              } catch {
+                // Publish already succeeded; narration can be retried from the panel.
+              }
+            }
+          } catch {
+            // Error is surfaced via saveMutation.isError in the footer.
+          } finally {
+            savingLock.current = false
+            setSavingAction(null)
+            const queued = queuedStatus.current
+            queuedStatus.current = null
+            if (queued) submitStatusRef.current(queued)
+          }
+        },
+        () => {
           savingLock.current = false
           setSavingAction(null)
-          const queued = queuedStatus.current
-          queuedStatus.current = null
-          if (queued) submitStatusRef.current(queued)
-        }
-      },
-      () => {
-        savingLock.current = false
-        setSavingAction(null)
-      },
-    )()
+        },
+      )()
+    }
+
+    if (statusToSave === 'PUBLISHED') {
+      const hasAudio =
+        Boolean(form.getValues('audioMediaId')?.trim()) ||
+        Boolean(articleQuery.data?.audioMediaId) ||
+        articleQuery.data?.narrationStatus === 'READY' ||
+        articleQuery.data?.narrationStatus === 'PENDING' ||
+        articleQuery.data?.narrationStatus === 'RUNNING'
+      if (!hasAudio) {
+        void (async () => {
+          const choice = await confirmChoice({
+            title: t('cms.editor.publishWithoutNarrationTitle'),
+            description: t('cms.editor.publishWithoutNarrationBody'),
+            confirmLabel: t('cms.editor.publishWithoutNarrationConfirm'),
+            altConfirmLabel: t('cms.editor.publishAndNarrate'),
+            cancelLabel: t('cms.editor.cancel'),
+            variant: 'default',
+          })
+          if (choice === 'cancel') return
+          runSave('PUBLISHED', choice === 'alt')
+        })()
+        return
+      }
+    }
+
+    runSave(statusToSave, false)
   }
   submitStatusRef.current = submitStatus
 
@@ -2308,14 +2370,44 @@ export default function CmsStoryEditorPage() {
             </CmsCard>
           ) : null}
 
-          {!isNew && articleQuery.data ? (
+          {articleId ? (
             <NarrationPanel
-              articleId={id!}
-              article={articleQuery.data}
-              audioUrl={audioUrl || articleQuery.data.audioUrl || undefined}
+              articleId={articleId}
+              article={
+                articleQuery.data ??
+                ({
+                  id: articleId,
+                  narrationStatus: 'IDLE',
+                } as CmsArticle)
+              }
+              audioUrl={audioUrl || articleQuery.data?.audioUrl || undefined}
+              hasText={Boolean(
+                form.watch('titleBg')?.trim() ||
+                  form
+                    .watch('body')
+                    ?.some(
+                      (block) =>
+                        (block.type === 'paragraph' ||
+                          block.type === 'pullquote' ||
+                          block.type === 'note') &&
+                        Boolean(
+                          ('textBg' in block && block.textBg?.trim()) ||
+                            ('labelBg' in block && block.labelBg?.trim()),
+                        ),
+                    ),
+              )}
               onQueued={noteUnpublishedEdit}
             />
-          ) : null}
+          ) : (
+            <CmsCard className="space-y-2 p-5">
+              <h3 className="text-sm font-semibold">
+                {t('cms.editor.narrationTitle')}
+              </h3>
+              <p className="text-[11px] leading-relaxed text-stone-500">
+                {t('cms.editor.narrationWaitingAutosave')}
+              </p>
+            </CmsCard>
+          )}
 
           <CmsCard className="space-y-4 p-5">
             <h3 className="text-sm font-semibold">{t('cms.editor.publishing')}</h3>

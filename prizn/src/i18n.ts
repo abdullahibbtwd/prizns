@@ -653,6 +653,17 @@ const cmsBg = {
     narrationGenerating: 'Генериране…',
     narrationDelete: 'Изтрий нарация',
     narrationFailed: 'Нарацията се провали',
+    narrationConfirmTitle: 'Генериране на нарация?',
+    narrationConfirmBody:
+      'Ще се създаде българско аудио от заглавието и текста. Може да отнеме няколко секунди.',
+    narrationNeedText: 'Добавете заглавие или абзац на български, за да генерирате аудио.',
+    narrationWaitingAutosave:
+      'Панелът за нарация се появява след първото автоматично запазване (около 5 секунди след писане).',
+    publishWithoutNarrationTitle: 'Публикуване без аудио?',
+    publishWithoutNarrationBody:
+      'Тази история няма аудио нарация. Можете да публикувате сега или да публикувате и да стартирате генерирането — аудиото ще се прикачи, когато е готово.',
+    publishWithoutNarrationConfirm: 'Публикувай без аудио',
+    publishAndNarrate: 'Публикувай и генерирай аудио',
     enPreview: 'Английски преглед',
   },
 
@@ -1937,6 +1948,17 @@ const cmsEn = {
     narrationGenerating: 'Generating…',
     narrationDelete: 'Delete narration',
     narrationFailed: 'Narration failed',
+    narrationConfirmTitle: 'Generate narration?',
+    narrationConfirmBody:
+      'This will create Bulgarian audio from the title and body. It may take a few seconds.',
+    narrationNeedText: 'Add a Bulgarian title or paragraph before generating audio.',
+    narrationWaitingAutosave:
+      'The narration panel appears after the first autosave (about 5 seconds after you type).',
+    publishWithoutNarrationTitle: 'Publish without audio?',
+    publishWithoutNarrationBody:
+      'This story has no audio narration yet. Publish now, or publish and start generation — audio will attach when ready.',
+    publishWithoutNarrationConfirm: 'Publish without audio',
+    publishAndNarrate: 'Publish and generate audio',
     enPreview: 'English preview',
   },
 

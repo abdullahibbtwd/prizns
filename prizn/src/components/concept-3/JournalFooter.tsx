@@ -95,12 +95,6 @@ export function JournalFooter({ lang }: JournalFooterProps) {
           >
             {lang === 'bg' ? 'Контакт' : 'Contact'}
           </Link>
-          <a
-            href="/feed.xml"
-            className="transition-colors hover:text-[#0C2686]"
-          >
-            RSS
-          </a>
           <a href="#instagram" className="transition-colors hover:text-[#0C2686]">
             Instagram
           </a>

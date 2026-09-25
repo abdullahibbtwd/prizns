@@ -453,4 +453,38 @@ describe('ArticlePage', () => {
       'https://cdn.example/maya.jpg',
     )
   })
+
+  it('shows the narration player above the hero on the story page', async () => {
+    getPublicArticle.mockResolvedValue(
+      buildCmsArticle({
+        section: 'stories',
+        slug: 'village-life',
+        path: '/stories/village-life',
+        title: 'Village life',
+        titleBg: 'Селски живот',
+        image: 'https://cdn.example/hero.jpg',
+        audioUrl: 'https://cdn.example/narration.mp3',
+        audioDuration: '2 min',
+        body: [
+          {
+            type: 'paragraph',
+            text: 'First paragraph of the story.',
+            textBg: 'Първи параграф.',
+          },
+        ],
+      }),
+    )
+
+    renderArticle()
+    await screen.findByRole('heading', { name: 'Village life' })
+    expect(screen.getByText(/listen/i)).toBeInTheDocument()
+    const audio = document.querySelector('audio')
+    expect(audio).toHaveAttribute('src', 'https://cdn.example/narration.mp3')
+    const listenLabel = screen.getByText(/listen/i)
+    const hero = screen.getByRole('img', { name: 'Village life' })
+    expect(
+      listenLabel.compareDocumentPosition(hero) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+  })
 })
