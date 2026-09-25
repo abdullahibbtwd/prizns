@@ -194,6 +194,14 @@ class EnvironmentVariables {
 
   @IsOptional()
   @IsString()
+  TTS_SPEAKING_RATE?: string;
+
+  @IsOptional()
+  @IsString()
+  TTS_PITCH?: string;
+
+  @IsOptional()
+  @IsString()
   RESEND_API_KEY?: string;
 
   @IsOptional()

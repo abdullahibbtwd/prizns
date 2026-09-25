@@ -84,7 +84,26 @@ jobs:
         run: npm run prisma:generate --prefix api
 
       - name: Start test infrastructure
-        run: docker compose -f docker-compose.test.yml up -d --wait
+        run: |
+          docker compose -f docker-compose.test.yml up -d
+          echo "Waiting for postgres/redis/minio…"
+          for i in $(seq 1 40); do
+            pg_ok=0
+            redis_ok=0
+            minio_ok=0
+            docker compose -f docker-compose.test.yml exec -T postgres-test pg_isready -U prizn_test -d prizn_test >/dev/null 2>&1 && pg_ok=1
+            docker compose -f docker-compose.test.yml exec -T redis-test redis-cli ping 2>/dev/null | grep -q PONG && redis_ok=1
+            curl -sf "http://localhost:9014/minio/health/live" >/dev/null && minio_ok=1
+            if [ "$pg_ok" = 1 ] && [ "$redis_ok" = 1 ] && [ "$minio_ok" = 1 ]; then
+              echo "Infrastructure ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Timed out waiting for test infrastructure"
+          docker compose -f docker-compose.test.yml ps
+          docker compose -f docker-compose.test.yml logs --tail=80
+          exit 1
 
       - name: Run Jest unit + e2e with coverage
         run: npm run test:cov:all --prefix api

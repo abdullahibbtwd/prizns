@@ -11,7 +11,7 @@ import { MediaKind, NarrationStatus } from '@prisma/client'
 import { Queue } from 'bullmq'
 import { TextToSpeechClient } from '@google-cloud/text-to-speech'
 import { resolveGoogleClientAuth, type GoogleClientAuth } from '../config/google-credentials'
-import { chunkTextForTts } from './tts-chunk'
+import { chunkParagraphsToSsml } from './tts-chunk'
 import { QUEUE_TTS } from '../jobs/queue.constants'
 import { PrismaService } from '../prisma/prisma.service'
 import { StorageService } from '../storage/storage.service'
@@ -27,6 +27,8 @@ export class TtsService {
   private readonly enabled: boolean
   private readonly voiceName: string
   private readonly languageCode: string
+  private readonly speakingRate: number
+  private readonly pitch: number
 
   constructor(
     private readonly prisma: PrismaService,
@@ -38,8 +40,24 @@ export class TtsService {
     this.enabled = flag === undefined || flag === '' || flag === 'true'
     this.languageCode =
       this.config.get<string>('TTS_LANGUAGE_CODE') || 'bg-BG'
+    // Chirp3 HD is the natural BG tier available on this project (no Wavenet/Neural2).
     this.voiceName =
-      this.config.get<string>('TTS_VOICE_NAME') || 'bg-BG-Standard-A'
+      this.config.get<string>('TTS_VOICE_NAME') || 'bg-BG-Chirp3-HD-Leda'
+    this.speakingRate = this.readNumber('TTS_SPEAKING_RATE', 0.92, 0.25, 4)
+    this.pitch = this.readNumber('TTS_PITCH', -1, -20, 20)
+  }
+
+  private readNumber(
+    key: string,
+    fallback: number,
+    min: number,
+    max: number,
+  ): number {
+    const raw = this.config.get<string>(key)
+    if (raw === undefined || raw === '') return fallback
+    const n = Number(raw)
+    if (!Number.isFinite(n)) return fallback
+    return Math.min(max, Math.max(min, n))
   }
 
   async enqueue(articleId: string) {
@@ -59,7 +77,9 @@ export class TtsService {
     })
     if (!article) throw new NotFoundException('Article not found')
 
-    const script = this.buildScript(article.titleBg, article.body)
+    const script = this.buildParagraphs(article.titleBg, article.body).join(
+      '\n\n',
+    )
     if (!script.trim()) {
       throw new BadRequestException(
         'Article has no Bulgarian text to narrate',
@@ -110,8 +130,8 @@ export class TtsService {
         },
       })
 
-      const script = this.buildScript(article.titleBg, article.body)
-      if (!script.trim()) {
+      const paragraphs = this.buildParagraphs(article.titleBg, article.body)
+      if (paragraphs.length === 0) {
         throw new Error('No text available for narration')
       }
 
@@ -122,20 +142,32 @@ export class TtsService {
         )
       }
 
-      const chunks = chunkTextForTts(script)
+      const chunks = chunkParagraphsToSsml(paragraphs)
       const client = this.createTtsClient(auth)
       const parts: Buffer[] = []
-      for (const [index, chunk] of chunks.entries()) {
+      this.logger.log(
+        `Synthesizing ${chunks.length} SSML chunk(s) with voice=${this.voiceName} rate=${this.speakingRate} pitch=${this.pitch}`,
+      )
+      for (const [index, ssml] of chunks.entries()) {
+        const audioConfig: {
+          audioEncoding: 'MP3'
+          speakingRate: number
+          pitch?: number
+        } = {
+          audioEncoding: 'MP3',
+          speakingRate: this.speakingRate,
+        }
+        // Chirp3 HD rejects pitch; only set it for Standard/Wavenet/Neural voices.
+        if (!this.voiceName.includes('Chirp') && this.pitch !== 0) {
+          audioConfig.pitch = this.pitch
+        }
         const [response] = await client.synthesizeSpeech({
-          input: { text: chunk },
+          input: { ssml },
           voice: {
             languageCode: this.languageCode,
             name: this.voiceName,
           },
-          audioConfig: {
-            audioEncoding: 'MP3',
-            speakingRate: 0.95,
-          },
+          audioConfig,
         })
         const audioContent = response.audioContent
         if (!audioContent) {
@@ -260,7 +292,7 @@ export class TtsService {
       .trim()
   }
 
-  private buildScript(titleBg: string, bodyRaw: unknown): string {
+  private buildParagraphs(titleBg: string, bodyRaw: unknown): string[] {
     const parts: string[] = []
     if (titleBg?.trim()) parts.push(titleBg.trim())
 
@@ -279,6 +311,6 @@ export class TtsService {
         // skip captions for narration
       }
     }
-    return parts.join('\n\n')
+    return parts
   }
 }

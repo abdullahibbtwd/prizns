@@ -18,6 +18,7 @@ vi.mock('framer-motion', () => ({
       <h1 {...props}>{children}</h1>
     ),
   },
+  AnimatePresence: ({ children }: { children: React.ReactNode }) => children,
 }))
 
 describe('EditorialHero', () => {
