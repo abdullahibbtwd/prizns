@@ -274,7 +274,7 @@ describe('CmsStoryEditorPage publishing actions', () => {
     })
   })
 
-  it('enables Publish after generating narration on a published story', async () => {
+  it('queues narration on a published story without demoting it to draft', async () => {
     const user = userEvent.setup()
     getCmsArticle.mockResolvedValue(
       buildCmsArticle({
@@ -295,11 +295,14 @@ describe('CmsStoryEditorPage publishing actions', () => {
     await confirmNarrationGenerate(user)
 
     await waitFor(() => {
-      expect(
-        screen.getByRole('button', { name: 'cms.editor.publish' }),
-      ).toBeEnabled()
+      expect(queueArticleNarration).toHaveBeenCalledWith('art-1')
     })
-    expect(screen.getByText('cms.editor.unpublishedEdits')).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'cms.editor.publish' }),
+    ).toBeDisabled()
+    expect(
+      screen.queryByText('cms.editor.unpublishedEdits'),
+    ).not.toBeInTheDocument()
   })
 })
 

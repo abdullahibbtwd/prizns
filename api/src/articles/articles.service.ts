@@ -173,6 +173,8 @@ export class ArticlesService {
     body: StoredArticleBlock[];
   }) {
     if (input.status !== ArticleStatus.PUBLISHED) return;
+    // translation_not_ready is advisory only — EN often lags or briefly mirrors BG
+    // while the job finishes; do not block publish/republish/autosave on it.
     const issues = validateStoryForPublish({
       titleBg: input.titleBg,
       titleEn: input.titleEn,
@@ -180,7 +182,7 @@ export class ArticlesService {
       subtitleEn: input.subtitleEn,
       translationStatus: input.translationStatus,
       body: input.body,
-    });
+    }).filter((issue) => issue.code !== 'translation_not_ready');
     if (issues.length === 0) return;
     throw new BadRequestException(
       issues.map((issue) => issue.message).join(' '),

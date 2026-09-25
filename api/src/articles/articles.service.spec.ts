@@ -239,6 +239,27 @@ describe('ArticlesService', () => {
     expect(data.publishedAt.getTime()).toBeGreaterThan(Date.now() - 5_000);
   });
 
+  it('allows republish when translation is READY but English still mirrors Bulgarian', async () => {
+    article.status = ArticleStatus.PUBLISHED;
+    article.translationStatus = 'READY' as never;
+    article.titleBg = 'Утро над реката';
+    article.titleEn = 'Утро над реката';
+    article.subtitleBg = 'Бележка';
+    article.subtitleEn = 'Бележка';
+    article.body = [
+      { type: 'paragraph', textBg: 'Текст на български.', textEn: 'Текст на български.' },
+    ];
+
+    await expect(
+      service.update('art-1', {
+        status: ArticleStatus.PUBLISHED,
+        titleBg: article.titleBg,
+        categoryBg: article.categoryBg,
+        section: 'places',
+      }),
+    ).resolves.toBeTruthy();
+  });
+
   it('publishes scheduled articles whose time has come', async () => {
     const due = {
       ...article,

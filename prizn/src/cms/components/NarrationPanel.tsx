@@ -16,7 +16,6 @@ type NarrationPanelProps = {
   audioUrl?: string
   /** True when the draft has Bulgarian text worth narrating. */
   hasText?: boolean
-  onQueued?: () => void
 }
 
 export function NarrationPanel({
@@ -24,7 +23,6 @@ export function NarrationPanel({
   article,
   audioUrl,
   hasText = true,
-  onQueued,
 }: NarrationPanelProps) {
   const { t } = useTranslation()
   const { confirm, dialog } = useCmsConfirm()
@@ -57,7 +55,6 @@ export function NarrationPanel({
       variant: 'default',
     })
     if (!ok) return
-    onQueued?.()
     narrateMutation.mutate()
   }
 
@@ -118,7 +115,6 @@ export function NarrationPanel({
             className="w-full text-xs"
             disabled={clearMutation.isPending}
             onClick={() => {
-              onQueued?.()
               clearMutation.mutate()
             }}
           >

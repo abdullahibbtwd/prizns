@@ -895,12 +895,6 @@ export default function CmsStoryEditorPage() {
     }
   }
 
-  const noteUnpublishedEdit = () => {
-    if (form.getValues('status') === 'PUBLISHED') {
-      form.setValue('status', 'DRAFT', { shouldDirty: true })
-    }
-  }
-
   const applyGallery = (
     next: GalleryItem[],
     body = form.getValues('body'),
@@ -2396,7 +2390,6 @@ export default function CmsStoryEditorPage() {
                         ),
                     ),
               )}
-              onQueued={noteUnpublishedEdit}
             />
           ) : (
             <CmsCard className="space-y-2 p-5">
