@@ -19,8 +19,8 @@
     "test:cov:all": "jest --coverage --runInBand",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand --selectProjects unit",
     "test:e2e": "jest --selectProjects e2e --runInBand",
-    "test:e2e:docker": "docker compose -f ../docker-compose.test.yml up -d --wait && npm run test:e2e",
-    "test:e2e:docker:down": "docker compose -f ../docker-compose.test.yml down -v",
+    "test:e2e:docker": "docker compose -f ../docker-compose.test.yml up -d --wait && ../scripts/start-test-minio.sh && npm run test:e2e",
+    "test:e2e:docker:down": "../scripts/stop-test-minio.sh; docker compose -f ../docker-compose.test.yml down -v",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
@@ -37,7 +37,8 @@
     "repair:slugs": "ts-node --transpile-only src/wordpress-import/repair-slugs.ts",
     "import:wordpress:package": "node dist/wordpress-import/import-wordpress.js --package=../wordpress-export --users",
     "import:wordpress:merge": "node dist/wordpress-import/merge-wordpress-categories.js",
-    "nginx:legacy-redirects": "node dist/wordpress-import/generate-nginx-redirects.js"
+    "nginx:legacy-redirects": "node dist/wordpress-import/generate-nginx-redirects.js",
+    "gallery:hide-story-photos": "node dist/media/hide-story-photos.js"
   },
   "prisma": {
     "seed": "node prisma/run-seed.cjs"

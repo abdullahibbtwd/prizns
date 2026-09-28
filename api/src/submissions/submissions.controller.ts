@@ -11,11 +11,16 @@ import {
 } from '@nestjs/common';
 import { SubmissionStatus } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { SUBMISSION_ROLES } from '../auth/role-access';
+import { ReplySubmissionDto } from './dto/reply-submission.dto';
 import { UpdateSubmissionDto } from './dto/update-submission.dto';
 import { SubmissionsService } from './submissions.service';
 
 @Controller('cms/submissions')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(...SUBMISSION_ROLES)
 export class SubmissionsController {
   constructor(private readonly submissions: SubmissionsService) {}
 
@@ -49,6 +54,11 @@ export class SubmissionsController {
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: UpdateSubmissionDto) {
     return this.submissions.update(id, dto);
+  }
+
+  @Post(':id/reply')
+  reply(@Param('id') id: string, @Body() dto: ReplySubmissionDto) {
+    return this.submissions.reply(id, dto);
   }
 
   @Post(':id/convert')

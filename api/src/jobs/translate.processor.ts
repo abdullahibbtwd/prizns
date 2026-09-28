@@ -14,6 +14,10 @@ export class TranslateProcessor extends WorkerHost {
 
   async process(job: Job<TranslateJobData>): Promise<void> {
     const { type, id } = job.data
+    if (type === 'sweep') {
+      await this.translation.sweepStale()
+      return
+    }
     this.logger.log(
       `Translate job ${job.id} attempt ${job.attemptsMade + 1}: ${type} ${id}`,
     )
@@ -37,20 +41,21 @@ export class TranslateProcessor extends WorkerHost {
   @OnWorkerEvent('failed')
   async onFailed(job: Job<TranslateJobData> | undefined, error: Error) {
     if (!job?.data) return
+    const { type, id } = job.data
+    if (type === 'sweep') {
+      this.logger.warn(`Translation sweep failed: ${error.message}`)
+      return
+    }
     const maxAttempts = job.opts.attempts ?? 1
     if (job.attemptsMade < maxAttempts) {
       this.logger.warn(
-        `Translate ${job.data.type} ${job.data.id} will retry (${job.attemptsMade}/${maxAttempts}): ${error.message}`,
+        `Translate ${type} ${id} will retry (${job.attemptsMade}/${maxAttempts}): ${error.message}`,
       )
       return
     }
     this.logger.error(
-      `Translate ${job.data.type} ${job.data.id} failed permanently: ${error.message}`,
+      `Translate ${type} ${id} failed permanently: ${error.message}`,
     )
-    await this.translation.markFailed(
-      job.data.type,
-      job.data.id,
-      error.message,
-    )
+    await this.translation.markFailed(type, id, error.message)
   }
 }

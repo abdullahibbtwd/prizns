@@ -5,7 +5,7 @@ import { JournalShell } from '@/components/concept-3/JournalShell'
 import { PageMeta } from '@/components/PageMeta'
 import { ListingHeader } from '@/components/concept-3/ListingHeader'
 import { ListingBody, listingCountLabel } from '@/components/concept-3/ListingBody'
-import { preferApi, usePublicMedia } from '@/lib/public-content'
+import { galleryPhotoText, preferApi, usePublicMedia } from '@/lib/public-content'
 import { getSectionPublicLabel } from '@/lib/section-i18n'
 
 type PhotoItem = {
@@ -26,18 +26,8 @@ export default function GalleryPage() {
         const mapped = preferApi(
           data?.map((item) => ({
             id: item.id,
-            title:
-              item.titleBg ||
-              item.titleEn ||
-              (lang === 'bg' ? 'Снимка от Prizni' : 'Photo from Prizni'),
-            caption: item.creditBg || item.creditEn || '',
+            ...galleryPhotoText(item, lang),
             image: item.url,
-            location:
-              item.locationBg ||
-              item.locationEn ||
-              (lang === 'bg'
-                ? 'Северозападна България'
-                : 'Northwestern Bulgaria'),
           })),
         )
         const photos = Array.from(
@@ -101,22 +91,27 @@ export default function GalleryPage() {
                     >
                       <img
                         src={item.image}
-                        alt={item.title}
+                        alt={item.title || item.location}
                         loading="lazy"
                         className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
                       />
-                      <div className="absolute inset-0 flex items-end bg-gradient-to-t from-black/70 via-transparent to-transparent p-5">
-                        <div>
-                          <p className="font-heading text-xl font-light text-white">
-                            {item.title}
-                          </p>
-                          {item.caption ? (
-                            <p className="mt-1 line-clamp-2 font-sans text-xs text-white/70">
-                              {item.caption}
-                            </p>
-                          ) : null}
+                      {item.title || item.location ? (
+                        <div className="absolute inset-0 flex items-end bg-gradient-to-t from-black/70 via-transparent to-transparent p-5">
+                          <div>
+                            {item.title ? (
+                              <p className="font-heading text-xl font-light text-white">
+                                {item.title}
+                              </p>
+                            ) : null}
+                            {item.location ? (
+                              <p className="mt-1 inline-flex items-center gap-1.5 font-sans text-[11px] uppercase tracking-widest text-white/75">
+                                <MapPin className="size-3" />
+                                {item.location}
+                              </p>
+                            ) : null}
+                          </div>
                         </div>
-                      </div>
+                      ) : null}
                       <div className="absolute right-4 top-4 flex size-10 items-center justify-center rounded-full bg-white/15 text-white opacity-0 backdrop-blur-md transition-opacity group-hover:opacity-100">
                         <Maximize2 className="size-4" />
                       </div>
@@ -151,21 +146,23 @@ export default function GalleryPage() {
                   <div className="relative mx-auto my-auto flex max-h-[70vh] max-w-5xl items-center justify-center">
                     <img
                       src={selectedPhoto.image}
-                      alt={selectedPhoto.title}
+                      alt={selectedPhoto.title || selectedPhoto.location}
                       className="max-h-[68vh] max-w-full rounded-xl object-contain shadow-2xl"
                     />
                   </div>
 
-                  <div className="mx-auto max-w-2xl pb-4 text-center text-white">
-                    <h3 className="mb-2 font-heading text-2xl font-light md:text-3xl">
-                      {selectedPhoto.title}
-                    </h3>
+                  <div className="mx-auto min-h-8 max-w-2xl pb-4 text-center text-white">
+                    {selectedPhoto.title ? (
+                      <h3 className="mb-2 font-heading text-2xl font-light md:text-3xl">
+                        {selectedPhoto.title}
+                      </h3>
+                    ) : null}
                     {selectedPhoto.caption ? (
                       <p className="mb-2 font-sans text-xs font-light text-white/70 md:text-sm">
                         {selectedPhoto.caption}
                       </p>
                     ) : null}
-                    {selectedPhoto.location?.trim() ? (
+                    {selectedPhoto.location ? (
                       <div className="inline-flex items-center gap-1.5 font-sans text-[11px] uppercase tracking-widest text-white/50">
                         <MapPin className="size-3 text-[#4051C7]" />
                         <span>{selectedPhoto.location}</span>

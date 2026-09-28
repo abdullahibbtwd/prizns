@@ -27,6 +27,7 @@ function toNewsCard(article: CmsArticle) {
     image: article.image || '',
     imageThumb: article.imageThumb || '',
     excerpt: article.subtitle || article.subtitleBg || '',
+    excerptBg: article.subtitleBg || '',
     path: articlePath(article),
   }
 }
@@ -80,7 +81,7 @@ export function NewsSection({ lang }: NewsSectionProps) {
                   {lang === 'bg' ? item.titleBg : item.title}
                 </h3>
                 <p className="mt-2 line-clamp-2 font-sans text-sm font-light leading-relaxed text-[#1A1A1A]/65">
-                  {item.excerpt}
+                  {lang === 'bg' ? item.excerptBg : item.excerpt}
                 </p>
                 {((lang === 'bg' ? item.locationBg : item.location) || '').trim() ? (
                   <p className="mt-3 inline-flex items-center gap-1.5 font-sans text-[11px] uppercase tracking-[0.18em] text-[#1A1A1A]/45">

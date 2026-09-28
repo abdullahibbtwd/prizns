@@ -62,6 +62,7 @@ export function createCmsUser(body: {
   role?: CmsUserRole
   roles: CmsUserRole[]
   showOnAuthors?: boolean
+  linkAuthorId?: string
 }) {
   return api.post<CmsUser>('/cms/users', body)
 }

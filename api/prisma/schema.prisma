@@ -10,6 +10,9 @@ datasource db {
 
 enum Role {
   ADMIN
+  /** Assistant editor: publishes any story, manages submissions/gallery/authors; no settings, users or permanent deletes. */
+  MODERATOR
+  /** Legacy name — same permissions as MODERATOR. */
   EDITOR
   AUTHOR
   CONTRIBUTOR
@@ -182,6 +185,8 @@ model Author {
   aliases           String[]          @default([])
   isActive          Boolean           @default(true) @map("is_active")
   showOnAuthors     Boolean           @default(false) @map("show_on_authors")
+  /** Guest contributor (e.g. Write for Us): profile + badge, no login needed. */
+  isGuest           Boolean           @default(false) @map("is_guest")
   translationStatus TranslationStatus @default(PENDING) @map("translation_status")
   translationError  String?           @map("translation_error")
   sourceLang        String?           @map("source_lang")
@@ -192,6 +197,7 @@ model Author {
   articles          Article[]
   badges            AuthorBadge[]
 
+  @@index([isGuest])
   @@map("authors")
 }
 
@@ -219,6 +225,8 @@ model MediaAsset {
   locationEn    String?             @map("location_en")
   creditBg      String?             @map("credit_bg")
   creditEn      String?             @map("credit_en")
+  /** Public /gallery feed only — hiding never detaches the photo from articles. Uploads opt in. */
+  showInGallery Boolean             @default(false) @map("show_in_gallery")
   createdAt     DateTime            @default(now()) @map("created_at")
   updatedAt     DateTime            @updatedAt @map("updated_at")
 
@@ -231,6 +239,7 @@ model MediaAsset {
   productGalleryItems ProductGalleryItem[]
 
   @@index([status])
+  @@index([kind, showInGallery, createdAt])
   @@map("media_assets")
 }
 
@@ -295,6 +304,10 @@ model Article {
   sourceLang        String?              @map("source_lang")
   narrationStatus   NarrationStatus      @default(IDLE) @map("narration_status")
   narrationError    String?              @map("narration_error")
+  /** Moderator's note when a story in review is sent back to its author. */
+  reviewNote        String?              @map("review_note")
+  reviewNoteAt      DateTime?            @map("review_note_at")
+  submittedForReviewAt DateTime?         @map("submitted_for_review_at")
   /** Gemini text embedding (float vector) for semantic related articles. */
   embedding         Json?
   embeddingUpdatedAt DateTime?           @map("embedding_updated_at")
@@ -704,6 +717,33 @@ model SocialWorkspaceSettings {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("social_workspace_settings")
+}
+
+/**
+ * Singleton row (id = "default"): admin-editable site configuration.
+ * Secret columns hold AES-256-GCM ciphertext; env vars remain the fallback.
+ */
+model SiteSettings {
+  id                         String   @id @default("default")
+  facebookUrl                String?  @map("facebook_url")
+  instagramUrl               String?  @map("instagram_url")
+  youtubeUrl                 String?  @map("youtube_url")
+  tiktokUrl                  String?  @map("tiktok_url")
+  photographerCreditName     String?  @map("photographer_credit_name")
+  photographerCreditUrl      String?  @map("photographer_credit_url")
+  shopPublic                 Boolean  @default(false) @map("shop_public")
+  donationPresets            Int[]    @default([5, 10, 15]) @map("donation_presets")
+  stripeSecretKeyEnc         String?  @map("stripe_secret_key_enc")
+  stripeWebhookSecretEnc     String?  @map("stripe_webhook_secret_enc")
+  resendApiKeyEnc            String?  @map("resend_api_key_enc")
+  mailFrom                   String?  @map("mail_from")
+  adminNotifyEmail           String?  @map("admin_notify_email")
+  notifyAdminOnSubmission    Boolean  @default(true) @map("notify_admin_on_submission")
+  notifySubmitterOnReceipt   Boolean  @default(true) @map("notify_submitter_on_receipt")
+  notifySubmitterOnDecision  Boolean  @default(true) @map("notify_submitter_on_decision")
+  updatedAt                  DateTime @updatedAt @map("updated_at")
+
+  @@map("site_settings")
 }
 
 enum DigestSendStatus {

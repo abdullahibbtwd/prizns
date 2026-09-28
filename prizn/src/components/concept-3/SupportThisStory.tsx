@@ -5,8 +5,10 @@ import { Heart } from 'lucide-react'
 import { ApiError } from '@/lib/api'
 import { createDonationCheckout } from '@/lib/donations-api'
 import type { JournalLang } from '@/components/concept-3/JournalShell'
-
-const PRESETS = [5, 10, 25] as const
+import {
+  DEFAULT_DONATION_PRESETS,
+  useSiteSettings,
+} from '@/lib/site-settings-api'
 
 export function SupportThisStory({
   articleId,
@@ -17,7 +19,10 @@ export function SupportThisStory({
   const { t } = useTranslation()
   const [searchParams, setSearchParams] = useSearchParams()
   const [open, setOpen] = useState(false)
-  const [amount, setAmount] = useState<number>(10)
+  const { data: siteSettings } = useSiteSettings()
+  const PRESETS = siteSettings?.donations.presets ?? DEFAULT_DONATION_PRESETS
+  const [pickedAmount, setAmount] = useState<number | null>(null)
+  const amount = pickedAmount ?? PRESETS[Math.floor((PRESETS.length - 1) / 2)] ?? 10
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [thanks, setThanks] = useState(
@@ -34,7 +39,7 @@ export function SupportThisStory({
     }
   }, [searchParams, setSearchParams])
 
-  if (!articleId) return null
+  if (!articleId || siteSettings?.donations.enabled === false) return null
 
   const onDonate = async () => {
     setError('')

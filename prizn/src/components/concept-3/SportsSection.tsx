@@ -29,6 +29,7 @@ function toSportsCard(article: CmsArticle) {
     image: article.image || '',
     imageThumb: article.imageThumb || '',
     excerpt: article.subtitle || article.subtitleBg || '',
+    excerptBg: article.subtitleBg || '',
     path: articlePath(article),
   }
 }
@@ -92,9 +93,9 @@ export function SportsSection({ lang }: SportsSectionProps) {
                     <h3 className="mt-2 font-heading text-2xl font-normal text-[#1A1A1A] transition-colors group-hover:text-[#0C2686] md:text-3xl">
                       {lang === 'bg' ? item.titleBg : item.title}
                     </h3>
-                    {item.excerpt?.trim() ? (
+                    {(lang === 'bg' ? item.excerptBg : item.excerpt)?.trim() ? (
                       <p className="mt-3 max-w-xl line-clamp-2 font-sans text-sm font-light leading-relaxed text-[#1A1A1A]/65 md:text-base">
-                        {item.excerpt}
+                        {lang === 'bg' ? item.excerptBg : item.excerpt}
                       </p>
                     ) : null}
                     <div className="mt-5 flex items-center justify-between gap-4">

@@ -25,6 +25,7 @@ export default async function globalSetup() {
       `E2E test database unavailable (${message}).\n` +
         'Start test infrastructure:\n' +
         '  docker compose -f docker-compose.test.yml up -d --wait\n' +
+        '  ./scripts/start-test-minio.sh\n' +
         'Then run:\n' +
         '  npm run test:e2e',
     );

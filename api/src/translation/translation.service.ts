@@ -1,21 +1,40 @@
 import { InjectQueue } from '@nestjs/bullmq'
 import { Injectable, Logger } from '@nestjs/common'
-import { type Article, type Prisma, TranslationStatus } from '@prisma/client'
+import {
+  type Article,
+  type Author,
+  type Category,
+  type Prisma,
+  type Series,
+  TranslationStatus,
+} from '@prisma/client'
 import { Queue } from 'bullmq'
 import { translate } from 'google-translate-api-x'
 import type { StoredArticleBlock } from '../articles/article.types'
 import {
   QUEUE_TRANSLATE,
+  type TranslateEntity,
   type TranslateJobData,
 } from '../jobs/queue.constants'
 import { PrismaService } from '../prisma/prisma.service'
 import { translationLooksReady } from '../common/translation-quality'
+import { transliterateBg } from '../common/slug.util'
 
 const CHUNK_SIZE = 25
 const CHUNK_DELAY_MS = 700
+/** Rows saved as PENDING more recently than this are assumed to have a live job. */
+const SWEEP_PENDING_GRACE_MS = 2 * 60_000
+const SWEEP_BATCH = 20
 
 type Lang = 'bg' | 'en'
 
+const CYRILLIC_RE = /\p{Script=Cyrillic}/u
+
+/**
+ * Bulgarian is the editorial source of truth. Translation jobs only ever fill
+ * the `*En` columns — they never rewrite what an editor typed into `*Bg`, and
+ * they preserve `updatedAt` so "last edited" reflects human edits only.
+ */
 @Injectable()
 export class TranslationService {
   private readonly logger = new Logger(TranslationService.name)
@@ -80,20 +99,28 @@ export class TranslationService {
   /**
    * Detect language of a single editor string and return bilingual pair.
    * Used for short entities (tags) that are not queued like articles.
+   * Place names are transliterated, never translated ("Лом" → "Lom", not "Scrap").
    */
   async bilingualFromSingle(
     text: string,
+    opts: { place?: boolean } = {},
   ): Promise<{ bg: string; en: string }> {
     const original = text.trim()
     if (!original) return { bg: '', en: '' }
+    if (opts.place && this.hasCyrillic(original)) {
+      return { bg: original, en: transliterateName(original) }
+    }
     const sourceLang = this.detectSourceLang([original])
     const targetLang: Lang = sourceLang === 'bg' ? 'en' : 'bg'
     const map = await this.translateMany([original], sourceLang, targetLang)
-    return this.pair(map, original, sourceLang)
+    const translated = this.tr(map, original)
+    return sourceLang === 'bg'
+      ? { bg: original, en: translated }
+      : { bg: translated, en: original }
   }
 
   async markFailed(
-    type: TranslateJobData['type'],
+    type: TranslateEntity,
     id: string,
     message: string,
   ): Promise<void> {
@@ -116,20 +143,59 @@ export class TranslationService {
     await this.prisma.category.update({ where: { id }, data })
   }
 
+  /**
+   * Re-queue rows whose job was lost (WordPress import, Redis restart, worker
+   * crash). Only runs when the queue is otherwise idle so live jobs are never
+   * duplicated.
+   */
+  async sweepStale(now = new Date()): Promise<number> {
+    const counts = await this.translateQueue.getJobCounts(
+      'waiting',
+      'delayed',
+      'active',
+    )
+    if ((counts.waiting ?? 0) + (counts.delayed ?? 0) > 0) return 0
+    if ((counts.active ?? 0) > 1) return 0
+
+    const where = {
+      OR: [
+        {
+          translationStatus: TranslationStatus.PENDING,
+          updatedAt: { lt: new Date(now.getTime() - SWEEP_PENDING_GRACE_MS) },
+        },
+        { translationStatus: TranslationStatus.RUNNING },
+      ],
+    }
+    const query = {
+      where,
+      select: { id: true },
+      orderBy: { updatedAt: 'desc' as const },
+      take: SWEEP_BATCH,
+    }
+    const authors = await this.prisma.author.findMany(query)
+    const categories = await this.prisma.category.findMany(query)
+    const series = await this.prisma.series.findMany(query)
+    const articles = await this.prisma.article.findMany(query)
+    const jobs: TranslateJobData[] = [
+      ...authors.map((row) => ({ type: 'author' as const, id: row.id })),
+      ...categories.map((row) => ({ type: 'category' as const, id: row.id })),
+      ...series.map((row) => ({ type: 'series' as const, id: row.id })),
+      ...articles.map((row) => ({ type: 'article' as const, id: row.id })),
+    ]
+    for (const job of jobs) {
+      await this.addJob(job)
+    }
+    if (jobs.length > 0) {
+      this.logger.log(`Translation sweep re-queued ${jobs.length} stuck row(s)`)
+    }
+    return jobs.length
+  }
+
   async processArticle(articleId: string): Promise<void> {
-    await this.prisma.article.update({
-      where: { id: articleId },
-      data: {
-        translationStatus: TranslationStatus.RUNNING,
-        translationError: null,
-      },
-    })
+    const article = await this.startRun('article', articleId)
+    if (!article) return
 
-    const article: Article = await this.prisma.article.findUniqueOrThrow({
-      where: { id: articleId },
-    })
     const body = this.parseBody(article.body)
-
     const sources: string[] = [
       article.categoryBg,
       article.titleBg,
@@ -145,107 +211,47 @@ export class TranslationService {
       article.seoDescriptionBg ?? '',
       ...this.collectFromBody(body),
     ]
-
     const sourceLang = this.detectSourceLang([
       article.titleBg,
       article.subtitleBg,
       ...this.collectFromBody(body).slice(0, 3),
     ])
-    const targetLang: Lang = sourceLang === 'bg' ? 'en' : 'bg'
-    this.logger.log(
-      `Article ${articleId}: detected ${sourceLang} → translating to ${targetLang}`,
-    )
+    this.logger.log(`Article ${articleId}: translating Bulgarian fields → en`)
 
-    const map = await this.translateMany(sources, sourceLang, targetLang)
-    const translatedBody = this.translateBody(body, map, sourceLang)
+    const map = await this.englishMap(sources)
+    const en = (value: string | null | undefined) => this.en(map, value)
+    const optionalEn = (value: string | null | undefined) =>
+      value?.trim() ? en(value) : null
 
-    const category = this.pair(map, article.categoryBg, sourceLang)
-    const title = this.pair(map, article.titleBg, sourceLang)
-    const subtitle = this.pair(map, article.subtitleBg, sourceLang)
-    const readTime = this.pair(map, article.readTimeBg, sourceLang)
-    const location = this.pair(map, article.locationBg, sourceLang)
-    const date = this.pair(map, article.dateBg, sourceLang)
-    const photoCredit = this.pair(map, article.photoCreditBg, sourceLang)
-    const endLabel = this.pair(map, article.endLabelBg, sourceLang)
-    const speaker = article.speakerBg
-      ? this.pair(map, article.speakerBg, sourceLang)
-      : null
-    const behindStory = article.behindStoryBg?.trim()
-      ? this.pair(map, article.behindStoryBg, sourceLang)
-      : null
-    const seoTitle = article.seoTitleBg?.trim()
-      ? this.pair(map, article.seoTitleBg, sourceLang)
-      : null
-    const seoDescription = article.seoDescriptionBg?.trim()
-      ? this.pair(map, article.seoDescriptionBg, sourceLang)
-      : null
-
-    const latest = await this.prisma.article.findUnique({
-      where: { id: articleId },
-      select: { translationStatus: true },
-    })
-    if (latest?.translationStatus !== TranslationStatus.RUNNING) {
-      this.logger.warn(`Skip stale article translation write for ${articleId}`)
-      return
-    }
-
-    const ready = translationLooksReady(title.bg, title.en)
-    await this.prisma.article.update({
-      where: { id: articleId },
+    const titleEn = en(article.titleBg)
+    const ready = this.englishReady(article.titleBg, titleEn)
+    const { count } = await this.prisma.article.updateMany({
+      where: this.runGuard(articleId, article.updatedAt),
       data: {
-        translationStatus: ready
-          ? TranslationStatus.READY
-          : TranslationStatus.FAILED,
-        translationError: ready
-          ? null
-          : 'English translation matched the Bulgarian source (or was empty). Re-run translation.',
+        ...this.result(ready),
         sourceLang,
-        categoryBg: category.bg,
-        categoryEn: category.en,
-        titleBg: title.bg,
-        titleEn: title.en,
-        subtitleBg: subtitle.bg,
-        subtitleEn: subtitle.en,
-        readTimeBg: readTime.bg,
-        readTimeEn: readTime.en,
-        locationBg: location.bg,
-        locationEn: location.en,
-        dateBg: date.bg,
-        dateEn: date.en,
-        photoCreditBg: photoCredit.bg,
-        photoCreditEn: photoCredit.en,
-        endLabelBg: endLabel.bg,
-        endLabelEn: endLabel.en,
-        speakerBg: speaker?.bg || null,
-        speakerEn: speaker?.en || null,
-        behindStoryBg: behindStory?.bg ?? article.behindStoryBg,
-        behindStoryEn: behindStory?.en || null,
-        seoTitleBg: seoTitle?.bg || article.seoTitleBg,
-        seoTitleEn: seoTitle?.en || null,
-        seoDescriptionBg: seoDescription?.bg || article.seoDescriptionBg,
-        seoDescriptionEn: seoDescription?.en || null,
-        body: translatedBody,
+        updatedAt: article.updatedAt,
+        categoryEn: en(article.categoryBg),
+        titleEn,
+        subtitleEn: en(article.subtitleBg),
+        readTimeEn: en(article.readTimeBg),
+        locationEn: en(article.locationBg),
+        dateEn: en(article.dateBg),
+        photoCreditEn: en(article.photoCreditBg),
+        endLabelEn: en(article.endLabelBg),
+        speakerEn: optionalEn(article.speakerBg),
+        behindStoryEn: optionalEn(article.behindStoryBg),
+        seoTitleEn: optionalEn(article.seoTitleBg),
+        seoDescriptionEn: optionalEn(article.seoDescriptionBg),
+        body: this.translateBody(body, map) as unknown as Prisma.InputJsonValue,
       },
     })
-    this.logger.log(
-      ready
-        ? `Translated article ${articleId} (${sourceLang}→${targetLang})`
-        : `Article ${articleId} translation rejected — EN did not differ from BG`,
-    )
+    await this.finishRun('article', articleId, count, ready)
   }
 
   async processAuthor(authorId: string): Promise<void> {
-    await this.prisma.author.update({
-      where: { id: authorId },
-      data: {
-        translationStatus: TranslationStatus.RUNNING,
-        translationError: null,
-      },
-    })
-
-    const author = await this.prisma.author.findUniqueOrThrow({
-      where: { id: authorId },
-    })
+    const author = await this.startRun('author', authorId)
+    if (!author) return
 
     const sources = [
       author.nameBg,
@@ -254,181 +260,170 @@ export class TranslationService {
       author.quoteBg ?? '',
       author.bioBg ?? '',
     ]
-    const sourceLang = this.detectSourceLang(sources)
-    const targetLang: Lang = sourceLang === 'bg' ? 'en' : 'bg'
-    this.logger.log(
-      `Author ${authorId}: detected ${sourceLang} → translating to ${targetLang}`,
-    )
+    const map = await this.englishMap(sources)
+    const optionalEn = (value: string | null | undefined) =>
+      value?.trim() ? this.en(map, value) || null : null
 
-    const map = await this.translateMany(sources, sourceLang, targetLang)
-
-    const name = this.pair(map, author.nameBg, sourceLang)
-    const role = this.pair(map, author.roleBg, sourceLang)
-    const location = author.locationBg
-      ? this.pair(map, author.locationBg, sourceLang)
-      : null
-    const quote = author.quoteBg
-      ? this.pair(map, author.quoteBg, sourceLang)
-      : null
-    const bio = author.bioBg
-      ? this.pair(map, author.bioBg, sourceLang)
-      : null
-
-    const latest = await this.prisma.author.findUnique({
-      where: { id: authorId },
-      select: { translationStatus: true },
-    })
-    if (latest?.translationStatus !== TranslationStatus.RUNNING) {
-      this.logger.warn(`Skip stale author translation write for ${authorId}`)
-      return
-    }
-
-    const ready = translationLooksReady(name.bg, name.en)
-    await this.prisma.author.update({
-      where: { id: authorId },
+    const nameEn = this.en(map, author.nameBg)
+    const ready = this.englishReady(author.nameBg, nameEn)
+    const { count } = await this.prisma.author.updateMany({
+      where: this.runGuard(authorId, author.updatedAt),
       data: {
-        translationStatus: ready
-          ? TranslationStatus.READY
-          : TranslationStatus.FAILED,
-        translationError: ready
-          ? null
-          : 'English translation matched the Bulgarian source (or was empty). Re-run translation.',
-        sourceLang,
-        nameBg: name.bg,
-        nameEn: name.en || null,
-        roleBg: role.bg,
-        roleEn: role.en || null,
-        locationBg: location?.bg || null,
-        locationEn: location?.en || null,
-        quoteBg: quote?.bg || null,
-        quoteEn: quote?.en || null,
-        bioBg: bio?.bg || null,
-        bioEn: bio?.en || null,
+        ...this.result(ready),
+        sourceLang: this.detectSourceLang(sources),
+        updatedAt: author.updatedAt,
+        nameEn: nameEn || null,
+        roleEn: optionalEn(author.roleBg),
+        locationEn: optionalEn(author.locationBg),
+        quoteEn: optionalEn(author.quoteBg),
+        bioEn: optionalEn(author.bioBg),
       },
     })
-    this.logger.log(
-      ready
-        ? `Translated author ${authorId} (${sourceLang}→${targetLang})`
-        : `Author ${authorId} translation rejected — EN did not differ from BG`,
-    )
+    await this.finishRun('author', authorId, count, ready)
   }
 
   async processSeries(seriesId: string): Promise<void> {
-    await this.prisma.series.update({
-      where: { id: seriesId },
+    const series = await this.startRun('series', seriesId)
+    if (!series) return
+
+    const sources = [series.titleBg, series.descriptionBg ?? '']
+    const map = await this.englishMap(sources)
+    const titleEn = this.en(map, series.titleBg)
+    const ready = this.englishReady(series.titleBg, titleEn)
+    const { count } = await this.prisma.series.updateMany({
+      where: this.runGuard(seriesId, series.updatedAt),
       data: {
-        translationStatus: TranslationStatus.RUNNING,
-        translationError: null,
+        ...this.result(ready),
+        sourceLang: this.detectSourceLang(sources),
+        updatedAt: series.updatedAt,
+        titleEn: titleEn || null,
+        descriptionEn: series.descriptionBg?.trim()
+          ? this.en(map, series.descriptionBg) || null
+          : null,
       },
     })
-
-    const series = await this.prisma.series.findUniqueOrThrow({
-      where: { id: seriesId },
-    })
-
-    const sources = [series.titleBg, series.descriptionBg]
-    const sourceLang = this.detectSourceLang(sources)
-    const targetLang: Lang = sourceLang === 'bg' ? 'en' : 'bg'
-    this.logger.log(
-      `Series ${seriesId}: detected ${sourceLang} → translating to ${targetLang}`,
-    )
-
-    const map = await this.translateMany(sources, sourceLang, targetLang)
-    const title = this.pair(map, series.titleBg, sourceLang)
-    const description = series.descriptionBg
-      ? this.pair(map, series.descriptionBg, sourceLang)
-      : null
-
-    const latest = await this.prisma.series.findUnique({
-      where: { id: seriesId },
-      select: { translationStatus: true },
-    })
-    if (latest?.translationStatus !== TranslationStatus.RUNNING) {
-      this.logger.warn(`Skip stale series translation write for ${seriesId}`)
-      return
-    }
-
-    const ready = translationLooksReady(title.bg, title.en)
-    await this.prisma.series.update({
-      where: { id: seriesId },
-      data: {
-        translationStatus: ready
-          ? TranslationStatus.READY
-          : TranslationStatus.FAILED,
-        translationError: ready
-          ? null
-          : 'English translation matched the Bulgarian source (or was empty). Re-run translation.',
-        sourceLang,
-        titleBg: title.bg,
-        titleEn: title.en || null,
-        descriptionBg: description?.bg ?? series.descriptionBg,
-        descriptionEn: description?.en || null,
-      },
-    })
-    this.logger.log(
-      ready
-        ? `Translated series ${seriesId} (${sourceLang}→${targetLang})`
-        : `Series ${seriesId} translation rejected — EN did not differ from BG`,
-    )
+    await this.finishRun('series', seriesId, count, ready)
   }
 
   async processCategory(categoryId: string): Promise<void> {
-    await this.prisma.category.update({
-      where: { id: categoryId },
+    const category = await this.startRun('category', categoryId)
+    if (!category) return
+
+    const sources = [category.nameBg, category.descriptionBg ?? '']
+    const map = await this.englishMap(sources)
+    const nameEn = this.en(map, category.nameBg)
+    const ready = this.englishReady(category.nameBg, nameEn)
+    const { count } = await this.prisma.category.updateMany({
+      where: this.runGuard(categoryId, category.updatedAt),
+      data: {
+        ...this.result(ready),
+        sourceLang: this.detectSourceLang(sources),
+        updatedAt: category.updatedAt,
+        nameEn: nameEn || null,
+        descriptionEn: category.descriptionBg?.trim()
+          ? this.en(map, category.descriptionBg) || null
+          : null,
+      },
+    })
+    await this.finishRun('category', categoryId, count, ready)
+  }
+
+  private startRun(type: 'article', id: string): Promise<Article | null>
+  private startRun(type: 'author', id: string): Promise<Author | null>
+  private startRun(type: 'series', id: string): Promise<Series | null>
+  private startRun(type: 'category', id: string): Promise<Category | null>
+  /**
+   * Snapshot the row and flip it to RUNNING without touching `updatedAt`.
+   * Returns null when the row changed between the read and the flip — the
+   * editor's save already queued a fresh job (or the sweep will).
+   */
+  private async startRun(
+    type: TranslateEntity,
+    id: string,
+  ): Promise<{ updatedAt: Date } | null> {
+    const delegate = this.delegate(type)
+    const row = (await delegate.findUniqueOrThrow({ where: { id } })) as {
+      updatedAt: Date
+    }
+    const { count } = await delegate.updateMany({
+      where: { id, updatedAt: row.updatedAt },
       data: {
         translationStatus: TranslationStatus.RUNNING,
         translationError: null,
+        updatedAt: row.updatedAt,
       },
     })
+    if (count === 0) {
+      this.logger.warn(`Skip ${type} ${id}: edited before translation started`)
+      return null
+    }
+    return row
+  }
 
-    const category = await this.prisma.category.findUniqueOrThrow({
-      where: { id: categoryId },
-    })
+  private runGuard(id: string, updatedAt: Date) {
+    return { id, translationStatus: TranslationStatus.RUNNING, updatedAt }
+  }
 
-    const sources = [category.nameBg, category.descriptionBg ?? '']
-    const sourceLang = this.detectSourceLang(sources)
-    const targetLang: Lang = sourceLang === 'bg' ? 'en' : 'bg'
-    this.logger.log(
-      `Category ${categoryId}: detected ${sourceLang} → translating to ${targetLang}`,
-    )
+  private result(ready: boolean) {
+    return {
+      translationStatus: ready
+        ? TranslationStatus.READY
+        : TranslationStatus.FAILED,
+      translationError: ready
+        ? null
+        : 'English translation matched the Bulgarian source (or was empty). Re-run translation.',
+    }
+  }
 
-    const map = await this.translateMany(sources, sourceLang, targetLang)
-    const name = this.pair(map, category.nameBg, sourceLang)
-    const description = category.descriptionBg?.trim()
-      ? this.pair(map, category.descriptionBg, sourceLang)
-      : null
-
-    const latest = await this.prisma.category.findUnique({
-      where: { id: categoryId },
-      select: { translationStatus: true },
-    })
-    if (latest?.translationStatus !== TranslationStatus.RUNNING) {
-      this.logger.warn(`Skip stale category translation write for ${categoryId}`)
+  /**
+   * A zero-count guarded write means an editor saved mid-translation. Text
+   * edits re-queue themselves (status → PENDING); for non-text edits the row
+   * is still RUNNING, so hand it back to the queue.
+   */
+  private async finishRun(
+    type: TranslateEntity,
+    id: string,
+    count: number,
+    ready: boolean,
+  ): Promise<void> {
+    if (count > 0) {
+      this.logger.log(
+        ready
+          ? `Translated ${type} ${id} (bg→en)`
+          : `${type} ${id} translation rejected — EN did not differ from BG`,
+      )
       return
     }
+    const latest = (await this.delegate(type).findUnique({
+      where: { id },
+      select: { translationStatus: true },
+    })) as { translationStatus: TranslationStatus } | null
+    if (latest?.translationStatus === TranslationStatus.RUNNING) {
+      this.logger.warn(`Re-queue ${type} ${id}: edited during translation`)
+      await this.addJob({ type, id })
+      return
+    }
+    this.logger.warn(`Skip stale ${type} translation write for ${id}`)
+  }
 
-    const ready = translationLooksReady(name.bg, name.en)
-    await this.prisma.category.update({
-      where: { id: categoryId },
-      data: {
-        translationStatus: ready
-          ? TranslationStatus.READY
-          : TranslationStatus.FAILED,
-        translationError: ready
-          ? null
-          : 'English translation matched the Bulgarian source (or was empty). Re-run translation.',
-        sourceLang,
-        nameBg: name.bg,
-        nameEn: name.en || null,
-        descriptionBg: description?.bg ?? category.descriptionBg,
-        descriptionEn: description?.en || null,
-      },
-    })
-    this.logger.log(
-      ready
-        ? `Translated category ${categoryId} (${sourceLang}→${targetLang})`
-        : `Category ${categoryId} translation rejected — EN did not differ from BG`,
-    )
+  private delegate(type: TranslateEntity) {
+    const delegates = {
+      article: this.prisma.article,
+      author: this.prisma.author,
+      series: this.prisma.series,
+      category: this.prisma.category,
+    }
+    return delegates[type] as unknown as {
+      findUniqueOrThrow(args: { where: { id: string } }): Promise<unknown>
+      findUnique(args: {
+        where: { id: string }
+        select: { translationStatus: true }
+      }): Promise<unknown>
+      updateMany(args: {
+        where: Record<string, unknown>
+        data: Record<string, unknown>
+      }): Promise<{ count: number }>
+    }
   }
 
   private async addJob(data: TranslateJobData) {
@@ -442,6 +437,10 @@ export class TranslationService {
 
   private sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms))
+  }
+
+  private hasCyrillic(text: string | null | undefined): boolean {
+    return CYRILLIC_RE.test(text ?? '')
   }
 
   /** Detect whether editor text is primarily Bulgarian or English. */
@@ -460,6 +459,28 @@ export class TranslationService {
     if (cyrillic > 0 && cyrillic >= latin * 0.35) return 'bg'
     if (latin > cyrillic) return 'en'
     return 'bg'
+  }
+
+  /** Translate only the strings that actually contain Bulgarian. */
+  private englishMap(texts: string[]): Promise<Map<string, string>> {
+    return this.translateMany(
+      texts.filter((text) => this.hasCyrillic(text)),
+      'bg',
+      'en',
+    )
+  }
+
+  /** English for one editor field; text already without Cyrillic is kept verbatim. */
+  private en(map: Map<string, string>, text: string | null | undefined): string {
+    const value = text?.trim() ?? ''
+    if (!value) return ''
+    if (!this.hasCyrillic(value)) return value
+    return map.get(value) ?? value
+  }
+
+  private englishReady(bg: string, en: string): boolean {
+    if (bg.trim() && !this.hasCyrillic(bg)) return true
+    return translationLooksReady(bg, en)
   }
 
   private async translateMany(
@@ -526,18 +547,6 @@ export class TranslationService {
     return map.get(value) ?? value
   }
 
-  private pair(
-    map: Map<string, string>,
-    original: string,
-    sourceLang: Lang,
-  ): { bg: string; en: string } {
-    const translated = this.tr(map, original)
-    if (sourceLang === 'bg') {
-      return { bg: original, en: translated }
-    }
-    return { bg: translated, en: original }
-  }
-
   private parseBody(raw: Prisma.JsonValue): StoredArticleBlock[] {
     if (!Array.isArray(raw)) return []
     return raw as StoredArticleBlock[]
@@ -563,57 +572,51 @@ export class TranslationService {
     return out
   }
 
+  /** Fill the `*En` side of every block; `*Bg` stays exactly as the editor wrote it. */
   private translateBody(
     body: StoredArticleBlock[],
     map: Map<string, string>,
-    sourceLang: Lang,
   ): StoredArticleBlock[] {
     return body.map((block) => {
       if (block.type === 'note') {
-        const label = this.pair(map, block.labelBg, sourceLang)
-        const text = this.pair(map, block.textBg, sourceLang)
         return {
           ...block,
-          labelBg: label.bg,
-          labelEn: label.en,
-          textBg: text.bg,
-          textEn: text.en,
+          labelEn: this.en(map, block.labelBg),
+          textEn: this.en(map, block.textBg),
         }
       }
       if (block.type === 'image' || block.type === 'video') {
         if (!block.captionBg) return block
-        const caption = this.pair(map, block.captionBg, sourceLang)
-        return {
-          ...block,
-          captionBg: caption.bg,
-          captionEn: caption.en,
-        }
+        return { ...block, captionEn: this.en(map, block.captionBg) }
       }
       if (block.type === 'collage') {
-        const caption = block.captionBg
-          ? this.pair(map, block.captionBg, sourceLang)
-          : { bg: block.captionBg ?? '', en: block.captionEn ?? '' }
         return {
           ...block,
-          captionBg: caption.bg,
-          captionEn: caption.en,
-          items: block.items.map((item) => {
-            if (!item.captionBg) return item
-            const itemCaption = this.pair(map, item.captionBg, sourceLang)
-            return {
-              ...item,
-              captionBg: itemCaption.bg,
-              captionEn: itemCaption.en,
-            }
-          }),
+          captionEn: block.captionBg
+            ? this.en(map, block.captionBg)
+            : (block.captionEn ?? ''),
+          items: block.items.map((item) =>
+            item.captionBg
+              ? { ...item, captionEn: this.en(map, item.captionBg) }
+              : item,
+          ),
         }
       }
-      const text = this.pair(map, block.textBg, sourceLang)
-      return {
-        ...block,
-        textBg: text.bg,
-        textEn: text.en,
-      }
+      return { ...block, textEn: this.en(map, block.textBg) }
     })
   }
+}
+
+/** "Стара Загора" → "Stara Zagora" (official transliteration, original casing). */
+export function transliterateName(input: string): string {
+  return input
+    .split(/(\s+|-)/)
+    .map((part) => {
+      const latin = transliterateBg(part)
+      const first = part.charAt(0)
+      return first && first !== first.toLowerCase()
+        ? latin.charAt(0).toUpperCase() + latin.slice(1)
+        : latin
+    })
+    .join('')
 }

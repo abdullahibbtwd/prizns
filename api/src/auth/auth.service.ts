@@ -25,7 +25,8 @@ import type { LoginDto } from './dto/login.dto';
 import { checkRateLimit } from '../common/rate-limit';
 
 const VERIFY_TTL_SECONDS = 15 * 60;
-const RESEND_COOLDOWN_SECONDS = 60;
+/** Minimum gap between verification emails, so the "send a new code" button can't be spammed. */
+export const RESEND_COOLDOWN_SECONDS = 120;
 const VERIFY_MAX_ATTEMPTS = 5;
 const VERIFY_SEND_LIMIT_USER = 3;
 const VERIFY_SEND_LIMIT_IP = 10;
@@ -264,20 +265,28 @@ export class AuthService {
       if (existing) return { sent: false, alreadyVerified: false };
     }
 
-    if (!opts.skipCooldown) {
-      const cooldown = await this.redis.client.set(
-        this.verifyCooldownKey(user.id),
-        '1',
-        'EX',
-        RESEND_COOLDOWN_SECONDS,
-        'NX',
-      );
-      if (cooldown !== 'OK') {
-        throw new HttpException(
-          'Wait before requesting another code.',
-          HttpStatus.TOO_MANY_REQUESTS,
+    // Sign-in always sends a code but still starts the cooldown; the resend
+    // button must wait for it. NX keeps two quick clicks from both sending.
+    const cooldownKey = this.verifyCooldownKey(user.id);
+    const cooldown = opts.skipCooldown
+      ? await this.redis.client.set(cooldownKey, '1', 'EX', RESEND_COOLDOWN_SECONDS)
+      : await this.redis.client.set(
+          cooldownKey,
+          '1',
+          'EX',
+          RESEND_COOLDOWN_SECONDS,
+          'NX',
         );
-      }
+    if (cooldown !== 'OK') {
+      const retryAfterSeconds = await this.verificationResendIn(user.id);
+      throw new HttpException(
+        {
+          statusCode: HttpStatus.TOO_MANY_REQUESTS,
+          message: `Wait ${retryAfterSeconds} seconds before requesting another code.`,
+          retryAfterSeconds,
+        },
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
     }
 
     const code = String(randomInt(100000, 1_000_000));
@@ -301,7 +310,17 @@ export class AuthService {
       code,
     );
 
-    return { sent: true, alreadyVerified: false };
+    return {
+      sent: true,
+      alreadyVerified: false,
+      retryAfterSeconds: RESEND_COOLDOWN_SECONDS,
+    };
+  }
+
+  /** Seconds until another verification code may be requested (0 = now). */
+  async verificationResendIn(userId: string): Promise<number> {
+    const ttl = await this.redis.client.ttl(this.verifyCooldownKey(userId));
+    return ttl > 0 ? ttl : 0;
   }
 
   async sendAccountCreatedEmail(userId: string) {

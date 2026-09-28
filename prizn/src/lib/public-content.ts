@@ -26,6 +26,7 @@ export type PublicAuthor = {
   bioBg: string;
   image: string;
   aliases: string[];
+  isGuest?: boolean;
   storyCount: number;
   badges?: Array<{
     id: string;
@@ -266,6 +267,17 @@ export type PublicMediaItem = {
   creditBg?: string | null
   creditEn?: string | null
   createdAt: string
+}
+
+/** Only what the editor actually entered — empty strings mean "show nothing". */
+export function galleryPhotoText(item: PublicMediaItem, lang: 'bg' | 'en') {
+  const pick = (bg?: string | null, en?: string | null) =>
+    ((lang === 'en' ? en || bg : bg || en) ?? '').trim()
+  return {
+    title: pick(item.titleBg, item.titleEn),
+    location: pick(item.locationBg, item.locationEn),
+    caption: pick(item.creditBg, item.creditEn),
+  }
 }
 
 export function usePublicMedia(

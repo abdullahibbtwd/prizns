@@ -4,7 +4,6 @@ import { useTranslation } from 'react-i18next'
 import {
   CmsCard,
   CmsPageHeader,
-  ComingSoon,
   GhostButton,
   PrimaryButton,
 } from '@/cms/components/CmsUI'
@@ -16,21 +15,32 @@ import {
   ImagePlus,
   MapPin,
   Search,
-  Settings,
   Sparkles,
   Copy,
+  Eye,
+  EyeOff,
   Trash2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { deleteCmsMedia, listCmsMedia, uploadCmsMedia } from '@/lib/articles-api'
+import {
+  deleteCmsMedia,
+  listCmsMedia,
+  setCmsMediaGalleryVisibility,
+  uploadCmsMedia,
+} from '@/lib/articles-api'
+import { useImageFileDrop } from '@/cms/hooks/useImageFileDrop'
 import type { MediaAsset } from '@/lib/cms-types'
 import { assertCmsFileSize } from '@/lib/upload-limits'
 import { useCmsConfirm } from '@/cms/components/CmsConfirmDialog'
+import { useAuth } from '@/lib/auth'
+import { isCmsStaff } from '@/lib/cms-roles'
 
 export function CmsMediaPage() {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const { confirm, dialog } = useCmsConfirm()
+  const { user } = useAuth()
+  const canManage = isCmsStaff(user)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [kindFilter, setKindFilter] = useState<
     'ALL' | 'IMAGE' | 'VIDEO' | 'AUDIO'
@@ -39,10 +49,12 @@ export function CmsMediaPage() {
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [page, setPage] = useState(1)
   const pageSize = 24
+  const [galleryFilter, setGalleryFilter] = useState<'all' | 'shown' | 'hidden'>('all')
   const [titleBg, setTitleBg] = useState('')
   const [locationBg, setLocationBg] = useState('')
-  const [file, setFile] = useState<File | null>(null)
-  const [previewUrl, setPreviewUrl] = useState('')
+  const [files, setFiles] = useState<File[]>([])
+  const [previewUrls, setPreviewUrls] = useState<string[]>([])
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
   const [formError, setFormError] = useState('')
   const [formOk, setFormOk] = useState('')
 
@@ -55,44 +67,90 @@ export function CmsMediaPage() {
   }, [search])
 
   const mediaQuery = useQuery({
-    queryKey: ['cms-media', kindFilter, debouncedSearch, page, pageSize],
+    queryKey: ['cms-media', kindFilter, galleryFilter, debouncedSearch, page, pageSize],
     queryFn: () =>
       listCmsMedia({
         kind: kindFilter === 'ALL' ? undefined : kindFilter,
+        gallery: galleryFilter === 'all' ? undefined : galleryFilter,
         q: debouncedSearch || undefined,
         page,
         pageSize,
       }),
   })
 
+  const replaceFiles = (next: File[]) => {
+    setPreviewUrls((prev) => {
+      prev.forEach((url) => URL.revokeObjectURL(url))
+      return next
+        .filter((f) => f.type.startsWith('image/'))
+        .slice(0, 12)
+        .map((f) => URL.createObjectURL(f))
+    })
+    setFiles(next)
+  }
+
   const uploadMutation = useMutation({
     mutationFn: async () => {
-      if (!titleBg.trim()) throw new Error(t('cms.mediaLibrary.requiredName'))
-      if (!file) throw new Error(t('cms.mediaLibrary.requiredFile'))
-      return uploadCmsMedia(file, {
-        titleBg: titleBg.trim(),
-        locationBg: locationBg.trim(),
-        folder: 'cms',
-      })
+      if (!files.length) throw new Error(t('cms.mediaLibrary.requiredFile'))
+      const failed: string[] = []
+      setProgress({ done: 0, total: files.length })
+      for (const [index, item] of files.entries()) {
+        try {
+          await uploadCmsMedia(item, {
+            titleBg: titleBg.trim(),
+            locationBg: locationBg.trim(),
+            folder: 'cms',
+            showInGallery: true,
+          })
+        } catch (error) {
+          failed.push(`${item.name}: ${error instanceof Error ? error.message : String(error)}`)
+        }
+        setProgress({ done: index + 1, total: files.length })
+      }
+      return { uploaded: files.length - failed.length, failed }
     },
-    onSuccess: async () => {
-      setTitleBg('')
-      setLocationBg('')
-      setFile(null)
-      setPreviewUrl((prev) => {
-        if (prev) URL.revokeObjectURL(prev)
-        return ''
-      })
+    onSuccess: async ({ uploaded, failed }) => {
+      setProgress(null)
+      if (!failed.length) {
+        setTitleBg('')
+        setLocationBg('')
+        replaceFiles([])
+        if (fileInputRef.current) fileInputRef.current.value = ''
+      }
+      setFormError(failed.join(' · '))
+      setFormOk(uploaded ? t('cms.mediaLibrary.uploadedCount', { count: uploaded }) : '')
+      await queryClient.invalidateQueries({ queryKey: ['cms-media'] })
+      await queryClient.invalidateQueries({ queryKey: ['public-media'] })
+    },
+    onError: (error: Error) => {
+      setProgress(null)
+      setFormOk('')
+      setFormError(error.message || t('cms.mediaLibrary.uploadFailed'))
+    },
+  })
+
+  const galleryMutation = useMutation({
+    mutationFn: (item: MediaAsset) =>
+      setCmsMediaGalleryVisibility([item.id], item.showInGallery === false),
+    onSuccess: async (result) => {
       setFormError('')
-      setFormOk(t('cms.mediaLibrary.uploaded'))
-      if (fileInputRef.current) fileInputRef.current.value = ''
+      setFormOk(
+        result.showInGallery
+          ? t('cms.mediaLibrary.shownInGallery')
+          : t('cms.mediaLibrary.hiddenFromGallery'),
+      )
       await queryClient.invalidateQueries({ queryKey: ['cms-media'] })
       await queryClient.invalidateQueries({ queryKey: ['public-media'] })
     },
     onError: (error: Error) => {
       setFormOk('')
-      setFormError(error.message || t('cms.mediaLibrary.uploadFailed'))
+      setFormError(error.message)
     },
+  })
+
+  const drop = useImageFileDrop({
+    disabled: uploadMutation.isPending,
+    onImages: (images) => onPickFiles([...files, ...images]),
   })
 
   const deleteMutation = useMutation({
@@ -129,30 +187,23 @@ export function CmsMediaPage() {
     { id: 'AUDIO', label: t('cms.mediaLibrary.audio') },
   ]
 
-  const onPickFile = (next: File | null) => {
+  const onPickFiles = (next: File[]) => {
     setFormError('')
     setFormOk('')
-    if (next) {
+    const accepted: File[] = []
+    const rejected: string[] = []
+    for (const item of next) {
       try {
-        assertCmsFileSize(next)
+        assertCmsFileSize(item)
+        accepted.push(item)
       } catch (error) {
-        setFile(null)
-        setPreviewUrl((prev) => {
-          if (prev) URL.revokeObjectURL(prev)
-          return ''
-        })
-        setFormError(
-          error instanceof Error ? error.message : t('cms.mediaLibrary.uploadFailed'),
+        rejected.push(
+          `${item.name}: ${error instanceof Error ? error.message : t('cms.mediaLibrary.uploadFailed')}`,
         )
-        if (fileInputRef.current) fileInputRef.current.value = ''
-        return
       }
     }
-    setPreviewUrl((prev) => {
-      if (prev) URL.revokeObjectURL(prev)
-      return next ? URL.createObjectURL(next) : ''
-    })
-    setFile(next)
+    if (rejected.length) setFormError(rejected.join(' · '))
+    replaceFiles(accepted)
   }
 
   return (
@@ -177,17 +228,16 @@ export function CmsMediaPage() {
           }}
         >
           <label className="block space-y-1.5 text-xs font-medium text-stone-600">
-            <span>{t('cms.mediaLibrary.name')}</span>
+            <span>{t('cms.mediaLibrary.nameOptional')}</span>
             <input
               value={titleBg}
               onChange={(e) => setTitleBg(e.target.value)}
               placeholder={t('cms.mediaLibrary.namePlaceholder')}
               className="w-full rounded-lg border border-[#E8E4DC] bg-white px-3 py-2.5 text-sm outline-none focus:border-[#0C2686]"
-              required
             />
           </label>
           <label className="block space-y-1.5 text-xs font-medium text-stone-600">
-            <span>{t('cms.mediaLibrary.location')}</span>
+            <span>{t('cms.mediaLibrary.locationShared')}</span>
             <input
               value={locationBg}
               onChange={(e) => setLocationBg(e.target.value)}
@@ -200,46 +250,48 @@ export function CmsMediaPage() {
             <span className="block text-xs font-medium text-stone-600">
               {t('cms.mediaLibrary.file')}
             </span>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch">
-              <label className="flex min-h-[140px] flex-1 cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-[#E8E4DC] bg-[#FAF8F3] px-4 py-6 text-center transition-colors hover:border-[#0C2686]/40">
-                <ImagePlus className="size-7 text-[#0C2686]" />
-                <span className="text-sm font-medium text-stone-700">
-                  {file ? t('cms.mediaLibrary.selectedFile') : t('cms.mediaLibrary.chooseFile')}
-                </span>
-                {file ? (
-                  <span className="max-w-full truncate text-[11px] text-stone-500">
-                    {file.name}
+            <label
+              {...drop.props}
+              className={cn(
+                'flex min-h-[140px] cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border border-dashed bg-[#FAF8F3] px-4 py-6 text-center transition-colors hover:border-[#0C2686]/40',
+                drop.active ? 'border-[#0C2686] bg-[#0C2686]/5' : 'border-[#E8E4DC]',
+              )}
+            >
+              <ImagePlus className="size-7 text-[#0C2686]" />
+              <span className="text-sm font-medium text-stone-700">
+                {files.length
+                  ? t('cms.mediaLibrary.selectedFiles', { count: files.length })
+                  : t('cms.mediaLibrary.chooseFiles')}
+              </span>
+              <span className="text-[11px] text-stone-500">
+                {t('cms.mediaLibrary.bulkHint')}
+              </span>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept="image/*,video/*"
+                className="hidden"
+                onChange={(e) => onPickFiles(Array.from(e.target.files ?? []))}
+              />
+            </label>
+            {previewUrls.length ? (
+              <div className="flex flex-wrap gap-2">
+                {previewUrls.map((url) => (
+                  <img
+                    key={url}
+                    src={url}
+                    alt=""
+                    className="size-16 rounded-lg border border-[#E8E4DC] object-cover"
+                  />
+                ))}
+                {files.length > previewUrls.length ? (
+                  <span className="flex size-16 items-center justify-center rounded-lg border border-[#E8E4DC] bg-stone-50 text-xs font-semibold text-stone-500">
+                    +{files.length - previewUrls.length}
                   </span>
                 ) : null}
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*,video/*"
-                  className="hidden"
-                  onChange={(e) => onPickFile(e.target.files?.[0] ?? null)}
-                />
-              </label>
-              {previewUrl && file?.type.startsWith('image/') ? (
-                <div className="relative h-[140px] w-full overflow-hidden rounded-2xl border border-[#E8E4DC] bg-stone-100 sm:w-48">
-                  <img
-                    src={previewUrl}
-                    alt=""
-                    className="h-full w-full object-cover"
-                  />
-                </div>
-              ) : null}
-              {previewUrl && file?.type.startsWith('video/') ? (
-                <div className="relative h-[140px] w-full overflow-hidden rounded-2xl border border-[#E8E4DC] bg-black sm:w-56">
-                  <video
-                    src={previewUrl}
-                    className="h-full w-full object-contain"
-                    muted
-                    playsInline
-                    controls
-                  />
-                </div>
-              ) : null}
-            </div>
+              </div>
+            ) : null}
           </div>
 
           <div className="md:col-span-2 flex flex-wrap items-center gap-3">
@@ -250,8 +302,12 @@ export function CmsMediaPage() {
             >
               <ImagePlus className="size-3.5" />
               {uploadMutation.isPending
-                ? t('cms.mediaLibrary.uploading')
-                : t('cms.mediaLibrary.submit')}
+                ? progress
+                  ? t('cms.mediaLibrary.uploadingProgress', progress)
+                  : t('cms.mediaLibrary.uploading')
+                : files.length > 1
+                  ? t('cms.mediaLibrary.submitMany', { count: files.length })
+                  : t('cms.mediaLibrary.submit')}
             </PrimaryButton>
             {formError ? (
               <span className="text-xs text-red-600">{formError}</span>
@@ -281,6 +337,25 @@ export function CmsMediaPage() {
               )}
             >
               {filter.label}
+            </button>
+          ))}
+          <span className="mx-1 hidden w-px self-stretch bg-[#E8E4DC] sm:block" aria-hidden />
+          {(['all', 'shown', 'hidden'] as const).map((id) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => {
+                setGalleryFilter(id)
+                setPage(1)
+              }}
+              className={cn(
+                'cursor-pointer rounded-full px-4 py-2 text-xs font-semibold transition-all duration-200',
+                galleryFilter === id
+                  ? 'bg-stone-800 text-white shadow-xs'
+                  : 'border border-[#E8E4DC] bg-white text-stone-600 hover:bg-stone-100',
+              )}
+            >
+              {t(`cms.mediaLibrary.gallery_${id}`)}
             </button>
           ))}
         </div>
@@ -314,7 +389,10 @@ export function CmsMediaPage() {
           {items.map((item: MediaAsset) => (
             <div
               key={item.id}
-              className="group relative aspect-square overflow-hidden rounded-2xl border border-[#E8E4DC] bg-stone-100 shadow-2xs transition-all hover:shadow-lg"
+              className={cn(
+                'group relative aspect-square overflow-hidden rounded-2xl border border-[#E8E4DC] bg-stone-100 shadow-2xs transition-all hover:shadow-lg',
+                item.showInGallery === false && 'opacity-60',
+              )}
             >
               {item.status === 'PENDING' || item.status === 'PROCESSING' ? (
                 <div className="flex h-full w-full items-center justify-center bg-stone-200 px-3 text-center text-xs font-semibold text-stone-600">
@@ -359,15 +437,49 @@ export function CmsMediaPage() {
                   </p>
                 ) : null}
               </div>
-              <button
-                type="button"
-                onClick={() => void confirmDelete(item)}
-                disabled={deleteMutation.isPending}
-                className="absolute right-2 top-2 inline-flex size-8 items-center justify-center rounded-full bg-black/55 text-white opacity-100 backdrop-blur-sm transition-opacity hover:bg-rose-700 md:opacity-0 md:group-hover:opacity-100"
-                aria-label={t('cms.mediaLibrary.delete')}
-              >
-                <Trash2 className="size-3.5" />
-              </button>
+              {item.kind === 'IMAGE' && canManage ? (
+                <button
+                  type="button"
+                  onClick={() => galleryMutation.mutate(item)}
+                  disabled={galleryMutation.isPending}
+                  title={
+                    item.showInGallery === false
+                      ? t('cms.mediaLibrary.showInGallery')
+                      : t('cms.mediaLibrary.hideFromGallery')
+                  }
+                  className={cn(
+                    'absolute left-2 top-2 inline-flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[10px] font-semibold text-white backdrop-blur-sm transition-colors',
+                    item.showInGallery === false
+                      ? 'bg-amber-600/90 hover:bg-amber-700'
+                      : 'bg-black/55 opacity-100 hover:bg-black/75 md:opacity-0 md:group-hover:opacity-100',
+                  )}
+                  aria-label={
+                    item.showInGallery === false
+                      ? t('cms.mediaLibrary.showInGallery')
+                      : t('cms.mediaLibrary.hideFromGallery')
+                  }
+                >
+                  {item.showInGallery === false ? (
+                    <>
+                      <EyeOff className="size-3.5" />
+                      {t('cms.mediaLibrary.hiddenBadge')}
+                    </>
+                  ) : (
+                    <Eye className="size-3.5" />
+                  )}
+                </button>
+              ) : null}
+              {canManage ? (
+                <button
+                  type="button"
+                  onClick={() => void confirmDelete(item)}
+                  disabled={deleteMutation.isPending}
+                  className="absolute right-2 top-2 inline-flex size-8 items-center justify-center rounded-full bg-black/55 text-white opacity-100 backdrop-blur-sm transition-opacity hover:bg-rose-700 md:opacity-0 md:group-hover:opacity-100"
+                  aria-label={t('cms.mediaLibrary.delete')}
+                >
+                  <Trash2 className="size-3.5" />
+                </button>
+              ) : null}
             </div>
           ))}
         </div>
@@ -432,24 +544,6 @@ export function CmsShopPage() {
         </a>
         {t('cms.shopHub.bodyAfter')} <code className="text-xs">/shop</code>
       </CmsCard>
-    </div>
-  )
-}
-
-export function CmsSettingsPage() {
-  const { t } = useTranslation()
-  return (
-    <div>
-      <CmsPageHeader
-        title={t('cms.settings.title')}
-        description={t('cms.settings.description')}
-        badge={t('cms.settings.badge')}
-      />
-      <ComingSoon
-        icon={Settings}
-        title={t('cms.settings.soonTitle')}
-        blurb={t('cms.settings.soonBlurb')}
-      />
     </div>
   )
 }

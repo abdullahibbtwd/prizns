@@ -7,12 +7,17 @@ import type {
   SeriesFormValues,
 } from '@/lib/cms-types'
 
-export function listCmsAuthors(all: true): Promise<CmsAuthor[]>
+export function listCmsAuthors(
+  all: true,
+  opts?: { guest?: boolean },
+): Promise<CmsAuthor[]>
 export function listCmsAuthors(all?: false): Promise<CmsAuthorOption[]>
-export function listCmsAuthors(all = false) {
-  const qs = all ? '?all=1' : ''
-  if (all) return api.get<CmsAuthor[]>(`/cms/authors${qs}`)
-  return api.get<CmsAuthorOption[]>(`/cms/authors${qs}`)
+export function listCmsAuthors(all = false, opts?: { guest?: boolean }) {
+  if (all) {
+    const guest = opts?.guest === undefined ? '' : `&guest=${opts.guest}`
+    return api.get<CmsAuthor[]>(`/cms/authors?all=1${guest}`)
+  }
+  return api.get<CmsAuthorOption[]>('/cms/authors')
 }
 
 export function getCmsAuthor(id: string) {

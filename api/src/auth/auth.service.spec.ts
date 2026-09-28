@@ -251,6 +251,60 @@ describe('AuthService', () => {
     ).rejects.toMatchObject({ status: HttpStatus.TOO_MANY_REQUESTS });
   });
 
+  it('starts a 2-minute resend cooldown when the sign-in code is sent', async () => {
+    prisma.user.findUnique = jest
+      .fn()
+      .mockResolvedValue({ ...user, emailVerifiedAt: null });
+    redis.client.set = jest.fn().mockResolvedValue('OK');
+
+    const result = await service.sendEmailVerification(user.id, {
+      replaceExisting: true,
+      skipCooldown: true,
+      ip: '5.5.5.5',
+    });
+
+    expect(result).toMatchObject({ sent: true, retryAfterSeconds: 120 });
+    expect(redis.client.set).toHaveBeenCalledWith(
+      `email-verify-cooldown:${user.id}`,
+      '1',
+      'EX',
+      120,
+    );
+  });
+
+  it('refuses a new code until the cooldown ends and says how long to wait', async () => {
+    prisma.user.findUnique = jest
+      .fn()
+      .mockResolvedValue({ ...user, emailVerifiedAt: null });
+    redis.client.set = jest.fn().mockResolvedValue(null);
+    (redis.client as unknown as { ttl: jest.Mock }).ttl = jest
+      .fn()
+      .mockResolvedValue(95);
+
+    const error = await service
+      .sendEmailVerification(user.id, { replaceExisting: true, ip: '6.6.6.6' })
+      .catch((e: unknown) => e as { getStatus(): number; getResponse(): unknown });
+
+    expect(error.getStatus()).toBe(HttpStatus.TOO_MANY_REQUESTS);
+    expect(error.getResponse()).toMatchObject({ retryAfterSeconds: 95 });
+    expect(redis.client.set).toHaveBeenCalledWith(
+      `email-verify-cooldown:${user.id}`,
+      '1',
+      'EX',
+      120,
+      'NX',
+    );
+  });
+
+  it('reports the seconds left before another code can be sent', async () => {
+    (redis.client as unknown as { ttl: jest.Mock }).ttl = jest
+      .fn()
+      .mockResolvedValueOnce(42)
+      .mockResolvedValueOnce(-2);
+    expect(await service.verificationResendIn(user.id)).toBe(42);
+    expect(await service.verificationResendIn(user.id)).toBe(0);
+  });
+
   it('sends a welcome email when an account is created', async () => {
     const result = await service.sendAccountCreatedEmail(user.id);
     expect(result.sent).toBe(true);

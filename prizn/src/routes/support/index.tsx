@@ -20,6 +20,10 @@ import {
 } from '@/components/concept-3/contribute/shared'
 import { ApiError } from '@/lib/api'
 import { createDonationCheckout } from '@/lib/donations-api'
+import {
+  DEFAULT_DONATION_PRESETS,
+  useSiteSettings,
+} from '@/lib/site-settings-api'
 import { cn } from '@/lib/utils'
 
 const stats = [
@@ -28,24 +32,21 @@ const stats = [
   { value: '35', label: 'Contributors', labelBg: 'Сътрудници' },
 ]
 
-const tiers = [
+/** Copy for preset tiers, lowest amount first (amounts come from CMS Settings). */
+const tierCopy = [
   {
-    amount: '10',
     title: 'Buy us a coffee',
     titleBg: 'Кафе за екипа',
     text: 'Keeps a field notebook day warm.',
     textBg: 'Затопля един ден с теренна тетрадка.',
   },
   {
-    amount: '25',
     title: 'Support one interview',
     titleBg: 'Подкрепете едно интервю',
     text: 'Travel, tea, and careful listening.',
     textBg: 'Пътуване, чай и внимателно слушане.',
-    featured: true,
   },
   {
-    amount: '50',
     title: 'Help preserve a local tradition',
     titleBg: 'Помогнете да се съхрани традиция',
     text: 'Funds photos, transcription, and editing.',
@@ -63,7 +64,7 @@ const otherWays = [
     textBg: 'Споделете история от вашето село или занаят.',
   },
   {
-    to: '/#shop',
+    to: '/stories',
     icon: Share2,
     title: 'Share Our Stories',
     titleBg: 'Споделете нашите истории',
@@ -103,7 +104,16 @@ const faqs = [
 
 export default function SupportUsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const [amount, setAmount] = useState('25')
+  const { data: siteSettings } = useSiteSettings()
+  const presets = siteSettings?.donations.presets ?? DEFAULT_DONATION_PRESETS
+  const donationsEnabled = siteSettings?.donations.enabled ?? true
+  const tiers = presets.map((value, index) => ({
+    amount: String(value),
+    ...tierCopy[Math.min(index, tierCopy.length - 1)]!,
+  }))
+  const [pickedAmount, setAmount] = useState<string | null>(null)
+  const amount =
+    pickedAmount ?? String(presets[Math.floor((presets.length - 1) / 2)] ?? 10)
   const [custom, setCustom] = useState('')
   const [email, setEmail] = useState('')
   const [donated, setDonated] = useState(
@@ -297,7 +307,7 @@ export default function SupportUsPage() {
                           min="1"
                           value={custom}
                           onChange={(e) => setCustom(e.target.value)}
-                          placeholder="e.g. 100"
+                          placeholder={lang === 'bg' ? 'напр. 20' : 'e.g. 20'}
                           autoFocus
                         />
                       </div>
@@ -321,6 +331,7 @@ export default function SupportUsPage() {
                   <button
                     type="button"
                     disabled={
+                      !donationsEnabled ||
                       submitting ||
                       !selectedAmount ||
                       Number(selectedAmount) <= 0
@@ -337,6 +348,13 @@ export default function SupportUsPage() {
                         ? `Дарете ${selectedAmount || '—'} EUR`
                         : `Donate ${selectedAmount || '—'} EUR`}
                   </button>
+                  {!donationsEnabled ? (
+                    <p className="mt-4 font-sans text-sm font-light text-[#1A1A1A]/60">
+                      {lang === 'bg'
+                        ? 'Онлайн даренията стартират съвсем скоро. Благодарим ви за търпението!'
+                        : 'Online donations are opening very soon. Thank you for your patience!'}
+                    </p>
+                  ) : null}
                   {error ? (
                     <p className="mt-4 font-sans text-sm text-rose-700">{error}</p>
                   ) : null}

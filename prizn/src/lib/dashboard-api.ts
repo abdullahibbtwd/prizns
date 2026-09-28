@@ -7,6 +7,23 @@ export type DashboardChecklist = {
   publishedToday: number
   draftArticles: number
   scheduledArticles: number
+  /** Stories awaiting review, oldest first (moderators and super admins). */
+  reviewQueue?: Array<{
+    id: string
+    titleBg: string
+    titleEn: string | null
+    authorBg: string | null
+    authorEn: string | null
+    submittedAt: string
+  }>
+  /** The author's own stories sent back with a note. */
+  changesRequested?: Array<{
+    id: string
+    titleBg: string
+    titleEn: string | null
+    reviewNote: string | null
+    reviewNoteAt: string | null
+  }>
 }
 
 export type EditorialTodo = {

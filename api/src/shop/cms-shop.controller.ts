@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { ShopOrderStatus } from '@prisma/client';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { STAFF_ROLES } from '../auth/role-access';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { CreateProductDto, UpdateProductDto } from './dto/shop.dto';
@@ -21,13 +22,13 @@ export class CmsShopController {
   constructor(private readonly shop: ShopService) {}
 
   @Get('products')
-  @Roles('ADMIN', 'EDITOR')
+  @Roles(...STAFF_ROLES)
   listProducts() {
     return this.shop.listCmsProducts();
   }
 
   @Get('products/:id')
-  @Roles('ADMIN', 'EDITOR')
+  @Roles(...STAFF_ROLES)
   getProduct(@Param('id') id: string) {
     return this.shop.getCmsProduct(id);
   }
@@ -45,7 +46,7 @@ export class CmsShopController {
   }
 
   @Get('orders')
-  @Roles('ADMIN', 'EDITOR')
+  @Roles(...STAFF_ROLES)
   listOrders(
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
@@ -65,7 +66,7 @@ export class CmsShopController {
   }
 
   @Get('orders/:id')
-  @Roles('ADMIN', 'EDITOR')
+  @Roles(...STAFF_ROLES)
   getOrder(@Param('id') id: string) {
     return this.shop.getCmsOrder(id);
   }

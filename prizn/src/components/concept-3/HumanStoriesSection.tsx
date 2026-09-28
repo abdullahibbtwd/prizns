@@ -85,10 +85,10 @@ export function HumanStoriesSection({ lang }: HumanStoriesSectionProps) {
                         <EpisodeBadge lang={lang} series={story.series} />
                       ) : null}
                     </div>
-                    {story.location?.trim() ? (
+                    {(lang === 'bg' ? story.locationBg : story.location)?.trim() ? (
                       <div className="absolute bottom-4 left-4 flex items-center gap-1.5 font-sans text-[11px] text-white/85">
                         <MapPin className="size-3" />
-                        {story.location}
+                        {lang === 'bg' ? story.locationBg : story.location}
                       </div>
                     ) : null}
                   </div>
@@ -97,10 +97,10 @@ export function HumanStoriesSection({ lang }: HumanStoriesSectionProps) {
                     {lang === 'bg' ? story.titleBg : story.title}
                   </h3>
                   <p className="mt-2 line-clamp-2 font-sans text-sm font-light leading-relaxed text-[#1A1A1A]/65">
-                    {story.excerpt}
+                    {lang === 'bg' ? story.excerptBg : story.excerpt}
                   </p>
                   <div className="mt-4 flex items-center justify-between text-[11px] uppercase tracking-[0.18em] text-[#1A1A1A]/50">
-                    <span>{story.author}</span>
+                    <span>{lang === 'bg' ? story.authorBg : story.author}</span>
                     <span className="inline-flex items-center gap-1">
                       <Clock className="size-3" />
                       {lang === 'bg' ? story.readTimeBg : story.readTime}

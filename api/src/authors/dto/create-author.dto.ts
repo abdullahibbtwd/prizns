@@ -44,6 +44,11 @@ export class CreateAuthorDto {
   @IsBoolean()
   showOnAuthors?: boolean;
 
+  /** Guest contributor badge; no login required. */
+  @IsOptional()
+  @IsBoolean()
+  isGuest?: boolean;
+
   @IsOptional()
   @IsString()
   userId?: string;

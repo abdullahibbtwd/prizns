@@ -20,6 +20,7 @@ import {
   StatusPill,
 } from '@/cms/components/CmsUI'
 import { JournalSelect } from '@/components/ui/JournalSelect'
+import { CmsField, CmsInput } from '@/cms/components/CmsFields'
 import { useCmsConfirm } from '@/cms/components/CmsConfirmDialog'
 import { deleteCmsArticle, listCmsArticles, listCmsAuthors } from '@/lib/articles-api'
 import { listCmsCategories } from '@/lib/categories-api'
@@ -31,6 +32,8 @@ import { formatCmsListDate } from '@/lib/format-date'
 import { pickLang } from '@/lib/pick-lang'
 import { getSectionLabel } from '@/lib/section-i18n'
 import { ApiError } from '@/lib/api'
+import { useAuth } from '@/lib/auth'
+import { canManageAllStories, isCmsSuperAdmin } from '@/lib/cms-roles'
 
 const filters: Array<'all' | ArticleStatus | 'sponsored'> = [
   'all',
@@ -47,6 +50,19 @@ function storyCategoryLabel(story: CmsArticle, lang: 'bg' | 'en') {
   return story.categoryBg || getSectionLabel(story.section, lang)
 }
 
+function ChangesRequestedPill({ story }: { story: CmsArticle }) {
+  const { t } = useTranslation()
+  if (story.status !== 'DRAFT' || !story.reviewNote) return null
+  return (
+    <span
+      title={story.reviewNote}
+      className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-amber-800"
+    >
+      {t('cms.stories.changesRequested')}
+    </span>
+  )
+}
+
 const PAGE_SIZE_OPTIONS = [10, 20, 50] as const
 const BASE_PATH = '/cms/stories'
 const ALL_CATEGORIES = ''
@@ -61,6 +77,13 @@ function parseStatusFilter(
   return 'all'
 }
 
+const SORTS = ['published', 'updated', 'created', 'title'] as const
+type StorySort = (typeof SORTS)[number]
+
+function parseSort(value: string | null): StorySort {
+  return SORTS.includes(value as StorySort) ? (value as StorySort) : 'published'
+}
+
 export default function CmsStoriesPage() {
   const { t } = useTranslation()
   const { lang } = useJournalLang()
@@ -69,10 +92,16 @@ export default function CmsStoriesPage() {
   const [searchParams, setSearchParams] = useSearchParams()
 
   const filter = parseStatusFilter(searchParams.get('status'))
+  const sort = parseSort(searchParams.get('sort'))
+  const editedFrom = searchParams.get('editedFrom') ?? ''
+  const editedTo = searchParams.get('editedTo') ?? ''
   const debouncedQuery = searchParams.get('q') ?? ''
   const page = Math.max(1, Number(searchParams.get('page') || 1) || 1)
   const [categorySlug, setCategorySlug] = useState(ALL_CATEGORIES)
   const [authorId, setAuthorId] = useState(ALL_AUTHORS)
+  const { user } = useAuth()
+  const canDelete = isCmsSuperAdmin(user)
+  const showAuthorFilter = canManageAllStories(user)
   const [queryInput, setQueryInput] = useState(debouncedQuery)
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid')
   const [pageSize, setPageSize] =
@@ -138,6 +167,9 @@ export default function CmsStoriesPage() {
       categorySlug,
       authorId,
       debouncedQuery,
+      sort,
+      editedFrom,
+      editedTo,
     ],
     queryFn: () =>
       listCmsArticles({
@@ -146,6 +178,9 @@ export default function CmsStoriesPage() {
         q: debouncedQuery || undefined,
         categorySlug: categorySlug || undefined,
         authorId: authorId || undefined,
+        sort,
+        editedFrom: editedFrom || undefined,
+        editedTo: editedTo || undefined,
         status:
           filter !== 'all' && filter !== 'sponsored'
             ? (filter as ArticleStatus)
@@ -170,7 +205,9 @@ export default function CmsStoriesPage() {
       filter !== 'all' ||
       categorySlug ||
       authorId ||
-      debouncedQuery
+      debouncedQuery ||
+      editedFrom ||
+      editedTo
     ) {
       return
     }
@@ -186,6 +223,8 @@ export default function CmsStoriesPage() {
     categorySlug,
     authorId,
     debouncedQuery,
+    editedFrom,
+    editedTo,
     articlesQuery.data,
     queryClient,
   ])
@@ -207,6 +246,15 @@ export default function CmsStoriesPage() {
       ...categorySelectOptions(categoriesQuery.data ?? [], lang, 'slug'),
     ],
     [categoriesQuery.data, lang, t],
+  )
+
+  const sortOptions = useMemo(
+    () =>
+      SORTS.map((value) => ({
+        value,
+        label: t(`cms.stories.sort_${value}`),
+      })),
+    [t],
   )
 
   const authorOptions = useMemo(
@@ -334,7 +382,17 @@ export default function CmsStoriesPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <JournalSelect
+            name="cms-stories-sort"
+            variant="boxed"
+            label={t('cms.stories.sortLabel')}
+            options={sortOptions}
+            value={sort}
+            onChange={(value) =>
+              patchParams({ sort: value === 'published' ? null : value, page: null })
+            }
+          />
           <JournalSelect
             name="cms-stories-category"
             variant="boxed"
@@ -344,15 +402,35 @@ export default function CmsStoriesPage() {
             value={categorySlug}
             onChange={(value) => setCategorySlug(value)}
           />
-          <JournalSelect
-            name="cms-stories-author"
-            variant="boxed"
-            label={t('cms.stories.filterAuthor')}
-            placeholder={t('cms.stories.filterAuthorAll')}
-            options={authorOptions}
-            value={authorId}
-            onChange={setAuthorId}
-          />
+          {showAuthorFilter && (
+            <JournalSelect
+              name="cms-stories-author"
+              variant="boxed"
+              label={t('cms.stories.filterAuthor')}
+              placeholder={t('cms.stories.filterAuthorAll')}
+              options={authorOptions}
+              value={authorId}
+              onChange={setAuthorId}
+            />
+          )}
+          <CmsField label={t('cms.stories.editedFrom')} htmlFor="cms-stories-edited-from">
+            <CmsInput
+              id="cms-stories-edited-from"
+              type="date"
+              value={editedFrom}
+              max={editedTo || undefined}
+              onChange={(e) => patchParams({ editedFrom: e.target.value || null, page: null })}
+            />
+          </CmsField>
+          <CmsField label={t('cms.stories.editedTo')} htmlFor="cms-stories-edited-to">
+            <CmsInput
+              id="cms-stories-edited-to"
+              type="date"
+              value={editedTo}
+              min={editedFrom || undefined}
+              onChange={(e) => patchParams({ editedTo: e.target.value || null, page: null })}
+            />
+          </CmsField>
         </div>
       </div>
 
@@ -427,6 +505,7 @@ export default function CmsStoriesPage() {
               <div className="space-y-3 p-4">
                 <div className="flex flex-wrap gap-2">
                   <StatusPill status={story.status} />
+                  <ChangesRequestedPill story={story} />
                   <StatusPill status={story.translationStatus} />
                   {(story.relateCount ?? 0) > 0 ? (
                     <span className="rounded-full bg-[#0C2686]/8 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-[#0C2686]">
@@ -466,17 +545,19 @@ export default function CmsStoriesPage() {
                       <Eye className="size-3.5" /> {t('cms.stories.view')}
                     </a>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => confirmDelete(story)}
-                    disabled={deleteMutation.isPending}
-                    className="inline-flex items-center gap-1 text-xs font-semibold text-rose-700 disabled:opacity-50"
-                  >
-                    <Trash2 className="size-3.5" />
-                    {deleteMutation.isPending
-                      ? t('cms.stories.deleting')
-                      : t('cms.stories.delete')}
-                  </button>
+                  {canDelete && (
+                    <button
+                      type="button"
+                      onClick={() => confirmDelete(story)}
+                      disabled={deleteMutation.isPending}
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-rose-700 disabled:opacity-50"
+                    >
+                      <Trash2 className="size-3.5" />
+                      {deleteMutation.isPending
+                        ? t('cms.stories.deleting')
+                        : t('cms.stories.delete')}
+                    </button>
+                  )}
                 </div>
               </div>
             </CmsCard>
@@ -507,7 +588,10 @@ export default function CmsStoriesPage() {
                     {storyCategoryLabel(story, lang)}
                   </td>
                   <td className="px-4 py-3">
-                    <StatusPill status={story.status} />
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <StatusPill status={story.status} />
+                      <ChangesRequestedPill story={story} />
+                    </div>
                   </td>
                   <td className="px-4 py-3">
                     <StatusPill status={story.translationStatus} />
@@ -523,14 +607,16 @@ export default function CmsStoriesPage() {
                       >
                         {t('cms.stories.edit')}
                       </Link>
-                      <button
-                        type="button"
-                        onClick={() => confirmDelete(story)}
-                        disabled={deleteMutation.isPending}
-                        className="font-semibold text-rose-700 disabled:opacity-50"
-                      >
-                        {t('cms.stories.delete')}
-                      </button>
+                      {canDelete && (
+                        <button
+                          type="button"
+                          onClick={() => confirmDelete(story)}
+                          disabled={deleteMutation.isPending}
+                          className="font-semibold text-rose-700 disabled:opacity-50"
+                        >
+                          {t('cms.stories.delete')}
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

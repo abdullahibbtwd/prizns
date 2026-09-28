@@ -39,6 +39,25 @@ export class JobsService implements OnModuleInit {
     )
     await this.ensureDailyDigestScheduler()
     await this.ensurePublishScheduler()
+    await this.ensureTranslateSweepScheduler()
+  }
+
+  private async ensureTranslateSweepScheduler() {
+    try {
+      await this.translateQueue.upsertJobScheduler(
+        'translate-sweep',
+        { pattern: '*/5 * * * *' },
+        {
+          name: 'translate:sweep',
+          data: { type: 'sweep', id: '' } satisfies TranslateJobData,
+          opts: { attempts: 1, removeOnComplete: 20, removeOnFail: 50 },
+        },
+      )
+      this.logger.log('Translation sweep: every 5 minutes')
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error)
+      this.logger.error(`Could not register translation sweep: ${message}`)
+    }
   }
 
   private async ensureDailyDigestScheduler() {

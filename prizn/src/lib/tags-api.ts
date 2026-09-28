@@ -51,7 +51,13 @@ export function createCmsTag(body: {
 
 export function updateCmsTag(
   id: string,
-  body: Partial<{ kind: TagKind; nameBg: string; lat: number; lng: number }>,
+  body: Partial<{
+    kind: TagKind
+    nameBg: string
+    nameEn: string
+    lat: number
+    lng: number
+  }>,
 ) {
   return api.patch<CmsTag>(`/cms/tags/${id}`, body)
 }

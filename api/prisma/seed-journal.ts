@@ -860,6 +860,7 @@ async function upsertMedia(
       originalName: key.split('/').pop() ?? key,
       creditBg: 'Архив ПРИЗНИ',
       creditEn: 'PRIZNI Archive',
+      showInGallery: kind === MediaKind.IMAGE,
     },
   });
 }

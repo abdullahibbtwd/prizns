@@ -1,14 +1,18 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { canManageAllStories, canPublishStories } from '../auth/role-access';
+import type { AuthUserPayload } from '../auth/auth.types';
 import {
   Article,
   ArticleStatus,
   Author,
   MediaAsset,
+  NarrationStatus,
   Prisma,
   Tag,
   TagKind,
@@ -16,6 +20,11 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { publicBodyWithInlineImages } from './article-body.util';
+import {
+  cmsArticleOrderBy,
+  parseDayBoundary,
+  type CmsArticleSort,
+} from './cms-list.util';
 import type {
   PublicArticleDto,
   PublicArticleListDto,
@@ -43,6 +52,12 @@ import { BadgesService } from '../badges/badges.service';
 import { DigestService } from '../digest/digest.service';
 import { AiService } from '../ai/ai.service';
 import { MediaService } from '../media/media.service';
+import { MailService } from '../mail/mail.service';
+import { SettingsService } from '../settings/settings.service';
+import {
+  changesRequestedEmail,
+  reviewSubmittedAdminAlert,
+} from './review-emails';
 import { sectionFromCategorySlugs } from '../categories/category-section';
 
 type GalleryMedia = {
@@ -90,6 +105,14 @@ type ArticleWithRelations = Article & {
   articleCategories?: ArticleCategoryRel[];
 };
 
+/** Statuses a writer without publishing rights may save. */
+const WRITER_STATUSES: ReadonlySet<ArticleStatus> = new Set([
+  ArticleStatus.DRAFT,
+  ArticleStatus.REVIEW,
+]);
+
+type StoryActor = Pick<AuthUserPayload, 'id' | 'role' | 'roles'>;
+
 @Injectable()
 export class ArticlesService {
   private readonly logger = new Logger(ArticlesService.name);
@@ -101,7 +124,56 @@ export class ArticlesService {
     private readonly digest: DigestService,
     private readonly ai: AiService,
     private readonly media: MediaService,
+    private readonly mail: MailService,
+    private readonly settings: SettingsService,
   ) {}
+
+  /**
+   * Entering review stamps the time and clears the last send-back note;
+   * publishing clears it too.
+   */
+  private reviewUpdate(
+    next: ArticleStatus | undefined,
+    current: ArticleStatus | null,
+  ) {
+    if (next === undefined || next === current) return {};
+    if (next === ArticleStatus.REVIEW) {
+      return {
+        submittedForReviewAt: new Date(),
+        reviewNote: null,
+        reviewNoteAt: null,
+      };
+    }
+    if (next === ArticleStatus.PUBLISHED || next === ArticleStatus.SCHEDULED) {
+      return { reviewNote: null, reviewNoteAt: null };
+    }
+    return {};
+  }
+
+  /** Non-blocking alert to the editorial inbox that a story awaits review. */
+  private notifyReviewSubmitted(article: {
+    id: string;
+    titleBg: string;
+    authorBg?: string | null;
+  }) {
+    if (!this.settings.notifications().adminOnSubmission) return;
+    void this.mail
+      .notifyAdmin(
+        reviewSubmittedAdminAlert({
+          articleId: article.id,
+          title: article.titleBg,
+          authorName: article.authorBg || null,
+          siteUrl: this.settings.siteUrl(),
+        }),
+      )
+      .catch((error: unknown) => {
+        this.logger.error(
+          `Review alert failed for ${article.id}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      });
+  }
 
   /** Non-blocking Episode of the Day when a published series story lands. */
   private queueEpisodeDigest(articleId: string, status: string) {
@@ -161,6 +233,25 @@ export class ArticlesService {
     if (typeof value !== 'string') return null;
     const trimmed = value.trim();
     return trimmed || null;
+  }
+
+  /**
+   * A manual upload or removal overrides TTS: the narration status resets to
+   * IDLE so a job still running cannot write its audio over the editor's choice.
+   */
+  private audioUpdate(
+    dto: UpdateArticleDto,
+    existing: Pick<Article, 'audioMediaId'>,
+  ): Prisma.ArticleUncheckedUpdateInput {
+    if (dto.audioMediaId === undefined) return {};
+    const next = dto.audioMediaId || null;
+    if (next === existing.audioMediaId) return {};
+    return {
+      audioMediaId: next,
+      narrationStatus: NarrationStatus.IDLE,
+      narrationError: null,
+      ...(next === null && !dto.audioDuration ? { audioDuration: null } : {}),
+    };
   }
 
   private assertPublishable(input: {
@@ -661,6 +752,7 @@ export class ArticlesService {
       authorBg: article.author?.nameBg ?? '',
       authorSlug: article.author?.slug,
       authorImage: article.author?.imageUrl?.trim() || undefined,
+      authorIsGuest: article.author?.isGuest || undefined,
       speaker: article.speakerEn ?? article.speakerBg ?? undefined,
       speakerBg: article.speakerBg ?? undefined,
       date: isoDate || article.dateEn || article.dateBg,
@@ -745,6 +837,7 @@ export class ArticlesService {
       authorBg: full.authorBg,
       authorSlug: full.authorSlug,
       authorImage: full.authorImage,
+      authorIsGuest: full.authorIsGuest,
       speaker: full.speaker,
       speakerBg: full.speakerBg,
       date: full.date,
@@ -788,6 +881,9 @@ export class ArticlesService {
       sourceLang: article.sourceLang,
       narrationStatus: article.narrationStatus,
       narrationError: article.narrationError,
+      reviewNote: article.reviewNote,
+      reviewNoteAt: article.reviewNoteAt,
+      submittedForReviewAt: article.submittedForReviewAt,
       createdAt: article.createdAt,
       updatedAt: article.updatedAt,
       series: membership
@@ -1182,12 +1278,23 @@ export class ArticlesService {
     q?: string;
     sponsored?: boolean;
     categorySlug?: string;
+    sort?: CmsArticleSort;
+    editedFrom?: string;
+    editedTo?: string;
     page?: number;
     pageSize?: number;
   }) {
     const page = Math.max(1, Number(filters.page) || 1);
     const pageSize = Math.min(100, Math.max(1, Number(filters.pageSize) || 9));
     const where: Prisma.ArticleWhereInput = {};
+    const editedFrom = parseDayBoundary(filters.editedFrom, 'start');
+    const editedTo = parseDayBoundary(filters.editedTo, 'end');
+    if (editedFrom || editedTo) {
+      where.updatedAt = {
+        ...(editedFrom ? { gte: editedFrom } : {}),
+        ...(editedTo ? { lte: editedTo } : {}),
+      };
+    }
     if (filters.section) where.section = toPrismaSection(filters.section);
     if (filters.status) where.status = filters.status;
     if (filters.authorId) where.authorId = filters.authorId;
@@ -1209,7 +1316,7 @@ export class ArticlesService {
       this.prisma.article.findMany({
         where,
         include: this.include,
-        orderBy: { updatedAt: 'desc' },
+        orderBy: cmsArticleOrderBy(filters.sort),
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),
@@ -1229,6 +1336,96 @@ export class ArticlesService {
     };
   }
 
+  /**
+   * `undefined` = the caller may manage every story. Otherwise the caller's own
+   * author id ('' when their account is not linked to an author profile).
+   */
+  async storyScope(user: StoryActor): Promise<string | undefined> {
+    if (canManageAllStories(user)) return undefined;
+    const author = await this.prisma.author.findUnique({
+      where: { userId: user.id },
+      select: { id: true },
+    });
+    return author?.id ?? '';
+  }
+
+  async assertCanViewStory(id: string, user: StoryActor): Promise<void> {
+    const scope = await this.storyScope(user);
+    if (scope === undefined) return;
+    const row = await this.prisma.article.findUnique({
+      where: { id },
+      select: { authorId: true },
+    });
+    if (!row) throw new NotFoundException('Article not found');
+    if (!scope || row.authorId !== scope) {
+      throw new ForbiddenException('You can only edit your own stories');
+    }
+  }
+
+  /**
+   * Writers change only their own drafts / stories in review; once a story is
+   * live or scheduled only a moderator or super admin may touch it.
+   */
+  async assertCanChangeStory(
+    id: string,
+    user: StoryActor,
+    nextStatus?: ArticleStatus,
+  ): Promise<void> {
+    if (canPublishStories(user)) return;
+    const scope = await this.storyScope(user);
+    const row = await this.prisma.article.findUnique({
+      where: { id },
+      select: { authorId: true, status: true },
+    });
+    if (!row) throw new NotFoundException('Article not found');
+    if (scope !== undefined) {
+      if (!scope || row.authorId !== scope) {
+        throw new ForbiddenException('You can only edit your own stories');
+      }
+      if (!WRITER_STATUSES.has(row.status)) {
+        throw new ForbiddenException(
+          'This story is live or scheduled — ask a moderator to change it.',
+        );
+      }
+    }
+    this.assertCanSetStatus(user, nextStatus, row.status);
+  }
+
+  assertCanSetStatus(
+    user: StoryActor,
+    nextStatus: ArticleStatus | undefined,
+    currentStatus?: ArticleStatus,
+  ): void {
+    if (canPublishStories(user)) return;
+    if (nextStatus === undefined || nextStatus === currentStatus) return;
+    if (
+      !WRITER_STATUSES.has(nextStatus) ||
+      (currentStatus !== undefined && !WRITER_STATUSES.has(currentStatus))
+    ) {
+      throw new ForbiddenException(
+        'Only a moderator can publish, schedule or archive — submit the story for review instead.',
+      );
+    }
+  }
+
+  /** Authors always write as themselves; staff may pick any author. */
+  async authorIdForWrite(
+    user: StoryActor,
+    requested: string | undefined,
+  ): Promise<string | undefined> {
+    const scope = await this.storyScope(user);
+    if (scope === undefined) return requested;
+    if (!scope) {
+      throw new ForbiddenException(
+        'Your account is not linked to an author profile yet — ask a moderator to link it.',
+      );
+    }
+    if (requested && requested !== scope) {
+      throw new ForbiddenException('You can only write stories as yourself');
+    }
+    return scope;
+  }
+
   async getCmsById(id: string) {
     const row = await this.prisma.article.findUnique({
       where: { id },
@@ -1239,7 +1436,7 @@ export class ArticlesService {
     return { ...this.toCmsDto(row), relateCount: relate.relateCount };
   }
 
-  async create(dto: CreateArticleDto) {
+  async create(dto: CreateArticleDto, opts: { notifyOnSubmit?: boolean } = {}) {
     const fallbackSection = toPrismaSection(dto.section);
     const section = await this.resolveSectionFromCategoryIds(
       dto.categoryIds,
@@ -1296,9 +1493,10 @@ export class ArticlesService {
         seoDescriptionBg: this.optionalText(dto.seoDescriptionBg),
         authorId: dto.authorId,
         heroMediaId,
-        audioMediaId: dto.audioMediaId,
+        audioMediaId: dto.audioMediaId || null,
         videoMediaId: dto.videoMediaId || null,
         translationStatus: TranslationStatus.PENDING,
+        ...this.reviewUpdate(dto.status, null),
       },
       include: this.include,
     });
@@ -1326,10 +1524,18 @@ export class ArticlesService {
       dto.status ?? ArticleStatus.DRAFT,
     );
     this.queueArticleEmbed(row.id, dto.status ?? ArticleStatus.DRAFT);
-    return this.getCmsById(row.id);
+    const created = await this.getCmsById(row.id);
+    if (opts.notifyOnSubmit && dto.status === ArticleStatus.REVIEW) {
+      this.notifyReviewSubmitted(created);
+    }
+    return created;
   }
 
-  async update(id: string, dto: UpdateArticleDto) {
+  async update(
+    id: string,
+    dto: UpdateArticleDto,
+    opts: { notifyOnSubmit?: boolean } = {},
+  ) {
     const existing = await this.prisma.article.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Article not found');
 
@@ -1473,7 +1679,8 @@ export class ArticlesService {
               heroMediaId:
                 dto.heroMediaId === '' ? null : dto.heroMediaId,
             }),
-        audioMediaId: dto.audioMediaId,
+        ...this.audioUpdate(dto, existing),
+        ...this.reviewUpdate(dto.status, existing.status),
         ...(dto.videoMediaId !== undefined
           ? { videoMediaId: dto.videoMediaId || null }
           : {}),
@@ -1524,7 +1731,69 @@ export class ArticlesService {
     }
     this.queueEpisodeDigest(id, result.status);
     this.queueArticleEmbed(id, result.status);
+    if (
+      opts.notifyOnSubmit &&
+      result.status === ArticleStatus.REVIEW &&
+      existing.status !== ArticleStatus.REVIEW
+    ) {
+      this.notifyReviewSubmitted(result);
+    }
     return result;
+  }
+
+  /** Moderator sends a story in review back to its author as a draft, with a note. */
+  async requestChanges(id: string, note: string) {
+    const text = note.trim();
+    if (!text) throw new BadRequestException('Add a note for the author');
+    const row = await this.prisma.article.findUnique({
+      where: { id },
+      select: {
+        status: true,
+        titleBg: true,
+        author: {
+          select: {
+            nameBg: true,
+            user: { select: { email: true, name: true, isActive: true } },
+          },
+        },
+      },
+    });
+    if (!row) throw new NotFoundException('Article not found');
+    if (row.status !== ArticleStatus.REVIEW) {
+      throw new BadRequestException('Only stories in review can be sent back');
+    }
+    await this.prisma.article.update({
+      where: { id },
+      data: {
+        status: ArticleStatus.DRAFT,
+        reviewNote: text,
+        reviewNoteAt: new Date(),
+      },
+    });
+
+    const recipient = row.author?.user;
+    if (recipient?.isActive && recipient.email && this.mail.isConfigured()) {
+      void this.mail
+        .send({
+          to: recipient.email,
+          ...changesRequestedEmail({
+            articleId: id,
+            title: row.titleBg,
+            recipientName:
+              recipient.name?.trim() || row.author?.nameBg || recipient.email,
+            note: text,
+            siteUrl: this.settings.siteUrl(),
+          }),
+        })
+        .catch((error: unknown) => {
+          this.logger.error(
+            `Changes-requested email failed for ${id}: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          );
+        });
+    }
+    return this.getCmsById(id);
   }
 
   async remove(id: string) {

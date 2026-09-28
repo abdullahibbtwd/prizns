@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common'
 import { Role } from '@prisma/client'
 import { Roles } from '../auth/decorators/roles.decorator'
+import { STAFF_ROLES } from '../auth/role-access'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { RolesGuard } from '../auth/guards/roles.guard'
 import { BadgesService } from './badges.service'
@@ -17,7 +18,7 @@ import { AwardBadgeDto } from './dto/award-badge.dto'
 
 @Controller('cms/badges')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.ADMIN, Role.EDITOR)
+@Roles(...STAFF_ROLES)
 export class BadgesCmsController {
   constructor(private readonly badges: BadgesService) {}
 

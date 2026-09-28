@@ -102,8 +102,16 @@ export class TagsService {
     return this.toDto(row);
   }
 
+  private async tagNames(nameBg: string, kind: TagKind, nameEn?: string) {
+    const names = await this.translation.bilingualFromSingle(nameBg, {
+      place: kind === TagKind.LOCATION,
+    });
+    const manualEn = nameEn?.trim();
+    return manualEn ? { ...names, en: manualEn } : names;
+  }
+
   async create(dto: CreateTagDto) {
-    const names = await this.translation.bilingualFromSingle(dto.nameBg);
+    const names = await this.tagNames(dto.nameBg, dto.kind, dto.nameEn);
     const slug = await ensureUniqueSlug(names.bg || dto.nameBg, async (candidate) => {
       const found = await this.prisma.tag.findUnique({
         where: { kind_slug: { kind: dto.kind, slug: candidate } },
@@ -141,7 +149,7 @@ export class TagsService {
     let nameEn = existing.nameEn;
 
     if (nameChanged && dto.nameBg) {
-      const names = await this.translation.bilingualFromSingle(dto.nameBg);
+      const names = await this.tagNames(dto.nameBg, kind, dto.nameEn);
       nameBg = names.bg || dto.nameBg.trim();
       nameEn = names.en || null;
     } else if (dto.nameEn !== undefined) {

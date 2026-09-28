@@ -1,10 +1,14 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { DonationStatus } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { STAFF_ROLES } from '../auth/role-access';
 import { DonationsService } from './donations.service';
 
 @Controller('cms/donations')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(...STAFF_ROLES)
 export class DonationsController {
   constructor(private readonly donations: DonationsService) {}
 

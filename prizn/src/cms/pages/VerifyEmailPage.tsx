@@ -1,18 +1,65 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { Clock } from 'lucide-react'
 import { useAuth } from '@/lib/auth'
 import { ApiError } from '@/lib/api'
 
+/** Matches the API's resend cooldown. */
+const RESEND_COOLDOWN_SECONDS = 120
+
+function formatWait(seconds: number) {
+  const m = Math.floor(seconds / 60)
+  const s = seconds % 60
+  return `${m}:${String(s).padStart(2, '0')}`
+}
+
 export default function CmsVerifyEmailPage() {
   const { t } = useTranslation()
-  const { user, loading, verifyEmail, resendVerification, logout } = useAuth()
+  const {
+    user,
+    loading,
+    verifyEmail,
+    resendVerification,
+    verificationResendIn,
+    logout,
+  } = useAuth()
   const navigate = useNavigate()
   const [code, setCode] = useState('')
   const [formError, setFormError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [resending, setResending] = useState(false)
+  const [resendAt, setResendAt] = useState(0)
+  const [now, setNow] = useState(() => Date.now())
+  const waitSeconds = Math.max(0, Math.ceil((resendAt - now) / 1000))
+  const needsVerification = Boolean(user) && user?.emailVerified === false
+
+  const startCooldown = (seconds: number) => {
+    const at = Date.now()
+    setNow(at)
+    setResendAt(at + seconds * 1000)
+  }
+
+  useEffect(() => {
+    if (!needsVerification) return
+    let active = true
+    verificationResendIn()
+      .then((seconds) => {
+        if (active) startCooldown(seconds)
+      })
+      .catch(() => undefined)
+    return () => {
+      active = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per verification visit
+  }, [needsVerification])
+
+  useEffect(() => {
+    if (waitSeconds <= 0) return
+    const timer = window.setTimeout(() => setNow(Date.now()), 1000)
+    return () => window.clearTimeout(timer)
+  }, [waitSeconds, now])
 
   if (loading) {
     return (
@@ -57,9 +104,13 @@ export default function CmsVerifyEmailPage() {
     setInfo(null)
     setResending(true)
     try {
-      await resendVerification()
+      startCooldown(await resendVerification())
       setInfo(t('cms.verify.resent'))
     } catch (error) {
+      if (error instanceof ApiError && error.retryAfterSeconds) {
+        startCooldown(error.retryAfterSeconds)
+        return
+      }
       setFormError(
         error instanceof ApiError ? error.message : t('cms.verify.resendFailed'),
       )
@@ -119,14 +170,44 @@ export default function CmsVerifyEmailPage() {
           </button>
         </form>
 
+        {waitSeconds > 0 ? (
+          <div
+            role="timer"
+            aria-live="polite"
+            className="mt-6 border border-[#E8E4DC] bg-[#FAF8F3] px-4 py-3"
+          >
+            <p className="flex items-center gap-2 text-sm text-stone-700">
+              <Clock className="size-4 shrink-0 text-[#0C2686]" />
+              <span>
+                {t('cms.verify.waitToResend')}{' '}
+                <span className="font-semibold tabular-nums text-[#0C2686]">
+                  {formatWait(waitSeconds)}
+                </span>
+              </span>
+            </p>
+            <div className="mt-2 h-1 overflow-hidden bg-[#E8E4DC]">
+              <div
+                className="h-full bg-[#0C2686] transition-[width] duration-1000 ease-linear"
+                style={{
+                  width: `${Math.min(100, (waitSeconds / RESEND_COOLDOWN_SECONDS) * 100)}%`,
+                }}
+              />
+            </div>
+          </div>
+        ) : null}
+
         <div className="mt-4 flex items-center justify-between text-sm">
           <button
             type="button"
             onClick={() => void onResend()}
-            disabled={resending}
-            className="font-semibold text-[#0C2686] hover:underline disabled:opacity-60"
+            disabled={resending || waitSeconds > 0}
+            className="font-semibold text-[#0C2686] hover:underline disabled:cursor-not-allowed disabled:no-underline disabled:opacity-60"
           >
-            {resending ? t('cms.verify.submitting') : t('cms.verify.resend')}
+            {resending
+              ? t('cms.verify.submitting')
+              : waitSeconds > 0
+                ? t('cms.verify.resendIn', { time: formatWait(waitSeconds) })
+                : t('cms.verify.resend')}
           </button>
           <button
             type="button"

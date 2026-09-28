@@ -128,84 +128,183 @@ describe('TranslationService', () => {
     expect(prisma.category.update).toHaveBeenCalled();
   });
 
-  it('processes article translation end-to-end', async () => {
-    const article = buildArticleRow({
-      categoryBg: 'Категория',
-      titleBg: 'Заглавие',
-      subtitleBg: 'Подзаглавие',
-      body: [{ type: 'paragraph', text: 'Текст' }],
-    });
-    prisma.article.findUniqueOrThrow = jest.fn().mockResolvedValue(article);
-    prisma.article.findUnique = jest.fn().mockResolvedValue({
-      translationStatus: TranslationStatus.RUNNING,
-    });
-    (translate as jest.Mock).mockResolvedValue({
-      k0: { text: 'Category' },
-      k1: { text: 'Title' },
-      k2: { text: 'Subtitle' },
-      k3: { text: '' },
-      k4: { text: '' },
-      k5: { text: '' },
-      k6: { text: '' },
-      k7: { text: 'End' },
-      k8: { text: '' },
-      k9: { text: '' },
-      k10: { text: '' },
-      k11: { text: '' },
-      k12: { text: 'Body text' },
+  describe('processing', () => {
+    const DICT: Record<string, string> = {
+      Категория: 'Category',
+      Заглавие: 'Title',
+      'Монтана е страхотна': 'Montana is great',
+      Край: 'The End',
+      Текст: 'Text',
+    };
+    const updatedAt = new Date('2026-09-01T10:00:00.000Z');
+
+    beforeEach(() => {
+      (translate as jest.Mock).mockImplementation(
+        async (payload: Record<string, string>) =>
+          Object.fromEntries(
+            Object.entries(payload).map(([key, text]) => [
+              key,
+              { text: DICT[text] ?? text },
+            ]),
+          ),
+      );
+      prisma.article.updateMany = jest.fn().mockResolvedValue({ count: 1 });
     });
 
-    const promise = service.processArticle('art-1');
-    await jest.runAllTimersAsync();
-    await promise;
+    function givenArticle(overrides: Record<string, unknown>) {
+      const article = buildArticleRow({ updatedAt, ...overrides });
+      prisma.article.findUniqueOrThrow = jest.fn().mockResolvedValue(article);
+      return article;
+    }
 
-    expect(prisma.article.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
+    async function run(id = 'art-1') {
+      const promise = service.processArticle(id);
+      await jest.runAllTimersAsync();
+      await promise;
+    }
+
+    function finalWrite() {
+      const calls = (prisma.article.updateMany as jest.Mock).mock.calls;
+      return calls[calls.length - 1][0] as {
+        where: Record<string, unknown>;
+        data: Record<string, unknown>;
+      };
+    }
+
+    it('fills English fields and never rewrites the Bulgarian ones', async () => {
+      givenArticle({
+        categoryBg: 'Категория',
+        titleBg: 'Заглавие',
+        subtitleBg: 'Монтана е страхотна',
+        body: [{ type: 'paragraph', textBg: 'Текст' }],
+      });
+      await run();
+
+      const { where, data } = finalWrite();
+      expect(where).toEqual({
+        id: 'art-1',
+        translationStatus: TranslationStatus.RUNNING,
+        updatedAt,
+      });
+      expect(data).toEqual(
+        expect.objectContaining({
           translationStatus: TranslationStatus.READY,
           titleEn: 'Title',
+          subtitleEn: 'Montana is great',
+          categoryEn: 'Category',
+          updatedAt,
         }),
-      }),
-    );
+      );
+      for (const key of Object.keys(data)) {
+        expect(key.endsWith('Bg')).toBe(false);
+      }
+      expect(data.body).toEqual([
+        { type: 'paragraph', textBg: 'Текст', textEn: 'Text' },
+      ]);
+    });
+
+    it('keeps an English-typed field as-is instead of machine-translating it', async () => {
+      givenArticle({
+        titleBg: 'Заглавие',
+        subtitleBg: 'Montana is great',
+      });
+      await run();
+      const { data } = finalWrite();
+      expect(data.subtitleEn).toBe('Montana is great');
+      const sent = (translate as jest.Mock).mock.calls.flatMap(
+        ([payload]: [Record<string, string>]) => Object.values(payload),
+      );
+      expect(sent).not.toContain('Montana is great');
+    });
+
+    it('marks FAILED when English is a copy of Bulgarian', async () => {
+      (translate as jest.Mock).mockImplementation(
+        async (payload: Record<string, string>) =>
+          Object.fromEntries(
+            Object.entries(payload).map(([key, text]) => [key, { text }]),
+          ),
+      );
+      givenArticle({ titleBg: 'Заглавие' });
+      await run();
+      expect(finalWrite().data.translationStatus).toBe(
+        TranslationStatus.FAILED,
+      );
+    });
+
+    it('re-queues instead of overwriting when the story was saved mid-run', async () => {
+      givenArticle({ titleBg: 'Заглавие' });
+      prisma.article.updateMany = jest
+        .fn()
+        .mockResolvedValueOnce({ count: 1 })
+        .mockResolvedValueOnce({ count: 0 });
+      prisma.article.findUnique = jest
+        .fn()
+        .mockResolvedValue({ translationStatus: TranslationStatus.RUNNING });
+      queue.add.mockClear();
+      await run();
+      expect(queue.add).toHaveBeenCalledWith(
+        'translate:article',
+        { type: 'article', id: 'art-1' },
+        expect.anything(),
+      );
+    });
+
+    it('skips when the story changed before the run started', async () => {
+      givenArticle({ titleBg: 'Заглавие' });
+      prisma.article.updateMany = jest.fn().mockResolvedValue({ count: 0 });
+      (translate as jest.Mock).mockClear();
+      await run();
+      expect(translate).not.toHaveBeenCalled();
+      expect(prisma.article.updateMany).toHaveBeenCalledTimes(1);
+    });
   });
 
-  it('marks article FAILED when English is a copy of Bulgarian', async () => {
-    const article = buildArticleRow({
-      categoryBg: 'Категория',
-      titleBg: 'Заглавие',
-      subtitleBg: 'Подзаглавие',
-      body: [{ type: 'paragraph', text: 'Текст' }],
-    });
-    prisma.article.findUniqueOrThrow = jest.fn().mockResolvedValue(article);
-    prisma.article.findUnique = jest.fn().mockResolvedValue({
-      translationStatus: TranslationStatus.RUNNING,
-    });
-    (translate as jest.Mock).mockResolvedValue({
-      k0: { text: 'Категория' },
-      k1: { text: 'Заглавие' },
-      k2: { text: 'Подзаглавие' },
-      k3: { text: '' },
-      k4: { text: '' },
-      k5: { text: '' },
-      k6: { text: '' },
-      k7: { text: '' },
-      k8: { text: '' },
-      k9: { text: '' },
-      k10: { text: '' },
-      k11: { text: '' },
-      k12: { text: 'Текст' },
+  describe('sweepStale', () => {
+    beforeEach(() => {
+      for (const model of ['article', 'author', 'series', 'category']) {
+        (prisma[model] as Record<string, unknown>).findMany = jest
+          .fn()
+          .mockResolvedValue([]);
+      }
+      queue.add.mockClear();
     });
 
-    const promise = service.processArticle('art-1');
-    await jest.runAllTimersAsync();
-    await promise;
+    it('re-queues orphaned rows when the queue is idle', async () => {
+      Object.assign(queue, {
+        getJobCounts: jest
+          .fn()
+          .mockResolvedValue({ waiting: 0, delayed: 0, active: 1 }),
+      });
+      (prisma.author as Record<string, jest.Mock>).findMany.mockResolvedValue([
+        { id: 'author-1' },
+      ]);
+      await expect(service.sweepStale()).resolves.toBe(1);
+      expect(queue.add).toHaveBeenCalledWith(
+        'translate:author',
+        { type: 'author', id: 'author-1' },
+        expect.anything(),
+      );
+    });
 
-    expect(prisma.article.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          translationStatus: TranslationStatus.FAILED,
-        }),
-      }),
-    );
+    it('does nothing while jobs are still waiting', async () => {
+      Object.assign(queue, {
+        getJobCounts: jest
+          .fn()
+          .mockResolvedValue({ waiting: 3, delayed: 0, active: 1 }),
+      });
+      await expect(service.sweepStale()).resolves.toBe(0);
+      expect(queue.add).not.toHaveBeenCalled();
+    });
+  });
+
+  it('transliterates place names instead of translating them', async () => {
+    (translate as jest.Mock).mockClear();
+    await expect(
+      service.bilingualFromSingle('Лом', { place: true }),
+    ).resolves.toEqual({ bg: 'Лом', en: 'Lom' });
+    await expect(
+      service.bilingualFromSingle('Стара Загора', { place: true }),
+    ).resolves.toEqual({ bg: 'Стара Загора', en: 'Stara Zagora' });
+    expect(translate).not.toHaveBeenCalled();
   });
 });

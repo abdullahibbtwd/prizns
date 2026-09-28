@@ -20,10 +20,13 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3003/api'
 
 export class ApiError extends Error {
   status: number
+  /** Set on 429 responses that say when to try again. */
+  retryAfterSeconds?: number
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, retryAfterSeconds?: number) {
     super(message)
     this.status = status
+    this.retryAfterSeconds = retryAfterSeconds
   }
 }
 
@@ -34,14 +37,21 @@ export type RequestOptions = {
 
 async function parseError(response: Response) {
   let message = response.statusText
+  let retryAfterSeconds: number | undefined
   try {
-    const body = (await response.json()) as { message?: string | string[] }
+    const body = (await response.json()) as {
+      message?: string | string[]
+      retryAfterSeconds?: number
+    }
     if (Array.isArray(body.message)) message = body.message.join(', ')
     else if (body.message) message = body.message
+    if (typeof body.retryAfterSeconds === 'number') {
+      retryAfterSeconds = body.retryAfterSeconds
+    }
   } catch {
     // ignore
   }
-  throw new ApiError(response.status, message)
+  throw new ApiError(response.status, message, retryAfterSeconds)
 }
 
 async function request<T>(

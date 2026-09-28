@@ -27,9 +27,9 @@ import CmsSocialPage from '@/cms/pages/SocialPage'
 import {
   CmsAiPage,
   CmsMediaPage,
-  CmsSettingsPage,
   CmsShopPage,
 } from '@/cms/pages/ContentPages'
+import CmsSettingsPage from '@/cms/pages/SettingsPage'
 import CmsSeoPage from '@/cms/pages/SeoPage'
 import CmsProductsPage from '@/cms/pages/ProductsPage'
 import CmsOrdersPage from '@/cms/pages/OrdersPage'

@@ -71,6 +71,8 @@ export type PublicArticleDto = {
   authorBg: string;
   authorSlug?: string;
   authorImage?: string;
+  /** Write for Us / guest contributor — show a "Guest author" badge. */
+  authorIsGuest?: boolean;
   speaker?: string;
   speakerBg?: string;
   date: string;
@@ -188,6 +190,8 @@ export type PublicArticleListDto = {
   authorBg: string;
   authorSlug?: string;
   authorImage?: string;
+  /** Write for Us / guest contributor — show a "Guest author" badge. */
+  authorIsGuest?: boolean;
   speaker?: string;
   speakerBg?: string;
   date: string;

@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeft, Trash2 } from 'lucide-react'
+import { ArrowLeft, KeyRound, Trash2 } from 'lucide-react'
 import {
   CmsCard,
   CmsPageHeader,
@@ -22,6 +22,8 @@ import {
 } from '@/lib/cms-content-api'
 import { uploadCmsMedia } from '@/lib/articles-api'
 import type { AuthorFormValues } from '@/lib/cms-types'
+import { useAuth } from '@/lib/auth'
+import { isCmsSuperAdmin } from '@/lib/cms-roles'
 
 const schema = z.object({
   nameBg: z.string().min(1),
@@ -33,6 +35,7 @@ const schema = z.object({
   aliases: z.string(),
   isActive: z.boolean(),
   showOnAuthors: z.boolean(),
+  isGuest: z.boolean(),
 })
 
 const emptyDefaults: AuthorFormValues = {
@@ -45,6 +48,7 @@ const emptyDefaults: AuthorFormValues = {
   aliases: '',
   isActive: true,
   showOnAuthors: true,
+  isGuest: false,
 }
 
 function Field({
@@ -72,6 +76,8 @@ export default function CmsAuthorEditorPage() {
   const { t } = useTranslation()
   const { confirm, dialog } = useCmsConfirm()
   const isNew = !id || id === 'new'
+  const { user } = useAuth()
+  const isSuperAdmin = isCmsSuperAdmin(user)
   const [uploading, setUploading] = useState(false)
 
   const authorQuery = useQuery({
@@ -97,6 +103,7 @@ export default function CmsAuthorEditorPage() {
       aliases: (author.aliases ?? []).join(', '),
       isActive: author.isActive,
       showOnAuthors: author.showOnAuthors ?? false,
+      isGuest: author.isGuest ?? false,
     }
   }, [authorQuery.data])
 
@@ -184,7 +191,15 @@ export default function CmsAuthorEditorPage() {
         description={t('cms.authors.editorHint')}
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            {!isNew ? (
+            {!isNew && isSuperAdmin && authorQuery.data && !authorQuery.data.userId ? (
+              <Link to={`/cms/users?linkAuthor=${id}`}>
+                <GhostButton type="button">
+                  <KeyRound className="size-4" />
+                  {t('cms.authors.giveLogin')}
+                </GhostButton>
+              </Link>
+            ) : null}
+            {!isNew && isSuperAdmin ? (
               <GhostButton
                 type="button"
                 className="text-rose-700 hover:border-rose-200 hover:bg-rose-50"
@@ -298,6 +313,19 @@ export default function CmsAuthorEditorPage() {
             <label className="flex items-center gap-2 text-xs font-medium text-stone-700">
               <input type="checkbox" {...form.register('showOnAuthors')} />
               {t('cms.authors.showOnAuthors')}
+            </label>
+            <label className="flex items-start gap-2 text-xs font-medium text-stone-700">
+              <input
+                type="checkbox"
+                className="mt-0.5"
+                {...form.register('isGuest')}
+              />
+              <span>
+                {t('cms.authors.guestLabel')}
+                <span className="block font-normal text-stone-500">
+                  {t('cms.authors.guestHint')}
+                </span>
+              </span>
             </label>
             {translationStatus && (
               <div className="pt-2">

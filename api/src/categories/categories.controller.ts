@@ -9,6 +9,9 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { SEO_ROLES } from '../auth/role-access';
 import { TranslationService } from '../translation/translation.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
@@ -39,7 +42,8 @@ export class CategoriesController {
   }
 
   @Post('cms/categories')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(...SEO_ROLES)
   async create(@Body() dto: CreateCategoryDto) {
     const category = await this.categories.create(dto);
     if (category.translationStatus === 'PENDING') {
@@ -49,7 +53,8 @@ export class CategoriesController {
   }
 
   @Patch('cms/categories/:id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(...SEO_ROLES)
   async update(@Param('id') id: string, @Body() dto: UpdateCategoryDto) {
     const category = await this.categories.update(id, dto);
     if (category.translationStatus === 'PENDING') {
@@ -59,7 +64,8 @@ export class CategoriesController {
   }
 
   @Delete('cms/categories/:id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(...SEO_ROLES)
   remove(@Param('id') id: string) {
     return this.categories.remove(id);
   }

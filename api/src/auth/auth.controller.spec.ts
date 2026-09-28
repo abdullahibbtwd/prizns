@@ -15,6 +15,7 @@ describe('AuthController', () => {
     clearAuthCookies: jest.fn(),
     verifyEmail: jest.fn(),
     sendEmailVerification: jest.fn(),
+    verificationResendIn: jest.fn(),
   };
   const res = { cookie: jest.fn(), clearCookie: jest.fn() };
 
@@ -67,14 +68,24 @@ describe('AuthController', () => {
   });
 
   it('resends a verification code', async () => {
-    auth.sendEmailVerification.mockResolvedValue({ sent: true });
+    auth.sendEmailVerification.mockResolvedValue({
+      sent: true,
+      retryAfterSeconds: 120,
+    });
     const req = { ip: '127.0.0.1' } as never;
     await expect(
       controller.resendVerification(mockAuthUser, req),
-    ).resolves.toEqual({ ok: true });
+    ).resolves.toEqual({ ok: true, retryAfterSeconds: 120 });
     expect(auth.sendEmailVerification).toHaveBeenCalledWith(
       mockAuthUser.id,
       expect.objectContaining({ ip: '127.0.0.1' }),
     );
+  });
+
+  it('tells the verify page how long until a new code can be sent', async () => {
+    auth.verificationResendIn.mockResolvedValue(73);
+    await expect(
+      controller.resendVerificationStatus(mockAuthUser),
+    ).resolves.toEqual({ retryAfterSeconds: 73 });
   });
 });

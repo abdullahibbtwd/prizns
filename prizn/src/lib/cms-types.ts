@@ -98,6 +98,7 @@ export type CmsArticle = {
   authorBg: string;
   authorSlug?: string;
   authorImage?: string;
+  authorIsGuest?: boolean;
   authorId?: string | null;
   speaker?: string;
   speakerBg?: string;
@@ -159,6 +160,9 @@ export type CmsArticle = {
   sourceLang?: string | null;
   narrationStatus?: 'IDLE' | 'PENDING' | 'RUNNING' | 'READY' | 'FAILED';
   narrationError?: string | null;
+  reviewNote?: string | null;
+  reviewNoteAt?: string | null;
+  submittedForReviewAt?: string | null;
   publishedAt?: string | null;
   updatedAt?: string;
   series?: {
@@ -181,6 +185,7 @@ export type CmsAuthorOption = {
   roleBg: string;
   roleEn: string | null;
   imageUrl: string | null;
+  isGuest?: boolean;
 };
 
 export type CmsAuthor = CmsAuthorOption & {
@@ -193,6 +198,7 @@ export type CmsAuthor = CmsAuthorOption & {
   aliases: string[];
   isActive: boolean;
   showOnAuthors: boolean;
+  userId?: string | null;
   translationStatus?: TranslationStatus;
   translationError?: string | null;
   createdAt?: string;
@@ -256,6 +262,7 @@ export type AuthorFormValues = {
   aliases: string;
   isActive: boolean;
   showOnAuthors: boolean;
+  isGuest: boolean;
 };
 
 export type SeriesFormValues = {
@@ -286,6 +293,7 @@ export type MediaAsset = {
   locationBg?: string | null
   locationEn?: string | null
   creditBg?: string | null
+  showInGallery?: boolean
 }
 
 export type ArticleFormValues = {

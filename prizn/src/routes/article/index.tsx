@@ -22,6 +22,7 @@ import { getPrimaryNavLinks } from '@/data/concept-3/nav'
 import { PageMeta } from '@/components/PageMeta'
 import { SponsoredBadge } from '@/components/concept-3/SponsoredBadge'
 import { SourcedBadge } from '@/components/concept-3/SourcedBadge'
+import { GuestAuthorBadge } from '@/components/concept-3/GuestAuthorBadge'
 import { SupportThisStory } from '@/components/concept-3/SupportThisStory'
 import { RegionalContextExplainer } from '@/components/concept-3/RegionalContextExplainer'
 import { SeriesContinue } from '@/components/concept-3/SeriesContinue'
@@ -118,6 +119,7 @@ function toJournalArticle(api: CmsArticle): JournalArticle {
     authorBg: api.authorBg,
     authorSlug: api.authorSlug,
     authorImage: api.authorImage,
+    authorIsGuest: api.authorIsGuest,
     speaker: api.speaker,
     speakerBg: api.speakerBg,
     date: api.date,
@@ -760,6 +762,9 @@ function ArticleContent({
                 )}
               </p>
             </div>
+          ) : null}
+          {!article.speaker && authorName && article.authorIsGuest ? (
+            <GuestAuthorBadge lang={lang} className="mb-2 mt-1" />
           ) : null}
           <p className="font-sans text-xs font-light text-[#1A1A1A]/60">
             {`${t('published')}${formatArticleDate(lang, article.date, article.dateBg)}`}

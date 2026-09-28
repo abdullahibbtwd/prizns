@@ -110,11 +110,23 @@ export function getCmsSubmission(id: string) {
 
 export function updateCmsSubmission(
   id: string,
-  body: { status?: SubmissionStatus; notes?: string },
+  body: { status?: SubmissionStatus; notes?: string; notifySubmitter?: boolean },
 ) {
   return api.patch<CmsSubmission>(`/cms/submissions/${id}`, {
     status: body.status ? statusToApi(body.status) : undefined,
     notes: body.notes,
+    notifySubmitter: body.notifySubmitter,
+  })
+}
+
+/** Emails the submitter and logs the message in the internal notes. */
+export function replyCmsSubmission(
+  id: string,
+  body: { message: string; status?: SubmissionStatus },
+) {
+  return api.post<CmsSubmission>(`/cms/submissions/${id}/reply`, {
+    message: body.message,
+    status: body.status ? statusToApi(body.status) : undefined,
   })
 }
 

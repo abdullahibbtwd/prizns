@@ -9,6 +9,10 @@ import type { JournalAuthor } from '@/data/concept-3/authors'
 import type { JournalArticle } from '@/data/concept-3/articleTypes'
 import type { JournalLang } from '@/components/concept-3/JournalShell'
 import { ListingBody } from '@/components/concept-3/ListingBody'
+import {
+  GuestAuthorBadge,
+  isGuestRoleText,
+} from '@/components/concept-3/GuestAuthorBadge'
 import { useJournalLang } from '@/hooks/useJournalLang'
 import { useLocalizedNavigate } from '@/hooks/useLocalizedNavigate'
 import { listPublicArticles } from '@/lib/articles-api'
@@ -106,9 +110,15 @@ function AuthorContent({
           </div>
 
           <div className="md:col-span-7 md:pt-4">
-            <p className="font-sans text-[11px] font-medium uppercase tracking-[0.28em] text-[#0C2686]">
-              {pick(lang, author.role, author.roleBg)}
-            </p>
+            <div className="flex flex-wrap items-center gap-3">
+              {author.isGuest ? <GuestAuthorBadge lang={lang} /> : null}
+              {author.isGuest &&
+              isGuestRoleText(pick(lang, author.role, author.roleBg)) ? null : (
+                <p className="font-sans text-[11px] font-medium uppercase tracking-[0.28em] text-[#0C2686]">
+                  {pick(lang, author.role, author.roleBg)}
+                </p>
+              )}
+            </div>
             <h1 className="mt-3 font-heading text-4xl font-light tracking-tight text-[#1A1A1A] md:text-5xl lg:text-6xl">
               {pick(lang, author.name, author.nameBg)}
             </h1>
@@ -271,6 +281,7 @@ export default function AuthorPage() {
         bio: apiAuthor.bio,
         bioBg: apiAuthor.bioBg,
         aliases: apiAuthor.aliases,
+        isGuest: apiAuthor.isGuest,
         badges: apiAuthor.badges,
       }
     : undefined

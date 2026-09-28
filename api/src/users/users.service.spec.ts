@@ -146,6 +146,61 @@ describe('UsersService', () => {
     );
   });
 
+  it('gives a guest author a login by linking the existing profile', async () => {
+    prisma.user.findUnique = jest.fn().mockResolvedValue(null);
+    prisma.user.create = jest.fn().mockResolvedValue({
+      ...row,
+      id: 'user-5',
+      email: 'guest@prizni.bg',
+      name: 'Guest Writer',
+      role: Role.AUTHOR,
+      roles: [Role.AUTHOR],
+    });
+    prisma.author.findUnique = jest
+      .fn()
+      .mockImplementation(({ where }: { where: { id?: string } }) =>
+        Promise.resolve(
+          where.id
+            ? { id: 'guest-1', userId: null, showOnAuthors: true }
+            : { id: 'guest-1', showOnAuthors: true },
+        ),
+      );
+    prisma.author.updateMany = jest.fn().mockResolvedValue({ count: 1 });
+
+    const created = await service.create({
+      email: 'guest@prizni.bg',
+      name: 'Guest Writer',
+      password: 'secret12',
+      role: Role.AUTHOR,
+      linkAuthorId: 'guest-1',
+    });
+
+    expect(prisma.author.updateMany).toHaveBeenCalledWith({
+      where: { id: 'guest-1', userId: null },
+      data: { userId: 'user-5', isGuest: false },
+    });
+    expect(authors.create).not.toHaveBeenCalled();
+    expect(created.user.authorId).toBe('guest-1');
+  });
+
+  it('refuses to link an author profile that already has a login', async () => {
+    prisma.user.findUnique = jest.fn().mockResolvedValue(null);
+    prisma.author.findUnique = jest
+      .fn()
+      .mockResolvedValue({ id: 'a-1', userId: 'other', showOnAuthors: true });
+
+    await expect(
+      service.create({
+        email: 'x@prizni.bg',
+        name: 'X',
+        password: 'secret12',
+        role: Role.AUTHOR,
+        linkAuthorId: 'a-1',
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(prisma.user.create).not.toHaveBeenCalled();
+  });
+
   it('rejects duplicate emails', async () => {
     await expect(
       service.create({

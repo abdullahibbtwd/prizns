@@ -4,6 +4,7 @@ import { JournalShell } from '@/components/concept-3/JournalShell'
 import { PageMeta } from '@/components/PageMeta'
 import { ListingHeader } from '@/components/concept-3/ListingHeader'
 import { ListingBody, listingCountLabel } from '@/components/concept-3/ListingBody'
+import { GuestAuthorBadge } from '@/components/concept-3/GuestAuthorBadge'
 import { preferApi, usePublicAuthors } from '@/lib/public-content'
 
 export default function AuthorsPage() {
@@ -78,6 +79,13 @@ export default function AuthorsPage() {
                             loading="lazy"
                             className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.03]"
                           />
+                          {author.isGuest ? (
+                            <GuestAuthorBadge
+                              lang={lang}
+                              tone="onDark"
+                              className="absolute left-3 top-3"
+                            />
+                          ) : null}
                         </div>
                         <div className="border-t border-[#EAE6DF] pt-4">
                           <h2 className="font-heading text-xl font-normal text-[#1A1A1A] transition-colors group-hover:text-[#0C2686] md:text-2xl">

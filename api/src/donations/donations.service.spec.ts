@@ -4,11 +4,11 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { DonationStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ShopService } from '../shop/shop.service';
-import { createMockConfig, createMockPrisma } from '../../test/helpers/mocks';
+import { SettingsService } from '../settings/settings.service';
+import { createMockPrisma, createSettings } from '../../test/helpers/mocks';
 import { DonationsService } from './donations.service';
 
 const mockCheckoutCreate = jest.fn().mockResolvedValue({
@@ -54,8 +54,8 @@ describe('DonationsService', () => {
         DonationsService,
         { provide: PrismaService, useValue: prisma },
         {
-          provide: ConfigService,
-          useValue: createMockConfig({ PUBLIC_SITE_URL: 'https://prizni.bg' }),
+          provide: SettingsService,
+          useValue: createSettings({ PUBLIC_SITE_URL: 'https://prizni.bg' }),
         },
         { provide: ShopService, useValue: shop },
       ],
@@ -73,7 +73,7 @@ describe('DonationsService', () => {
   it('rejects amounts below minimum', async () => {
     const withStripe = new DonationsService(
       prisma as never,
-      createMockConfig({
+      createSettings({
         STRIPE_SECRET_KEY: 'sk_test_123',
         PUBLIC_SITE_URL: 'https://prizni.bg',
       }) as never,
@@ -87,7 +87,7 @@ describe('DonationsService', () => {
   it('creates Stripe checkout for a valid donation', async () => {
     const withStripe = new DonationsService(
       prisma as never,
-      createMockConfig({
+      createSettings({
         STRIPE_SECRET_KEY: 'sk_test_123',
         PUBLIC_SITE_URL: 'https://prizni.bg',
         STRIPE_CURRENCY: 'eur',
@@ -125,7 +125,7 @@ describe('DonationsService', () => {
   it('requires published article when articleId is set', async () => {
     const withStripe = new DonationsService(
       prisma as never,
-      createMockConfig({
+      createSettings({
         STRIPE_SECRET_KEY: 'sk_test_123',
         PUBLIC_SITE_URL: 'https://prizni.bg',
       }) as never,
@@ -144,7 +144,7 @@ describe('DonationsService', () => {
   it('rejects webhook without signature', async () => {
     const withStripe = new DonationsService(
       prisma as never,
-      createMockConfig({
+      createSettings({
         STRIPE_SECRET_KEY: 'sk_test_123',
         STRIPE_WEBHOOK_SECRET: 'whsec_test',
       }) as never,
@@ -169,7 +169,7 @@ describe('DonationsService', () => {
 
     const withStripe = new DonationsService(
       prisma as never,
-      createMockConfig({
+      createSettings({
         STRIPE_SECRET_KEY: 'sk_test_123',
         STRIPE_WEBHOOK_SECRET: 'whsec_test',
       }) as never,
@@ -204,7 +204,7 @@ describe('DonationsService', () => {
 
     const withStripe = new DonationsService(
       prisma as never,
-      createMockConfig({
+      createSettings({
         STRIPE_SECRET_KEY: 'sk_test_123',
         STRIPE_WEBHOOK_SECRET: 'whsec_test',
       }) as never,
@@ -242,7 +242,7 @@ describe('DonationsService', () => {
     });
     const withStripe = new DonationsService(
       prisma as never,
-      createMockConfig({
+      createSettings({
         STRIPE_SECRET_KEY: 'sk_test_123',
         STRIPE_WEBHOOK_SECRET: 'whsec_test',
       }) as never,

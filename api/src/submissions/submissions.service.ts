@@ -3,7 +3,9 @@ import {
   HttpException,
   HttpStatus,
   Injectable,
+  Logger,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import {
   ArticleStatus,
@@ -13,12 +15,22 @@ import {
   SubmissionStatus,
 } from '@prisma/client';
 import { ArticlesService } from '../articles/articles.service';
+import { AuthorsService } from '../authors/authors.service';
 import { checkRateLimit } from '../common/rate-limit';
 import type { UploadProfile } from '../common/upload-validation';
+import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { SettingsService } from '../settings/settings.service';
 import { StorageService } from '../storage/storage.service';
 import { CreateSubmissionDto } from './dto/create-submission.dto';
+import { ReplySubmissionDto } from './dto/reply-submission.dto';
 import { UpdateSubmissionDto } from './dto/update-submission.dto';
+import {
+  hasDecisionEmail,
+  submissionAdminAlert,
+  submissionReceiptEmail,
+  submissionStatusEmail,
+} from './submission-emails';
 
 const CATEGORY_TO_SECTION: Record<string, string> = {
   'Human Stories': 'human-stories',
@@ -39,11 +51,59 @@ type Attachment = {
 
 @Injectable()
 export class SubmissionsService {
+  private readonly logger = new Logger(SubmissionsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
     private readonly articles: ArticlesService,
+    private readonly mail: MailService,
+    private readonly settings: SettingsService,
+    private readonly authors: AuthorsService,
   ) {}
+
+  /** Email failures must never block the editorial action itself. */
+  private async safeSend(label: string, fn: () => Promise<unknown>) {
+    try {
+      await fn();
+    } catch (error) {
+      this.logger.warn(
+        `${label} email failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  private async notifyCreated(row: Submission, photoCount: number) {
+    if (!this.mail.isConfigured()) {
+      this.logger.warn('Email not configured — submission emails skipped');
+      return;
+    }
+    const flags = this.settings.notifications();
+    if (flags.submitterOnReceipt) {
+      await this.safeSend('Submission receipt', () =>
+        this.mail.send({ to: row.email, ...submissionReceiptEmail(row) }),
+      );
+    }
+    if (flags.adminOnSubmission) {
+      await this.safeSend('Submission admin alert', () =>
+        this.mail.notifyAdmin({
+          replyTo: row.email,
+          ...submissionAdminAlert(row, this.settings.siteUrl(), photoCount),
+        }),
+      );
+    }
+  }
+
+  private async notifyStatus(row: Submission, previous: SubmissionStatus) {
+    if (row.status === previous || !hasDecisionEmail(row.status)) return;
+    if (!this.settings.notifications().submitterOnDecision) return;
+    if (!this.mail.isConfigured()) return;
+    const email = submissionStatusEmail(row, row.status);
+    if (!email) return;
+    await this.safeSend('Submission status', () =>
+      this.mail.send({ to: row.email, ...email }),
+    );
+  }
 
   private parseAttachments(value: Prisma.JsonValue): Attachment[] {
     if (!Array.isArray(value)) return [];
@@ -222,6 +282,8 @@ export class SubmissionsService {
       },
     });
 
+    await this.notifyCreated(row, photoUrls.length);
+
     return this.toDto(row);
   }
 
@@ -274,7 +336,8 @@ export class SubmissionsService {
   }
 
   async update(id: string, dto: UpdateSubmissionDto) {
-    await this.getById(id);
+    const before = await this.prisma.submission.findUnique({ where: { id } });
+    if (!before) throw new NotFoundException('Submission not found');
     const row = await this.prisma.submission.update({
       where: { id },
       data: {
@@ -282,7 +345,38 @@ export class SubmissionsService {
         notes: dto.notes === undefined ? undefined : dto.notes,
       },
     });
+    if (dto.notifySubmitter !== false) {
+      await this.notifyStatus(row, before.status);
+    }
     return this.toDto(row);
+  }
+
+  /** Editor writes to the submitter directly (optionally moving the status). */
+  async reply(id: string, dto: ReplySubmissionDto) {
+    const before = await this.prisma.submission.findUnique({ where: { id } });
+    if (!before) throw new NotFoundException('Submission not found');
+    if (!this.mail.isConfigured()) {
+      throw new ServiceUnavailableException(
+        'Email is not configured. Add a Resend API key in CMS → Settings.',
+      );
+    }
+    const row = dto.status
+      ? await this.prisma.submission.update({
+          where: { id },
+          data: { status: dto.status },
+        })
+      : before;
+    const email = submissionStatusEmail(row, row.status, dto.message);
+    if (email) {
+      await this.mail.send({ to: row.email, ...email });
+    }
+    const stamp = new Date().toISOString().slice(0, 16).replace('T', ' ');
+    const log = `[${stamp}] Emailed submitter:\n${dto.message.trim()}`;
+    const updated = await this.prisma.submission.update({
+      where: { id },
+      data: { notes: row.notes?.trim() ? `${row.notes.trim()}\n\n${log}` : log },
+    });
+    return this.toDto(updated);
   }
 
   async remove(id: string) {
@@ -323,8 +417,12 @@ export class SubmissionsService {
 
     const photos = this.parseAttachments(row.photoUrls);
     const galleryMediaIds = await this.mediaIdsFromPhotos(photos, row.name);
+    const guest = row.name.trim()
+      ? await this.authors.findOrCreateGuest(row.name)
+      : null;
 
     const article = await this.articles.create({
+      authorId: guest?.id,
       section,
       status: ArticleStatus.DRAFT,
       categoryBg: row.category,
@@ -346,6 +444,7 @@ export class SubmissionsService {
         articleId: article.id,
       },
     });
+    await this.notifyStatus(updated, row.status);
 
     return {
       submission: this.toDto(updated),

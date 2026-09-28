@@ -11,9 +11,21 @@ import {
 } from '@nestjs/common';
 import { ArticleStatus } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { AuthUserPayload } from '../auth/auth.types';
+import {
+  PUBLISHER_ROLES,
+  STORY_WRITER_ROLES,
+  SUPER_ADMIN_ROLES,
+  canPublishStories,
+} from '../auth/role-access';
 import { ArticlesService } from './articles.service';
+import { parseCmsArticleSort } from './cms-list.util';
 import { CreateArticleDto } from './dto/create-article.dto';
 import { CreateReactionDto } from './dto/create-reaction.dto';
+import { RequestChangesDto } from './dto/request-changes.dto';
 import { UpdateArticleDto } from './dto/update-article.dto';
 import { TranslationService } from '../translation/translation.service';
 import { TtsService } from '../tts/tts.service';
@@ -94,23 +106,33 @@ export class ArticlesController {
   }
 
   @Get('cms/articles')
-  @UseGuards(JwtAuthGuard)
-  listCms(
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(...STORY_WRITER_ROLES)
+  async listCms(
     @Query('section') section?: string,
     @Query('status') status?: ArticleStatus,
     @Query('authorId') authorId?: string,
     @Query('q') q?: string,
     @Query('sponsored') sponsored?: string,
     @Query('categorySlug') categorySlug?: string,
+    @Query('sort') sort?: string,
+    @Query('editedFrom') editedFrom?: string,
+    @Query('editedTo') editedTo?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
+    @CurrentUser() user?: AuthUserPayload,
   ) {
+    const scope = user ? await this.articles.storyScope(user) : undefined;
     return this.articles.listCms({
       section,
       status,
-      authorId,
+      // Authors only ever see their own stories.
+      authorId: scope === undefined ? authorId : scope || '__none__',
       q,
       categorySlug,
+      sort: parseCmsArticleSort(sort),
+      editedFrom,
+      editedTo,
       sponsored:
         sponsored === 'true' || sponsored === '1'
           ? true
@@ -123,15 +145,29 @@ export class ArticlesController {
   }
 
   @Get('cms/articles/:id')
-  @UseGuards(JwtAuthGuard)
-  getCms(@Param('id') id: string) {
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(...STORY_WRITER_ROLES)
+  async getCms(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthUserPayload,
+  ) {
+    await this.articles.assertCanViewStory(id, user);
     return this.articles.getCmsById(id);
   }
 
   @Post('cms/articles')
-  @UseGuards(JwtAuthGuard)
-  async create(@Body() dto: CreateArticleDto) {
-    const article = await this.articles.create(dto);
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(...STORY_WRITER_ROLES)
+  async create(
+    @Body() dto: CreateArticleDto,
+    @CurrentUser() user: AuthUserPayload,
+  ) {
+    dto.authorId = await this.articles.authorIdForWrite(user, dto.authorId);
+    this.articles.assertCanSetStatus(user, dto.status ?? ArticleStatus.DRAFT);
+    if (!canPublishStories(user)) delete dto.publishedAt;
+    const article = await this.articles.create(dto, {
+      notifyOnSubmit: !canPublishStories(user),
+    });
     if (article.translationStatus === 'PENDING') {
       await this.translation.enqueue(article.id);
     }
@@ -139,36 +175,73 @@ export class ArticlesController {
   }
 
   @Patch('cms/articles/:id')
-  @UseGuards(JwtAuthGuard)
-  async update(@Param('id') id: string, @Body() dto: UpdateArticleDto) {
-    const article = await this.articles.update(id, dto);
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(...STORY_WRITER_ROLES)
+  async update(
+    @Param('id') id: string,
+    @Body() dto: UpdateArticleDto,
+    @CurrentUser() user: AuthUserPayload,
+  ) {
+    await this.articles.assertCanChangeStory(id, user, dto.status);
+    if (!canPublishStories(user)) delete dto.publishedAt;
+    if (dto.authorId !== undefined) {
+      dto.authorId = await this.articles.authorIdForWrite(user, dto.authorId);
+    }
+    const article = await this.articles.update(id, dto, {
+      notifyOnSubmit: !canPublishStories(user),
+    });
     if (article.translationStatus === 'PENDING') {
       await this.translation.enqueue(article.id);
     }
     return article;
   }
 
+  /** Send a story in review back to its author as a draft, with a note. */
+  @Post('cms/articles/:id/request-changes')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(...PUBLISHER_ROLES)
+  requestChanges(@Param('id') id: string, @Body() dto: RequestChangesDto) {
+    return this.articles.requestChanges(id, dto.note);
+  }
+
   @Post('cms/articles/:id/translate')
-  @UseGuards(JwtAuthGuard)
-  async translate(@Param('id') id: string) {
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(...STORY_WRITER_ROLES)
+  async translate(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthUserPayload,
+  ) {
+    await this.articles.assertCanChangeStory(id, user);
     await this.translation.enqueue(id);
     return { ok: true, queued: true };
   }
 
   @Post('cms/articles/:id/narrate')
-  @UseGuards(JwtAuthGuard)
-  narrate(@Param('id') id: string) {
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(...STORY_WRITER_ROLES)
+  async narrate(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthUserPayload,
+  ) {
+    await this.articles.assertCanChangeStory(id, user);
     return this.tts.enqueue(id);
   }
 
   @Delete('cms/articles/:id/narration')
-  @UseGuards(JwtAuthGuard)
-  clearNarration(@Param('id') id: string) {
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(...STORY_WRITER_ROLES)
+  async clearNarration(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthUserPayload,
+  ) {
+    await this.articles.assertCanChangeStory(id, user);
     return this.tts.clearNarration(id);
   }
 
+  /** Permanent delete is super-admin only; moderators archive instead. */
   @Delete('cms/articles/:id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(...SUPER_ADMIN_ROLES)
   remove(@Param('id') id: string) {
     return this.articles.remove(id);
   }

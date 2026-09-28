@@ -5,12 +5,12 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { Prisma, ShopOrderStatus, ShopPaymentMethod } from '@prisma/client';
 import Stripe from 'stripe';
 import { MailService } from '../mail/mail.service';
 import { absoluteSiteUrl } from '../common/money.util';
 import { PrismaService } from '../prisma/prisma.service';
+import { SettingsService } from '../settings/settings.service';
 import { StorageService } from '../storage/storage.service';
 import { ensureUniqueSlug } from '../common/slug.util';
 import {
@@ -34,53 +34,44 @@ type RateBucket = { count: number; resetAt: number };
 @Injectable()
 export class ShopService {
   private readonly logger = new Logger(ShopService.name);
-  private stripe: Stripe | null = null;
   private readonly rateBuckets = new Map<string, RateBucket>();
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly config: ConfigService,
     private readonly storage: StorageService,
     private readonly mail: MailService,
-  ) {
-    const secret = this.config.get<string>('STRIPE_SECRET_KEY')?.trim();
-    if (secret) this.stripe = new Stripe(secret);
-  }
+    private readonly settings: SettingsService,
+  ) {}
 
+  /** Public storefront: FEATURE_SHOP env AND the CMS Settings toggle. */
   isEnabled() {
-    const flag = this.config.get<string>('FEATURE_SHOP')?.trim().toLowerCase();
-    return flag === 'true' || flag === '1';
+    return this.settings.shopPublic();
   }
 
   assertEnabled() {
     if (!this.isEnabled()) {
       throw new ServiceUnavailableException(
-        'Shop is disabled. Set FEATURE_SHOP=true to enable.',
+        'Shop is not public. Enable it in CMS → Settings.',
       );
     }
   }
 
   private requireStripe(): Stripe {
-    if (!this.stripe) {
+    const stripe = this.settings.stripe();
+    if (!stripe) {
       throw new ServiceUnavailableException(
-        'Stripe is not configured. Set STRIPE_SECRET_KEY.',
+        'Stripe is not configured. Add the secret key in CMS → Settings.',
       );
     }
-    return this.stripe;
+    return stripe;
   }
 
   private siteUrl(): string {
-    const raw =
-      this.config.get<string>('PUBLIC_SITE_URL')?.trim() ||
-      'http://localhost:5175';
-    return raw.replace(/\/+$/, '');
+    return this.settings.siteUrl();
   }
 
   private currency(): string {
-    // Stripe dropped BGN after Bulgaria’s euro adoption — map legacy env to EUR.
-    const raw =
-      this.config.get<string>('STRIPE_CURRENCY')?.trim().toLowerCase() || 'eur';
-    return this.normalizeCurrency(raw);
+    return this.settings.stripeCurrency();
   }
 
   private normalizeCurrency(code: string | null | undefined): string {

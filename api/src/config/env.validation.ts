@@ -207,6 +207,16 @@ class EnvironmentVariables {
   @IsOptional()
   @IsString()
   RESEND_FROM?: string;
+
+  /** Inbox for new submission / contact alerts (CMS Settings overrides). */
+  @IsOptional()
+  @IsString()
+  ADMIN_NOTIFY_EMAIL?: string;
+
+  /** Encrypts API keys saved in CMS Settings. Defaults to JWT_ACCESS_SECRET. */
+  @IsOptional()
+  @IsString()
+  SETTINGS_ENCRYPTION_KEY?: string;
 }
 
 export function validateEnv(config: Record<string, unknown>) {

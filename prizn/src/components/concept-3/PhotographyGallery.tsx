@@ -4,7 +4,7 @@ import { Maximize2, X, MapPin, Camera } from 'lucide-react'
 import { ViewAllLink } from '@/components/concept-3/ViewAllLink'
 import { SectionLoading } from '@/components/concept-3/SectionLoading'
 import { ResponsiveImage } from '@/components/ResponsiveImage'
-import { preferApi, usePublicMedia } from '@/lib/public-content'
+import { galleryPhotoText, preferApi, usePublicMedia } from '@/lib/public-content'
 import { getSectionPublicLabel } from '@/lib/section-i18n'
 
 interface PhotoItem {
@@ -37,25 +37,13 @@ function aspectForIndex(index: number): { aspect: string; span: string } {
 export function PhotographyGallery({ lang }: PhotographyGalleryProps) {
   const { data, isLoading } = usePublicMedia('IMAGE', { limit: 6 })
   const mapped = preferApi(
-    data?.map((item, index) => {
-      const layout = aspectForIndex(index)
-      const title =
-        item.titleBg ||
-        item.titleEn ||
-        (lang === 'bg' ? 'Снимка от Prizni' : 'Photo from Prizni')
-      return {
-        id: item.id,
-        title,
-        caption: item.creditBg || item.creditEn || '',
-        image: item.url,
-        imageThumb: item.thumbnailUrl || undefined,
-        location:
-          item.locationBg ||
-          item.locationEn ||
-          (lang === 'bg' ? 'Северозападна България' : 'Northwestern Bulgaria'),
-        ...layout,
-      } satisfies PhotoItem
-    }),
+    data?.map((item, index) => ({
+      id: item.id,
+      ...galleryPhotoText(item, lang),
+      image: item.url,
+      imageThumb: item.thumbnailUrl || undefined,
+      ...aspectForIndex(index),
+    }) satisfies PhotoItem),
   )
   // Dedupe by media asset id (API also dedupes; this catches any client doubles).
   const photos = Array.from(
@@ -108,18 +96,26 @@ export function PhotographyGallery({ lang }: PhotographyGalleryProps) {
                 <ResponsiveImage
                   src={item.image}
                   thumbSrc={item.imageThumb}
-                  alt={item.title}
+                  alt={item.title || item.location}
                   sizes="gallery"
                   className="h-full w-full object-cover transition-transform duration-1000 ease-out group-hover:scale-105 filter grayscale-[15%] group-hover:grayscale-0"
                 />
                 <div className="absolute inset-0 flex items-center justify-center bg-black/40 p-6 text-center opacity-0 transition-opacity duration-300 group-hover:opacity-100">
                   <div className="translate-y-4 transition-transform duration-300 group-hover:translate-y-0">
-                    <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-full bg-white/20 text-white backdrop-blur-md">
+                    <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-white/20 text-white backdrop-blur-md">
                       <Maximize2 className="size-5 stroke-[1.5]" />
                     </div>
-                    <p className="font-heading text-xl font-light text-white">
-                      {item.title}
-                    </p>
+                    {item.title ? (
+                      <p className="mt-3 font-heading text-xl font-light text-white">
+                        {item.title}
+                      </p>
+                    ) : null}
+                    {item.location ? (
+                      <p className="mt-2 inline-flex items-center gap-1.5 font-sans text-[11px] uppercase tracking-widest text-white/75">
+                        <MapPin className="size-3" />
+                        {item.location}
+                      </p>
+                    ) : null}
                   </div>
                 </div>
               </motion.div>
@@ -153,21 +149,23 @@ export function PhotographyGallery({ lang }: PhotographyGalleryProps) {
             <div className="relative mx-auto my-auto flex max-h-[70vh] max-w-5xl items-center justify-center">
               <img
                 src={selectedPhoto.image}
-                alt={selectedPhoto.title}
+                alt={selectedPhoto.title || selectedPhoto.location}
                 className="max-h-[68vh] max-w-full rounded-xl object-contain shadow-2xl"
               />
             </div>
 
-            <div className="mx-auto max-w-2xl pb-4 text-center text-white">
-              <h3 className="mb-2 font-heading text-2xl font-light md:text-3xl">
-                {selectedPhoto.title}
-              </h3>
+            <div className="mx-auto min-h-8 max-w-2xl pb-4 text-center text-white">
+              {selectedPhoto.title ? (
+                <h3 className="mb-2 font-heading text-2xl font-light md:text-3xl">
+                  {selectedPhoto.title}
+                </h3>
+              ) : null}
               {selectedPhoto.caption ? (
                 <p className="mb-2 font-sans text-xs font-light text-white/70 md:text-sm">
                   {selectedPhoto.caption}
                 </p>
               ) : null}
-              {selectedPhoto.location?.trim() ? (
+              {selectedPhoto.location ? (
                 <div className="inline-flex items-center gap-1.5 font-sans text-[11px] uppercase tracking-widest text-white/50">
                   <MapPin className="size-3 text-[#4051C7]" />
                   <span>{selectedPhoto.location}</span>

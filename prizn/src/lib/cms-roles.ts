@@ -4,6 +4,7 @@ export const CMS_USER_ROLES = [
   'SUBSCRIBER',
   'CONTRIBUTOR',
   'AUTHOR',
+  'MODERATOR',
   'EDITOR',
   'ADMIN',
 ] as const
@@ -16,6 +17,7 @@ const CMS_ROLE_I18N_KEYS = {
   SUBSCRIBER: 'cms.roles.subscriber',
   CONTRIBUTOR: 'cms.roles.contributor',
   AUTHOR: 'cms.roles.author',
+  MODERATOR: 'cms.roles.moderator',
   EDITOR: 'cms.roles.editor',
   ADMIN: 'cms.roles.admin',
 } as const satisfies Record<CmsUserRole, string>
@@ -26,6 +28,7 @@ const ROLE_RANK: Record<CmsUserRole, number> = {
   AUTHOR: 2,
   SEO_EDITOR: 3,
   SEO_MANAGER: 4,
+  MODERATOR: 5,
   EDITOR: 5,
   ADMIN: 6,
 }
@@ -35,19 +38,21 @@ type CmsPathAccess = {
   deny?: string[]
 }
 
-/** Union of these prefixes is what each role can open in the CMS. */
+/**
+ * Union of these prefixes is what each role can open in the CMS. Menu only —
+ * the API enforces the same rules (`api/src/auth/role-access.ts`).
+ */
+const STAFF_PATH_ACCESS: CmsPathAccess = {
+  allow: '*',
+  deny: ['/cms/users', '/cms/settings'],
+}
+
 const ROLE_PATH_ACCESS: Record<CmsUserRole, CmsPathAccess> = {
   ADMIN: { allow: '*' },
-  EDITOR: { allow: '*', deny: ['/cms/users'] },
+  MODERATOR: STAFF_PATH_ACCESS,
+  EDITOR: STAFF_PATH_ACCESS,
   AUTHOR: {
-    allow: [
-      '/cms',
-      '/cms/stories',
-      '/cms/series',
-      '/cms/media',
-      '/cms/authors',
-      '/cms/profile',
-    ],
+    allow: ['/cms', '/cms/stories', '/cms/profile'],
   },
   CONTRIBUTOR: {
     allow: [
@@ -121,6 +126,29 @@ export function primaryCmsRole(
 
 export function hasCmsRole(user: CmsRoleUser, role: CmsUserRole): boolean {
   return userRoles(user).includes(role)
+}
+
+const STAFF_ROLES: CmsUserRole[] = ['ADMIN', 'MODERATOR', 'EDITOR']
+const ALL_STORIES_ROLES: CmsUserRole[] = [...STAFF_ROLES, 'SEO_EDITOR']
+
+/** Moderator-level: submissions, gallery, authors, any story. */
+export function isCmsStaff(user: CmsRoleUser): boolean {
+  return userRoles(user).some((role) => STAFF_ROLES.includes(role))
+}
+
+/** Settings, users/roles and permanent deletes. */
+export function isCmsSuperAdmin(user: CmsRoleUser): boolean {
+  return hasCmsRole(user, 'ADMIN')
+}
+
+/** Only moderators and super admins publish, schedule or archive; others submit for review. */
+export function canPublishStories(user: CmsRoleUser): boolean {
+  return isCmsStaff(user)
+}
+
+/** False for authors/contributors, who only see and edit their own stories. */
+export function canManageAllStories(user: CmsRoleUser): boolean {
+  return userRoles(user).some((role) => ALL_STORIES_ROLES.includes(role))
 }
 
 function normalizeCmsPath(pathname: string) {

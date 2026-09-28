@@ -1,12 +1,16 @@
 import { Link } from '@/components/LocaleLink'
 import { motion } from 'framer-motion'
 import { ArrowRight } from 'lucide-react'
+import { useSiteSettings } from '@/lib/site-settings-api'
 
 interface ShopWithUsSectionProps {
   lang: 'bg' | 'en'
 }
 
 export function ShopWithUsSection({ lang }: ShopWithUsSectionProps) {
+  const { data: settings } = useSiteSettings()
+  if (!settings?.shopEnabled) return null
+
   return (
     <section
       id="shop"

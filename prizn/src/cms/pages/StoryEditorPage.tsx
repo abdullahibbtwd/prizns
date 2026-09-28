@@ -18,6 +18,7 @@ import {
   Plus,
   Save,
   Trash2,
+  Undo2,
   X,
 } from 'lucide-react'
 import {
@@ -28,6 +29,7 @@ import {
   StatusPill,
 } from '@/cms/components/CmsUI'
 import { useCmsConfirm } from '@/cms/components/CmsConfirmDialog'
+import { CmsModal } from '@/cms/components/CmsModal'
 import {
   CmsCheckbox,
   CmsField,
@@ -38,7 +40,7 @@ import {
 } from '@/cms/components/CmsFields'
 import { CmsTagPicker } from '@/cms/components/CmsMultiSelect'
 import { AiAssistantPanel } from '@/cms/components/AiAssistantPanel'
-import { NarrationPanel } from '@/cms/components/NarrationPanel'
+import { NarrationPanel, type AudioChange } from '@/cms/components/NarrationPanel'
 import { StoryBodyEditor } from '@/cms/components/StoryBodyEditor'
 import { StoryRichTextField } from '@/cms/components/StoryRichTextField'
 import { StoryGalleryThumbs } from '@/cms/components/StoryGalleryThumbs'
@@ -51,8 +53,8 @@ import {
   deleteCmsArticle,
   getCmsArticle,
   listCmsAuthors,
-  queueArticleNarration,
   queueArticleTranslation,
+  requestArticleChanges,
   updateCmsArticle,
   uploadCmsMedia,
 } from '@/lib/articles-api'
@@ -64,7 +66,6 @@ import {
   type ArticleFormValues,
   type ArticleSection,
   type BodyBlock,
-  type CmsArticle,
 } from '@/lib/cms-types'
 import { createCmsTag, listCmsTags } from '@/lib/tags-api'
 import { listCmsCategories } from '@/lib/categories-api'
@@ -76,6 +77,13 @@ import { useJournalLang } from '@/hooks/useJournalLang'
 import { pickLang } from '@/lib/pick-lang'
 import { cn, randomId } from '@/lib/utils'
 import { getSectionProfile } from '@/cms/section-profiles'
+import { useAuth } from '@/lib/auth'
+import {
+  canManageAllStories,
+  canPublishStories,
+  isCmsStaff,
+  isCmsSuperAdmin,
+} from '@/lib/cms-roles'
 import {
   defaultScheduleLocal,
   editorActionDisabled,
@@ -342,7 +350,12 @@ export default function CmsStoryEditorPage() {
   const queryClient = useQueryClient()
   const { t } = useTranslation()
   const { lang } = useJournalLang()
-  const { confirm, confirmChoice, dialog } = useCmsConfirm()
+  const { confirm, dialog } = useCmsConfirm()
+  const { user } = useAuth()
+  const canPickAuthor = canManageAllStories(user)
+  const canCreateAuthor = isCmsStaff(user)
+  const canDeleteStory = isCmsSuperAdmin(user)
+  const canPublish = canPublishStories(user)
   const basePath = '/cms/stories'
   const routeIsNew = !id || id === 'new'
   const [savedArticleId, setSavedArticleId] = useState<string | null>(
@@ -358,11 +371,23 @@ export default function CmsStoryEditorPage() {
   const [mediaTab, setMediaTab] = useState<'image' | 'video'>('image')
   const [showAuthorForm, setShowAuthorForm] = useState(false)
   const [newAuthorName, setNewAuthorName] = useState('')
+  const [newAuthorGuest, setNewAuthorGuest] = useState(false)
   const [showCreateSeries, setShowCreateSeries] = useState(false)
   const [newSeriesTitle, setNewSeriesTitle] = useState('')
   const [posterBusy, setPosterBusy] = useState(false)
   const [audioUrl, setAudioUrl] = useState('')
   const [pendingAudioFile, setPendingAudioFile] = useState<File | null>(null)
+  /** Audio was uploaded/removed in the editor and must be sent on the next save. */
+  const [audioTouched, setAudioTouchedState] = useState(false)
+  const [audioError, setAudioError] = useState<string | null>(null)
+  const audioTouchedRef = useRef(false)
+  const setAudioTouched = (next: boolean) => {
+    audioTouchedRef.current = next
+    setAudioTouchedState(next)
+  }
+  /** Files already uploaded by an autosave, reused so the next save doesn't upload them again. */
+  const uploadedGalleryRef = useRef(new Map<string, string>())
+  const uploadedAudioRef = useRef<{ file: File; id: string } | null>(null)
   const [mediaSaving, setMediaSaving] = useState(false)
   const [mediaPreparing, setMediaPreparing] = useState(false)
   const [readTimeManual, setReadTimeManual] = useState(() => !isNew)
@@ -529,6 +554,16 @@ export default function CmsStoryEditorPage() {
     name: 'body',
   })
 
+  /** Sets value and saved baseline together, so the field no longer counts as an edit. */
+  const resetAudioField = (
+    name: 'audioMediaId' | 'audioDuration',
+    defaultValue?: string,
+  ) => {
+    // resetField() skips unregistered fields, and form.reset() drops registrations.
+    form.register(name)
+    form.resetField(name, defaultValue === undefined ? undefined : { defaultValue })
+  }
+
   useEffect(() => {
     hydratedArticleId.current = null
   }, [id])
@@ -541,10 +576,28 @@ export default function CmsStoryEditorPage() {
     hydratedArticleId.current = article.id
     form.reset(defaults)
     setAudioUrl(article.audioUrl ?? '')
+    setAudioTouched(false)
     setGallery(
       mergeBodyVideosIntoGallery(mergeLoadedMedia(article), article.bodyRaw),
     )
   }, [articleQuery.data, defaults, form, isNew])
+
+  const serverAudioId = articleQuery.data?.audioMediaId ?? ''
+  const serverAudioUrl = articleQuery.data?.audioUrl ?? ''
+
+  // Generated narration lands on the server after the job finishes; mirror it
+  // into the form unless the editor has its own unsaved audio change.
+  useEffect(() => {
+    if (audioTouched || !articleQuery.data) return
+    if (form.getValues('audioMediaId') !== serverAudioId) {
+      resetAudioField('audioMediaId', serverAudioId)
+    }
+    setAudioUrl((current) => {
+      if (current === serverAudioUrl) return current
+      revokeIfBlob(current)
+      return serverAudioUrl
+    })
+  }, [articleQuery.data, audioTouched, form, serverAudioId, serverAudioUrl])
 
   const section = form.watch('section')
   const seriesMode = form.watch('seriesMode')
@@ -578,44 +631,19 @@ export default function CmsStoryEditorPage() {
     )
   }, [gallery, form])
 
-  // Editing a published story returns it to draft until Publish is clicked again.
-  const allowPublishDemote = useRef(false)
-  useEffect(() => {
-    allowPublishDemote.current = false
-    const timer = window.setTimeout(() => {
-      allowPublishDemote.current = true
-    }, 0)
-    return () => window.clearTimeout(timer)
-  }, [articleQuery.data?.id])
-
-  useEffect(() => {
-    const sub = form.watch((_values, info) => {
-      if (!allowPublishDemote.current) return
-      if (info.type !== 'change') return
-      if (!info.name || info.name === 'status') return
-      // Synced from local gallery state — demotion happens via noteGalleryEdit.
-      if (info.name === 'galleryMediaIds') return
-      if (form.getValues('status') !== 'PUBLISHED') return
-      // Skip programmatic syncs (shouldDirty: false) that leave the form clean.
-      if (!form.formState.isDirty) return
-      form.setValue('status', 'DRAFT', { shouldDirty: true })
-    })
-    return () => sub.unsubscribe()
-  }, [form])
-
   const applySection = (next: ArticleSection, dirty = true) => {
     const nextProfile = getSectionProfile(next)
     form.setValue('section', next, { shouldDirty: dirty })
     form.setValue('categoryBg', nextProfile.defaultCategoryBg, {
       shouldDirty: dirty,
     })
+    // Audio (uploaded or generated) is valid for every section, so switching
+    // section keeps it; only the voices-specific speaker field is cleared.
     if (!nextProfile.showSpeakerAudio) {
       form.setValue('speakerBg', '', { shouldDirty: dirty })
-      form.setValue('audioDuration', '', { shouldDirty: dirty })
-      form.setValue('audioMediaId', '', { shouldDirty: dirty })
-      revokeIfBlob(audioUrl)
-      setPendingAudioFile(null)
-      setAudioUrl('')
+      if (!form.getValues('audioMediaId') && !pendingAudioFile) {
+        form.setValue('audioDuration', '', { shouldDirty: dirty })
+      }
     }
     if (nextProfile.showTeaser) {
       const body = form.getValues('body')
@@ -662,8 +690,16 @@ export default function CmsStoryEditorPage() {
         const idMap = new Map<string, string>()
         for (const item of gallery) {
           if (item.file) {
-            const media = await uploadCmsMedia(item.file, credit)
-            idMap.set(item.id, media.id)
+            const mediaId =
+              uploadedGalleryRef.current.get(item.id) ??
+              (
+                await uploadCmsMedia(item.file, {
+                  creditBg: credit,
+                  showInGallery: values.section === 'events',
+                })
+              ).id
+            uploadedGalleryRef.current.set(item.id, mediaId)
+            idMap.set(item.id, mediaId)
           }
         }
 
@@ -671,10 +707,18 @@ export default function CmsStoryEditorPage() {
         const { galleryMediaIds, videoUrl, videoMediaId } = mediaFields
         const heroMediaId = mediaFields.heroMediaId
 
-        let audioMediaId = values.audioMediaId || undefined
+        // Only send audio when the editor changed it, so a save never undoes
+        // narration generated in the background (or restores removed audio).
+        let audioMediaId: string | null | undefined
         if (pendingAudioFile) {
-          const media = await uploadCmsMedia(pendingAudioFile)
-          audioMediaId = media.id
+          const cached = uploadedAudioRef.current
+          audioMediaId =
+            cached?.file === pendingAudioFile
+              ? cached.id
+              : (await uploadCmsMedia(pendingAudioFile)).id
+          uploadedAudioRef.current = { file: pendingAudioFile, id: audioMediaId }
+        } else if (audioTouchedRef.current) {
+          audioMediaId = values.audioMediaId || null
         }
 
         const minutes = Number(values.readTimeMinutes) || 1
@@ -740,7 +784,7 @@ export default function CmsStoryEditorPage() {
           authorId: values.authorId || undefined,
           galleryMediaIds,
           heroMediaId: heroMediaId ?? '',
-          audioMediaId,
+          ...(audioMediaId !== undefined ? { audioMediaId } : {}),
           videoUrl,
           videoMediaId,
           featured: values.featured || values.section === 'featured',
@@ -798,6 +842,10 @@ export default function CmsStoryEditorPage() {
       revokeIfBlob(audioUrl)
       revokeIfBlob(form.getValues('videoUrl'))
       setPendingAudioFile(null)
+      queryClient.setQueryData(['cms-article', article.id], article)
+      uploadedGalleryRef.current.clear()
+      uploadedAudioRef.current = null
+      setAudioTouched(false)
       setGallery(
         mergeBodyVideosIntoGallery(mergeLoadedMedia(article), article.bodyRaw),
       )
@@ -806,9 +854,8 @@ export default function CmsStoryEditorPage() {
       form.setValue('videoMediaId', article.videoMediaId ?? '', {
         shouldDirty: false,
       })
-      form.setValue('audioMediaId', article.audioMediaId ?? '', {
-        shouldDirty: false,
-      })
+      resetAudioField('audioMediaId', article.audioMediaId ?? '')
+      resetAudioField('audioDuration', article.audioDuration ?? '')
 
       await queryClient.invalidateQueries({ queryKey: ['cms-articles'] })
       await queryClient.invalidateQueries({ queryKey: ['cms-articles-count'] })
@@ -850,6 +897,21 @@ export default function CmsStoryEditorPage() {
     },
   })
 
+  const [sendBackOpen, setSendBackOpen] = useState(false)
+  const [sendBackNote, setSendBackNote] = useState('')
+  const sendBackMutation = useMutation({
+    mutationFn: (note: string) => requestArticleChanges(articleId!, note),
+    onSuccess: async (article) => {
+      queryClient.setQueryData(['cms-article', article.id], article)
+      form.resetField('status', { defaultValue: article.status })
+      setSendBackOpen(false)
+      setSendBackNote('')
+      await queryClient.invalidateQueries({ queryKey: ['cms-articles'] })
+      await queryClient.invalidateQueries({ queryKey: ['cms-articles-count'] })
+      await queryClient.invalidateQueries({ queryKey: ['cms-dashboard-checklist'] })
+    },
+  })
+
   const confirmDelete = async () => {
     const title =
       pickLang(lang, articleQuery.data?.title, form.getValues('titleBg')) ||
@@ -863,11 +925,13 @@ export default function CmsStoryEditorPage() {
   }
 
   const createAuthorMutation = useMutation({
-    mutationFn: (nameBg: string) => createCmsAuthor(nameBg),
+    mutationFn: (nameBg: string) =>
+      createCmsAuthor(nameBg, { isGuest: newAuthorGuest }),
     onSuccess: async (author) => {
       await queryClient.invalidateQueries({ queryKey: ['cms-authors'] })
       form.setValue('authorId', author.id, { shouldDirty: true })
       setNewAuthorName('')
+      setNewAuthorGuest(false)
       setShowAuthorForm(false)
     },
   })
@@ -884,15 +948,9 @@ export default function CmsStoryEditorPage() {
   })
 
   const noteGalleryEdit = () => {
-    if (form.getValues('status') === 'PUBLISHED') {
-      form.setValue('status', 'DRAFT', { shouldDirty: true })
-    } else {
-      form.setValue(
-        'galleryMediaIds',
-        form.getValues('galleryMediaIds'),
-        { shouldDirty: true },
-      )
-    }
+    form.setValue('galleryMediaIds', form.getValues('galleryMediaIds'), {
+      shouldDirty: true,
+    })
   }
 
   const applyGallery = (
@@ -1073,12 +1131,22 @@ export default function CmsStoryEditorPage() {
     applyGallery([...gallery, item], form.getValues('body'), gallery.length)
   }
 
-  const pickAudioFile = async (file: File) => {
+  /** Local preview only — upload happens on Save. Returns an error message when rejected. */
+  const pickAudioFile = async (file: File): Promise<string | null> => {
+    if (file.type && !file.type.startsWith('audio/')) {
+      return t('cms.editor.audioNotAudio')
+    }
+    try {
+      assertCmsFileSize(file)
+    } catch (error) {
+      return error instanceof Error ? error.message : String(error)
+    }
     setMediaPreparing(true)
     try {
       revokeIfBlob(audioUrl)
       const localUrl = URL.createObjectURL(file)
       setPendingAudioFile(file)
+      setAudioTouched(true)
       setAudioUrl(localUrl)
       form.setValue('audioMediaId', '', { shouldDirty: true })
 
@@ -1094,8 +1162,10 @@ export default function CmsStoryEditorPage() {
           resolve()
         }
         el.onerror = () => resolve()
+        window.setTimeout(resolve, 3000)
         el.src = localUrl
       })
+      return null
     } finally {
       setMediaPreparing(false)
     }
@@ -1159,9 +1229,38 @@ export default function CmsStoryEditorPage() {
     }
   }
 
-  const clearAudio = () => {
+  const selectAudioFile = async (file: File) => {
+    setAudioError(await pickAudioFile(file))
+  }
+
+  const watchedAudioMediaId = form.watch('audioMediaId')
+  const audioChange: AudioChange = pendingAudioFile
+    ? 'added'
+    : audioTouched && !watchedAudioMediaId
+      ? 'removed'
+      : 'none'
+
+  /** Back to the saved audio (drops a pending upload or a pending removal). */
+  const undoAudioChange = () => {
+    setAudioError(null)
     revokeIfBlob(audioUrl)
     setPendingAudioFile(null)
+    setAudioTouched(false)
+    resetAudioField('audioMediaId', serverAudioId)
+    resetAudioField('audioDuration')
+    setAudioUrl(serverAudioUrl)
+  }
+
+  /** Removal is applied on Save/Update, so it can still be undone. */
+  const clearAudio = () => {
+    if (!serverAudioId) {
+      undoAudioChange()
+      return
+    }
+    setAudioError(null)
+    revokeIfBlob(audioUrl)
+    setPendingAudioFile(null)
+    setAudioTouched(true)
     setAudioUrl('')
     form.setValue('audioMediaId', '', { shouldDirty: true })
     form.setValue('audioDuration', '', { shouldDirty: true })
@@ -1216,26 +1315,16 @@ export default function CmsStoryEditorPage() {
       return
     }
 
-    const runSave = (status: EditorSaveAction, alsoNarrate: boolean) => {
+    const runSave = (status: EditorSaveAction) => {
       savingLock.current = true
       setSavingAction(status)
       void form.handleSubmit(
         async (values) => {
           try {
-            const article = await saveMutation.mutateAsync({
+            await saveMutation.mutateAsync({
               ...values,
               status,
             })
-            if (alsoNarrate && article?.id) {
-              try {
-                await queueArticleNarration(article.id)
-                await queryClient.invalidateQueries({
-                  queryKey: ['cms-article', article.id],
-                })
-              } catch {
-                // Publish already succeeded; narration can be retried from the panel.
-              }
-            }
           } catch {
             // Error is surfaced via saveMutation.isError in the footer.
           } finally {
@@ -1253,31 +1342,35 @@ export default function CmsStoryEditorPage() {
       )()
     }
 
-    if (statusToSave === 'PUBLISHED') {
-      const hasAudio =
-        Boolean(form.getValues('audioMediaId')?.trim()) ||
-        Boolean(articleQuery.data?.audioMediaId) ||
-        articleQuery.data?.narrationStatus === 'READY' ||
-        articleQuery.data?.narrationStatus === 'PENDING' ||
-        articleQuery.data?.narrationStatus === 'RUNNING'
-      if (!hasAudio) {
-        void (async () => {
-          const choice = await confirmChoice({
-            title: t('cms.editor.publishWithoutNarrationTitle'),
-            description: t('cms.editor.publishWithoutNarrationBody'),
-            confirmLabel: t('cms.editor.publishWithoutNarrationConfirm'),
-            altConfirmLabel: t('cms.editor.publishAndNarrate'),
-            cancelLabel: t('cms.editor.cancel'),
-            variant: 'default',
-          })
-          if (choice === 'cancel') return
-          runSave('PUBLISHED', choice === 'alt')
-        })()
-        return
-      }
+    const alreadyLive = !isNew && articleQuery.data?.status === 'PUBLISHED'
+
+    if (statusToSave === 'DRAFT' && alreadyLive) {
+      void (async () => {
+        const ok = await confirm({
+          title: t('cms.editor.unpublishConfirmTitle'),
+          description: t('cms.editor.unpublishConfirmBody'),
+          confirmLabel: t('cms.editor.unpublish'),
+        })
+        if (ok) runSave('DRAFT')
+      })()
+      return
     }
 
-    runSave(statusToSave, false)
+    if (statusToSave === 'PUBLISHED' && !alreadyLive) {
+      void (async () => {
+        const ok = await confirm({
+          title: t('cms.editor.publishConfirmTitle'),
+          description: t('cms.editor.publishConfirmBody'),
+          confirmLabel: t('cms.editor.publish'),
+          cancelLabel: t('cms.editor.cancel'),
+          variant: 'default',
+        })
+        if (ok) runSave('PUBLISHED')
+      })()
+      return
+    }
+
+    runSave(statusToSave)
   }
   submitStatusRef.current = submitStatus
 
@@ -1437,18 +1530,36 @@ export default function CmsStoryEditorPage() {
     categoriesQuery.data ?? [],
   )
   const statusOptions = (
-    ['DRAFT', 'REVIEW', 'SCHEDULED', 'PUBLISHED', 'ARCHIVED'] as const
+    canPublish
+      ? (['DRAFT', 'REVIEW', 'SCHEDULED', 'PUBLISHED', 'ARCHIVED'] as const)
+      : (['DRAFT', 'REVIEW'] as const)
   ).map((status) => ({
     value: status,
     label: t(`cms.status.${status.toLowerCase()}`),
   }))
 
-  const authorOptions = (authorsQuery.data ?? []).map((author) => ({
-    value: author.id,
-    label: pickLang(lang, author.nameEn ?? author.nameBg, author.nameBg),
-  }))
+  const authorOptions = (authorsQuery.data ?? []).map((author) => {
+    const name = pickLang(lang, author.nameEn ?? author.nameBg, author.nameBg)
+    return {
+      value: author.id,
+      label: author.isGuest ? `${name} · ${t('cms.authors.guestBadge')}` : name,
+    }
+  })
+  const selectedAuthorLabel =
+    authorOptions.find((option) => option.value === form.watch('authorId'))
+      ?.label ?? ''
 
   const savedStatus = articleQuery.data?.status
+  const isLive = !isNew && savedStatus === 'PUBLISHED'
+  /** Writers without publishing rights only move a story between draft and review. */
+  const writerStage =
+    isNew || savedStatus === undefined || savedStatus === 'DRAFT' || savedStatus === 'REVIEW'
+  const showWriterActions = canPublish || writerStage
+  /** Live/scheduled/archived: authors can't change it; SEO editors may update content in place. */
+  const showThirdAction = canPublish || (!writerStage && canPickAuthor)
+  const canSendBack = canPublish && !isNew && savedStatus === 'REVIEW'
+  const reviewNote =
+    savedStatus === 'DRAFT' ? articleQuery.data?.reviewNote?.trim() || '' : ''
   const thirdAction: EditorSaveAction =
     status === 'SCHEDULED' || status === 'ARCHIVED' ? status : 'PUBLISHED'
   const actionDisabled = (action: EditorSaveAction) =>
@@ -1484,9 +1595,9 @@ export default function CmsStoryEditorPage() {
 
         <div className="flex flex-wrap items-center gap-3">
           <StatusPill status={status} />
-          {articleQuery.data?.status === 'PUBLISHED' && status === 'DRAFT' ? (
+          {isLive && editorDirty ? (
             <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-amber-800">
-              {t('cms.editor.unpublishedEdits')}
+              {t('cms.editor.liveEditsPending')}
             </span>
           ) : null}
           {articleQuery.data?.translationStatus && (
@@ -1505,7 +1616,7 @@ export default function CmsStoryEditorPage() {
               {t('cms.editor.autosaveFailed')}
             </span>
           ) : null}
-          {!isNew ? (
+          {!isNew && canDeleteStory ? (
             <GhostButton
               type="button"
               className="text-rose-700 hover:border-rose-200 hover:bg-rose-50"
@@ -1518,6 +1629,19 @@ export default function CmsStoryEditorPage() {
                 : t('cms.stories.delete')}
             </GhostButton>
           ) : null}
+          {canSendBack ? (
+            <GhostButton
+              type="button"
+              disabled={editorDirty || editorBusy || sendBackMutation.isPending}
+              title={editorDirty ? t('cms.editor.sendBackSaveFirst') : undefined}
+              onClick={() => setSendBackOpen(true)}
+            >
+              <Undo2 className="size-4" />
+              {t('cms.editor.sendBack')}
+            </GhostButton>
+          ) : null}
+          {showWriterActions ? (
+          <>
           <EditorActionButton
             type="button"
             primary={status === 'REVIEW'}
@@ -1530,8 +1654,10 @@ export default function CmsStoryEditorPage() {
                 <Loader2 className="size-4 animate-spin" />
                 {t('cms.editor.saving')}
               </>
-            ) : (
+            ) : canPublish ? (
               t('cms.editor.review')
+            ) : (
+              t('cms.editor.submitForReview')
             )}
           </EditorActionButton>
           <EditorActionButton
@@ -1548,10 +1674,14 @@ export default function CmsStoryEditorPage() {
               </>
             ) : (
               <>
-                <Save className="size-4" /> {t('cms.editor.saveDraft')}
+                <Save className="size-4" />{' '}
+                {isLive ? t('cms.editor.unpublish') : t('cms.editor.saveDraft')}
               </>
             )}
           </EditorActionButton>
+          </>
+          ) : null}
+          {showThirdAction ? (
           <EditorActionButton
             type="button"
             primary={status === thirdAction}
@@ -1572,11 +1702,49 @@ export default function CmsStoryEditorPage() {
               </>
             ) : thirdAction === 'ARCHIVED' ? (
               t('cms.editor.archive')
+            ) : isLive ? (
+              t('cms.editor.update')
             ) : (
               t('cms.editor.publish')
             )}
           </EditorActionButton>
+          ) : null}
         </div>
+        {!canPublish && writerStage && !reviewNote ? (
+          <p className="w-full text-xs text-stone-500">
+            {t('cms.editor.reviewHint')}
+          </p>
+        ) : null}
+        {reviewNote ? (
+          <div
+            role="status"
+            className="w-full rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+          >
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-800">
+              {canPublish
+                ? t('cms.editor.sentBackTitle')
+                : t('cms.editor.changesRequestedTitle')}
+            </p>
+            <p className="mt-1 whitespace-pre-line">{reviewNote}</p>
+            {!canPublish ? (
+              <p className="mt-2 text-xs text-amber-800">
+                {t('cms.editor.changesRequestedHint')}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+        {saveMutation.isError ||
+        (form.formState.isSubmitted && Object.keys(errors).length > 0) ? (
+          <p
+            role="alert"
+            className="w-full rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800"
+          >
+            {saveMutation.isError
+              ? (saveMutation.error as ApiError)?.message ||
+                t('cms.editor.saveFailed')
+              : t('cms.editor.validationFailed')}
+          </p>
+        ) : null}
       </div>
 
       <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto pb-8">
@@ -1627,6 +1795,24 @@ export default function CmsStoryEditorPage() {
                 </p>
               </div>
 
+              {audioChange === 'removed' ? (
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+                  <p className="text-xs font-medium text-amber-900">
+                    {t('cms.editor.narrationRemovePending')}
+                  </p>
+                  <GhostButton
+                    type="button"
+                    className="py-1.5 text-xs"
+                    onClick={undoAudioChange}
+                  >
+                    {t('cms.editor.narrationUndo')}
+                  </GhostButton>
+                </div>
+              ) : null}
+              {audioError ? (
+                <p className="text-xs text-rose-700">{audioError}</p>
+              ) : null}
+
               {!audioUrl && !form.watch('audioMediaId') ? (
                 <label className="relative flex cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-[#E8E4DC] bg-[#FAF8F3] px-6 py-16 text-center transition-colors hover:border-[#0C2686]/40">
                   <MediaPrepOverlay />
@@ -1647,7 +1833,7 @@ export default function CmsStoryEditorPage() {
                     onChange={async (e) => {
                       const file = e.target.files?.[0]
                       if (!file) return
-                      await pickAudioFile(file)
+                      await selectAudioFile(file)
                       e.target.value = ''
                     }}
                   />
@@ -1657,7 +1843,9 @@ export default function CmsStoryEditorPage() {
                   <MediaPrepOverlay />
                   <div className="rounded-2xl border border-[#E8E4DC] bg-[#FAF8F3] p-4">
                     <p className="mb-3 text-xs font-semibold text-stone-700">
-                      {t('cms.editor.audioReady')}
+                      {audioChange === 'added'
+                        ? t('cms.editor.narrationSourceNew')
+                        : t('cms.editor.audioReady')}
                     </p>
                     {audioUrl ? (
                       <audio
@@ -1695,7 +1883,7 @@ export default function CmsStoryEditorPage() {
                         onChange={async (e) => {
                           const file = e.target.files?.[0]
                           if (!file) return
-                          await pickAudioFile(file)
+                          await selectAudioFile(file)
                           e.target.value = ''
                         }}
                       />
@@ -1703,9 +1891,13 @@ export default function CmsStoryEditorPage() {
                     <GhostButton
                       type="button"
                       className="py-2 text-xs"
-                      onClick={() => clearAudio()}
+                      onClick={() =>
+                        audioChange === 'added' ? undoAudioChange() : clearAudio()
+                      }
                     >
-                      {t('cms.editor.clearAudio')}
+                      {audioChange === 'added'
+                        ? t('cms.editor.narrationUndo')
+                        : t('cms.editor.clearAudio')}
                     </GhostButton>
                   </div>
                 </div>
@@ -2364,46 +2556,38 @@ export default function CmsStoryEditorPage() {
             </CmsCard>
           ) : null}
 
-          {articleId ? (
-            <NarrationPanel
-              articleId={articleId}
-              article={
-                articleQuery.data ??
-                ({
-                  id: articleId,
-                  narrationStatus: 'IDLE',
-                } as CmsArticle)
-              }
-              audioUrl={audioUrl || articleQuery.data?.audioUrl || undefined}
-              hasText={Boolean(
-                form.watch('titleBg')?.trim() ||
-                  form
-                    .watch('body')
-                    ?.some(
-                      (block) =>
-                        (block.type === 'paragraph' ||
-                          block.type === 'pullquote' ||
-                          block.type === 'note') &&
-                        Boolean(
-                          ('textBg' in block && block.textBg?.trim()) ||
-                            ('labelBg' in block && block.labelBg?.trim()),
-                        ),
-                    ),
-              )}
-            />
-          ) : (
-            <CmsCard className="space-y-2 p-5">
-              <h3 className="text-sm font-semibold">
-                {t('cms.editor.narrationTitle')}
-              </h3>
-              <p className="text-[11px] leading-relaxed text-stone-500">
-                {t('cms.editor.narrationWaitingAutosave')}
-              </p>
-            </CmsCard>
-          )}
+          <NarrationPanel
+            articleId={articleId}
+            article={articleQuery.data}
+            audioUrl={audioUrl || undefined}
+            audioChange={audioChange}
+            textUnsaved={editorDirty}
+            allowUpload={!profile.showSpeakerAudio}
+            preparing={mediaPreparing}
+            error={audioError}
+            onUpload={selectAudioFile}
+            onRemove={clearAudio}
+            onUndo={undoAudioChange}
+            hasText={Boolean(
+              form.watch('titleBg')?.trim() ||
+                form
+                  .watch('body')
+                  ?.some(
+                    (block) =>
+                      (block.type === 'paragraph' ||
+                        block.type === 'pullquote' ||
+                        block.type === 'note') &&
+                      Boolean(
+                        ('textBg' in block && block.textBg?.trim()) ||
+                          ('labelBg' in block && block.labelBg?.trim()),
+                      ),
+                  ),
+            )}
+          />
 
           <CmsCard className="space-y-4 p-5">
             <h3 className="text-sm font-semibold">{t('cms.editor.publishing')}</h3>
+            {canPublish || writerStage ? (
             <div className="space-y-1 text-xs">
               <span>{t('cms.editor.status')}</span>
               <JournalSelect
@@ -2424,6 +2608,11 @@ export default function CmsStoryEditorPage() {
                 }}
               />
             </div>
+            ) : (
+              <p className="text-xs text-stone-500">
+                {t('cms.editor.statusModeratorOnly')}
+              </p>
+            )}
             {status === 'SCHEDULED' ? (
               <div className="space-y-2 rounded-xl border border-[#E8E4DC] bg-[#FAF8F3] p-3">
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-stone-500">
@@ -2691,18 +2880,29 @@ export default function CmsStoryEditorPage() {
           {profile.showAuthor && (
           <CmsCard className="space-y-3 p-5">
             <h3 className="text-sm font-semibold">{t('cms.editor.author')}</h3>
-            <JournalSelect
-              name="authorId"
-              variant="boxed"
-              label={t('cms.editor.author')}
-              placeholder={t('cms.editor.selectAuthor')}
-              options={authorOptions}
-              value={form.watch('authorId')}
-              onChange={(value) =>
-                form.setValue('authorId', value, { shouldDirty: true })
-              }
-            />
-            {!showAuthorForm ? (
+            {canPickAuthor ? (
+              <JournalSelect
+                name="authorId"
+                variant="boxed"
+                label={t('cms.editor.author')}
+                placeholder={t('cms.editor.selectAuthor')}
+                options={authorOptions}
+                value={form.watch('authorId')}
+                onChange={(value) =>
+                  form.setValue('authorId', value, { shouldDirty: true })
+                }
+              />
+            ) : (
+              <div className="space-y-1 text-sm">
+                {selectedAuthorLabel ? (
+                  <p className="font-medium">{selectedAuthorLabel}</p>
+                ) : null}
+                <p className="text-xs text-stone-500">
+                  {t('cms.editor.authorOwnOnly')}
+                </p>
+              </div>
+            )}
+            {!canCreateAuthor ? null : !showAuthorForm ? (
               <GhostButton
                 type="button"
                 onClick={() => setShowAuthorForm(true)}
@@ -2719,6 +2919,22 @@ export default function CmsStoryEditorPage() {
                     onChange={(e) => setNewAuthorName(e.target.value)}
                     className="w-full border border-[#E8E4DC] bg-white px-2 py-2"
                   />
+                </label>
+                <label className="flex items-start gap-2 text-xs">
+                  <input
+                    type="checkbox"
+                    checked={newAuthorGuest}
+                    onChange={(e) => setNewAuthorGuest(e.target.checked)}
+                    className="mt-0.5"
+                  />
+                  <span>
+                    <span className="font-semibold">
+                      {t('cms.authors.guestLabel')}
+                    </span>
+                    <span className="block text-stone-500">
+                      {t('cms.authors.guestHint')}
+                    </span>
+                  </span>
                 </label>
                 <div className="flex gap-2">
                   <PrimaryButton
@@ -2737,6 +2953,7 @@ export default function CmsStoryEditorPage() {
                     onClick={() => {
                       setShowAuthorForm(false)
                       setNewAuthorName('')
+                      setNewAuthorGuest(false)
                     }}
                   >
                     {t('cms.editor.cancel')}
@@ -2779,6 +2996,62 @@ export default function CmsStoryEditorPage() {
       </form>
       </div>
       {dialog}
+      <CmsModal
+        open={sendBackOpen}
+        onClose={() => {
+          if (!sendBackMutation.isPending) setSendBackOpen(false)
+        }}
+        title={t('cms.editor.sendBackTitle')}
+        description={t('cms.editor.sendBackDescription')}
+      >
+        <form
+          className="space-y-4"
+          onSubmit={(event) => {
+            event.preventDefault()
+            const note = sendBackNote.trim()
+            if (note) sendBackMutation.mutate(note)
+          }}
+        >
+          <CmsField label={t('cms.editor.sendBackNote')} htmlFor="send-back-note">
+            <CmsTextarea
+              id="send-back-note"
+              rows={5}
+              maxLength={4000}
+              required
+              autoFocus
+              value={sendBackNote}
+              onChange={(event) => setSendBackNote(event.target.value)}
+              placeholder={t('cms.editor.sendBackPlaceholder')}
+            />
+          </CmsField>
+          {sendBackMutation.isError ? (
+            <p role="alert" className="text-sm text-rose-700">
+              {(sendBackMutation.error as ApiError)?.message ||
+                t('cms.editor.sendBackFailed')}
+            </p>
+          ) : null}
+          <div className="flex justify-end gap-2">
+            <GhostButton
+              type="button"
+              disabled={sendBackMutation.isPending}
+              onClick={() => setSendBackOpen(false)}
+            >
+              {t('cms.editor.cancel')}
+            </GhostButton>
+            <PrimaryButton
+              type="submit"
+              disabled={!sendBackNote.trim() || sendBackMutation.isPending}
+            >
+              {sendBackMutation.isPending ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Undo2 className="size-4" />
+              )}
+              {t('cms.editor.sendBackConfirm')}
+            </PrimaryButton>
+          </div>
+        </form>
+      </CmsModal>
     </div>
   )
 }

@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest'
 import {
   CMS_USER_ROLES,
   canAccessCmsPath,
+  canManageAllStories,
   cmsRoleI18nKey,
   filterCmsNavGroups,
+  isCmsStaff,
+  isCmsSuperAdmin,
   isCmsUserRole,
   primaryCmsRole,
   userRoles,
@@ -17,6 +20,7 @@ describe('cms-roles', () => {
       'SUBSCRIBER',
       'CONTRIBUTOR',
       'AUTHOR',
+      'MODERATOR',
       'EDITOR',
       'ADMIN',
     ])
@@ -69,5 +73,34 @@ describe('cms-roles', () => {
         g.items.map((item) => item.to),
       ),
     ).toEqual([['/cms', '/cms/stories']])
+  })
+
+  it('gives moderators everything except settings and users', () => {
+    const moderator = { role: 'MODERATOR' }
+    for (const path of [
+      '/cms/stories/abc',
+      '/cms/submissions',
+      '/cms/media',
+      '/cms/authors/new',
+      '/cms/analytics',
+      '/cms/newsletter',
+    ]) {
+      expect(canAccessCmsPath(moderator, path)).toBe(true)
+    }
+    expect(canAccessCmsPath(moderator, '/cms/settings')).toBe(false)
+    expect(canAccessCmsPath(moderator, '/cms/users')).toBe(false)
+    expect(isCmsStaff(moderator)).toBe(true)
+    expect(isCmsSuperAdmin(moderator)).toBe(false)
+    expect(canManageAllStories(moderator)).toBe(true)
+  })
+
+  it('keeps authors to their own stories and profile', () => {
+    const author = { role: 'AUTHOR' }
+    expect(canAccessCmsPath(author, '/cms/stories/new')).toBe(true)
+    expect(canAccessCmsPath(author, '/cms/profile')).toBe(true)
+    expect(canAccessCmsPath(author, '/cms/media')).toBe(false)
+    expect(canAccessCmsPath(author, '/cms/authors')).toBe(false)
+    expect(canManageAllStories(author)).toBe(false)
+    expect(isCmsStaff(author)).toBe(false)
   })
 })

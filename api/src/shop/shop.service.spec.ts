@@ -4,12 +4,12 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { ShopOrderStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { MailService } from '../mail/mail.service';
-import { createMockConfig, createMockPrisma } from '../../test/helpers/mocks';
+import { SettingsService } from '../settings/settings.service';
+import { createMockPrisma, createSettings } from '../../test/helpers/mocks';
 import { buildProductRow } from '../../test/helpers/factories';
 import { ShopService } from './shop.service';
 
@@ -93,12 +93,15 @@ describe('ShopService', () => {
         ShopService,
         { provide: PrismaService, useValue: prisma },
         {
-          provide: ConfigService,
-          useValue: createMockConfig({
-            FEATURE_SHOP: 'true',
-            PUBLIC_SITE_URL: 'https://prizni.bg',
-            STRIPE_CURRENCY: 'eur',
-          }),
+          provide: SettingsService,
+          useValue: createSettings(
+            {
+              FEATURE_SHOP: 'true',
+              PUBLIC_SITE_URL: 'https://prizni.bg',
+              STRIPE_CURRENCY: 'eur',
+            },
+            { shopPublic: true },
+          ),
         },
         { provide: StorageService, useValue: storage },
         { provide: MailService, useValue: mail },
@@ -108,19 +111,29 @@ describe('ShopService', () => {
     service = module.get(ShopService);
   });
 
-  it('is enabled when feature flag is true', () => {
+  it('is enabled when feature flag and CMS toggle are on', () => {
     expect(service.isEnabled()).toBe(true);
   });
 
-  it('throws when shop disabled', () => {
+  it('throws when the server feature flag is off', () => {
     expect(() =>
       new ShopService(
         prisma as never,
-        createMockConfig({ FEATURE_SHOP: 'false' }) as never,
         storage as never,
         mail as never,
+        createSettings({ FEATURE_SHOP: 'false' }, { shopPublic: true }),
       ).assertEnabled(),
     ).toThrow(ServiceUnavailableException);
+  });
+
+  it('stays hidden until editors turn it on in CMS settings', () => {
+    const hidden = new ShopService(
+      prisma as never,
+      storage as never,
+      mail as never,
+      createSettings({ FEATURE_SHOP: 'true' }),
+    );
+    expect(hidden.isEnabled()).toBe(false);
   });
 
   it('lists and fetches public products', async () => {
@@ -190,14 +203,17 @@ describe('ShopService', () => {
   it('creates Stripe checkout session when configured', async () => {
     const stripeService = new ShopService(
       prisma as never,
-      createMockConfig({
-        FEATURE_SHOP: 'true',
-        PUBLIC_SITE_URL: 'https://prizni.bg',
-        STRIPE_SECRET_KEY: 'sk_test_123',
-        STRIPE_CURRENCY: 'eur',
-      }) as never,
       storage as never,
       mail as never,
+      createSettings(
+        {
+          FEATURE_SHOP: 'true',
+          PUBLIC_SITE_URL: 'https://prizni.bg',
+          STRIPE_SECRET_KEY: 'sk_test_123',
+          STRIPE_CURRENCY: 'eur',
+        },
+        { shopPublic: true },
+      ),
     );
     prisma.shopOrder.create = jest.fn().mockResolvedValue({
       id: 'order-stripe',

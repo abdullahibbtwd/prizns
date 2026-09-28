@@ -22,7 +22,9 @@ type AuthState = {
   refresh: () => Promise<boolean>
   reload: () => Promise<void>
   verifyEmail: (code: string) => Promise<void>
-  resendVerification: () => Promise<void>
+  /** Resolves to the seconds before another code may be requested. */
+  resendVerification: () => Promise<number>
+  verificationResendIn: () => Promise<number>
 }
 
 const AuthContext = createContext<AuthState | null>(null)
@@ -107,9 +109,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const resendVerification = async () => {
-    await api.post('/auth/resend-verification', undefined, {
-      skipAuthRefresh: true,
-    })
+    const result = await api.post<{ retryAfterSeconds?: number }>(
+      '/auth/resend-verification',
+      undefined,
+      { skipAuthRefresh: true },
+    )
+    return result?.retryAfterSeconds ?? 0
+  }
+
+  const verificationResendIn = async () => {
+    const result = await api.get<{ retryAfterSeconds?: number }>(
+      '/auth/resend-verification',
+      { skipAuthRefresh: true },
+    )
+    return result?.retryAfterSeconds ?? 0
   }
 
   return (
@@ -123,6 +136,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         reload,
         verifyEmail,
         resendVerification,
+        verificationResendIn,
       }}
     >
       {children}

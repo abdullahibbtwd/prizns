@@ -14,8 +14,11 @@ export type MediaJobData = {
   mimeType: string
 }
 
+export type TranslateEntity = 'article' | 'author' | 'series' | 'category'
+
+/** `sweep` re-queues rows stuck in PENDING/RUNNING (id is unused). */
 export type TranslateJobData = {
-  type: 'article' | 'author' | 'series' | 'category'
+  type: TranslateEntity | 'sweep'
   id: string
 }
 

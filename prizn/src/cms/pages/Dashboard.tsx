@@ -17,6 +17,8 @@ import {
   Bot,
   Plus,
   Trash2,
+  Inbox,
+  MessageSquareWarning,
 } from 'lucide-react'
 import {
   CmsCard,
@@ -34,7 +36,7 @@ import {
   listCmsTodos,
   updateCmsTodo,
 } from '@/lib/dashboard-api'
-import { canAccessCmsPath } from '@/lib/cms-roles'
+import { canAccessCmsPath, canPublishStories } from '@/lib/cms-roles'
 import { formatTrendPct } from '@/lib/format'
 import { pickLang } from '@/lib/pick-lang'
 import { useJournalLang } from '@/hooks/useJournalLang'
@@ -64,6 +66,7 @@ export default function CmsDashboard() {
   const canAnalytics = canAccessCmsPath(user, '/cms/analytics')
   const canAi = canAccessCmsPath(user, '/cms/ai')
   const canSubmissions = canAccessCmsPath(user, '/cms/submissions')
+  const canPublish = canPublishStories(user)
 
   const checklistQuery = useQuery({
     queryKey: ['cms-dashboard-checklist'],
@@ -120,6 +123,13 @@ export default function CmsDashboard() {
   const drafts = checklist?.draftArticles ?? 0
   const pending =
     (checklist?.reviewArticles ?? 0) + (checklist?.pendingSubmissions ?? 0)
+  const reviewQueue = checklist?.reviewQueue ?? []
+  const changesRequested = checklist?.changesRequested ?? []
+  const formatWhen = (iso: string) =>
+    new Date(iso).toLocaleString(i18n.language === 'bg' ? 'bg-BG' : 'en-GB', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    })
   const publishedToday = checklist?.publishedToday ?? 0
   const scheduled = checklist?.scheduledArticles ?? 0
   const analytics = analyticsQuery.data
@@ -390,6 +400,109 @@ export default function CmsDashboard() {
           />
         ) : null}
       </div>
+
+      {canStories && canPublish && checklist ? (
+        <CmsCard className="mt-8 p-6">
+          <div className="flex items-center justify-between gap-3 border-b border-[#E8E4DC] pb-4">
+            <div className="flex items-center gap-2">
+              <div className="flex size-8 items-center justify-center rounded-lg bg-[#0C2686]/10 text-[#0C2686]">
+                <Inbox className="size-4" />
+              </div>
+              <div>
+                <h2 className="font-heading text-lg font-bold text-stone-900">
+                  {t('cms.dashboard.reviewQueue')}
+                </h2>
+                <p className="text-xs text-stone-600">
+                  {t('cms.dashboard.reviewQueueHint')}
+                </p>
+              </div>
+            </div>
+            {checklist.reviewArticles > 0 ? (
+              <Link
+                to="/cms/stories?status=REVIEW"
+                className="text-xs font-bold text-[#0C2686] hover:underline"
+              >
+                {t('cms.dashboard.reviewQueueAll', {
+                  count: checklist.reviewArticles,
+                })}
+              </Link>
+            ) : null}
+          </div>
+          {reviewQueue.length === 0 ? (
+            <p className="mt-4 rounded-xl border border-dashed border-[#E8E4DC] px-3 py-4 text-xs text-stone-500">
+              {t('cms.dashboard.reviewQueueEmpty')}
+            </p>
+          ) : (
+            <ul className="mt-4 divide-y divide-[#E8E4DC]">
+              {reviewQueue.map((item) => (
+                <li key={item.id}>
+                  <Link
+                    to={`/cms/stories/${item.id}`}
+                    className="group flex items-center justify-between gap-3 py-3"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-bold text-stone-900 group-hover:text-[#0C2686]">
+                        {pickLang(lang, item.titleEn, item.titleBg) ||
+                          t('cms.editor.untitled')}
+                      </p>
+                      <p className="mt-0.5 text-xs text-stone-600">
+                        {t('cms.dashboard.submittedBy', {
+                          author:
+                            pickLang(lang, item.authorEn, item.authorBg) ||
+                            t('cms.dashboard.unknownAuthor'),
+                          date: formatWhen(item.submittedAt),
+                        })}
+                      </p>
+                    </div>
+                    <ArrowUpRight className="size-4 shrink-0 text-stone-400 group-hover:text-[#0C2686]" />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CmsCard>
+      ) : null}
+
+      {canStories && !canPublish && changesRequested.length > 0 ? (
+        <CmsCard className="mt-8 border-amber-200 p-6">
+          <div className="flex items-center gap-2 border-b border-amber-200 pb-4">
+            <div className="flex size-8 items-center justify-center rounded-lg bg-amber-500/10 text-amber-800">
+              <MessageSquareWarning className="size-4" />
+            </div>
+            <div>
+              <h2 className="font-heading text-lg font-bold text-stone-900">
+                {t('cms.dashboard.changesRequested')}
+              </h2>
+              <p className="text-xs text-stone-600">
+                {t('cms.dashboard.changesRequestedHint')}
+              </p>
+            </div>
+          </div>
+          <ul className="mt-4 divide-y divide-[#E8E4DC]">
+            {changesRequested.map((item) => (
+              <li key={item.id}>
+                <Link
+                  to={`/cms/stories/${item.id}`}
+                  className="group flex items-start justify-between gap-3 py-3"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-bold text-stone-900 group-hover:text-[#0C2686]">
+                      {pickLang(lang, item.titleEn, item.titleBg) ||
+                        t('cms.editor.untitled')}
+                    </p>
+                    {item.reviewNote ? (
+                      <p className="mt-1 line-clamp-2 whitespace-pre-line text-xs text-amber-900">
+                        {item.reviewNote}
+                      </p>
+                    ) : null}
+                  </div>
+                  <ArrowUpRight className="mt-0.5 size-4 shrink-0 text-stone-400 group-hover:text-[#0C2686]" />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </CmsCard>
+      ) : null}
 
       <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-3">
         {canAnalytics ? (

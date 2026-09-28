@@ -7,6 +7,7 @@ import {
   getPrimaryNavLinks,
 } from '@/data/concept-3/nav'
 import { useSectionPresence } from '@/hooks/useSectionPresence'
+import { useSiteSettings } from '@/lib/site-settings-api'
 
 interface JournalFooterProps {
   lang: 'bg' | 'en'
@@ -15,6 +16,7 @@ interface JournalFooterProps {
 export function JournalFooter({ lang }: JournalFooterProps) {
   const { t } = useTranslation()
   const { isPathVisible } = useSectionPresence()
+  const { data: settings } = useSiteSettings()
   const primaryLinks = getPrimaryNavLinks(lang).filter((link) =>
     isPathVisible(link.to),
   )
@@ -22,6 +24,13 @@ export function JournalFooter({ lang }: JournalFooterProps) {
     isPathVisible(link.to),
   )
   const contributeLinks = getContributeNavLinks(lang)
+  const socialLinks = [
+    { label: 'Facebook', href: settings?.social.facebook },
+    { label: 'Instagram', href: settings?.social.instagram },
+    { label: 'YouTube', href: settings?.social.youtube },
+    { label: 'TikTok', href: settings?.social.tiktok },
+  ].filter((link): link is { label: string; href: string } => Boolean(link.href))
+  const credit = settings?.photographerCredit ?? null
 
   return (
     <footer className="overflow-x-hidden border-t border-[#EAE6DF] bg-[#FDFBF7] px-6 py-24 text-[#1A1A1A] md:px-12 md:py-32">
@@ -32,12 +41,6 @@ export function JournalFooter({ lang }: JournalFooterProps) {
         >
           PRIZNI
         </Link>
-
-        <p className="mt-8 max-w-2xl font-sans text-sm font-light leading-relaxed text-[#1A1A1A]/65 md:text-base">
-          {lang === 'bg'
-            ? 'Топъл дигитален журнал за човешки истории, места и традиции от Северозападна България.'
-            : 'A warm digital journal of human stories, places, and traditions from Northwestern Bulgaria.'}
-        </p>
 
         <nav
           aria-label={lang === 'bg' ? 'Основна навигация' : 'Primary'}
@@ -95,16 +98,38 @@ export function JournalFooter({ lang }: JournalFooterProps) {
           >
             {lang === 'bg' ? 'Контакт' : 'Contact'}
           </Link>
-          <a href="#instagram" className="transition-colors hover:text-[#0C2686]">
-            Instagram
-          </a>
-          <a href="#facebook" className="transition-colors hover:text-[#0C2686]">
-            Facebook
-          </a>
+          {socialLinks.map((link) => (
+            <a
+              key={link.label}
+              href={link.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="transition-colors hover:text-[#0C2686]"
+            >
+              {link.label}
+            </a>
+          ))}
         </div>
 
         <div className="mt-16 flex w-full flex-col items-center justify-between gap-4 border-t border-[#EAE6DF] pt-8 font-sans text-[11px] uppercase tracking-widest text-[#1A1A1A]/40 sm:flex-row">
-          <span>© 2026 PRIZNI</span>
+          <span>© {new Date().getFullYear()} PRIZNI</span>
+          {credit ? (
+            <span>
+              {lang === 'bg' ? 'Снимки: ' : 'Photography: '}
+              {credit.url ? (
+                <a
+                  href={credit.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[#1A1A1A]/60 underline-offset-4 transition-colors hover:text-[#0C2686] hover:underline"
+                >
+                  {credit.name}
+                </a>
+              ) : (
+                credit.name
+              )}
+            </span>
+          ) : null}
           <span>{t('livingJournalTagline')}</span>
         </div>
       </div>

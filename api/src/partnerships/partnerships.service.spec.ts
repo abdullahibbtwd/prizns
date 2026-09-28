@@ -1,12 +1,18 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { createMockPrisma } from '../../test/helpers/mocks';
+import { MailService } from '../mail/mail.service';
+import { SettingsService } from '../settings/settings.service';
+import { createMockPrisma, createSettings } from '../../test/helpers/mocks';
 import { PartnershipsService } from './partnerships.service';
 
 describe('PartnershipsService', () => {
   let service: PartnershipsService;
   let prisma: ReturnType<typeof createMockPrisma>;
+  const mail = {
+    isConfigured: jest.fn().mockReturnValue(true),
+    notifyAdmin: jest.fn().mockResolvedValue(true),
+  };
 
   const row = {
     id: 'inq-1',
@@ -39,6 +45,8 @@ describe('PartnershipsService', () => {
       providers: [
         PartnershipsService,
         { provide: PrismaService, useValue: prisma },
+        { provide: MailService, useValue: mail },
+        { provide: SettingsService, useValue: createSettings() },
       ],
     }).compile();
 

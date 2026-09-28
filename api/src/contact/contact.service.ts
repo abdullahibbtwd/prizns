@@ -8,6 +8,7 @@ import {
 } from '@prisma/client'
 import { AiService } from '../ai/ai.service'
 import { checkRateLimit } from '../common/rate-limit'
+import { escapeHtml } from '../mail/email-html'
 import { MailService } from '../mail/mail.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { CreateContactDto } from './dto/create-contact.dto'
@@ -132,24 +133,13 @@ export class ContactService {
   }
 
   private async notifyAdmin(row: ContactInquiry) {
-    if (!this.mail.isConfigured()) return
-    const admin =
-      this.config.get<string>('ADMIN_EMAIL')?.trim() ||
-      this.config.get<string>('RESEND_FROM')?.trim()
-    if (!admin) return
-
-    const to = admin.includes('<')
-      ? admin.replace(/^.*<([^>]+)>.*$/, '$1').trim()
-      : admin
-    if (!to.includes('@')) return
-
     const label = this.categoryLabel(row.aiCategory)
     const site =
       this.config.get<string>('PUBLIC_SITE_URL')?.replace(/\/$/, '') ||
       'https://prizni.bg'
 
-    await this.mail.send({
-      to,
+    await this.mail.notifyAdmin({
+      replyTo: row.email,
       subject: `[Prizni contact] ${label}: ${row.subject}`,
       text: [
         `New contact inquiry (${label})`,
@@ -165,9 +155,9 @@ export class ContactService {
         .join('\n'),
       html: `
         <p><strong>New contact inquiry</strong> — ${label}</p>
-        <p>From: ${row.name} &lt;${row.email}&gt;<br/>Subject: ${row.subject}</p>
-        ${row.aiSummary ? `<p><em>AI:</em> ${row.aiSummary}</p>` : ''}
-        <pre style="white-space:pre-wrap;font-family:sans-serif">${row.message}</pre>
+        <p>From: ${escapeHtml(row.name)} &lt;${escapeHtml(row.email)}&gt;<br/>Subject: ${escapeHtml(row.subject)}</p>
+        ${row.aiSummary ? `<p><em>AI:</em> ${escapeHtml(row.aiSummary)}</p>` : ''}
+        <pre style="white-space:pre-wrap;font-family:sans-serif">${escapeHtml(row.message)}</pre>
         <p><a href="${site}/cms/contact">Open in CMS</a></p>
       `,
     })
@@ -201,10 +191,10 @@ export class ContactService {
       subject: `Prizni · ${row.subject}`,
       text: `Здравейте, ${row.name},\n\n${bodyBg}\n\nHello ${row.name},\n\n${bodyEn}\n\n— Prizni`,
       html: `
-        <p>Здравейте, ${row.name},</p>
+        <p>Здравейте, ${escapeHtml(row.name)},</p>
         <p>${bodyBg}</p>
         <hr/>
-        <p>Hello ${row.name},</p>
+        <p>Hello ${escapeHtml(row.name)},</p>
         <p>${bodyEn}</p>
         <p>— Prizni</p>
       `,

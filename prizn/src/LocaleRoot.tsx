@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Routes, Route } from 'react-router-dom'
+import { Outlet, Routes, Route } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import HomePage from '@/routes/concept-3'
 import DiscoverPage from '@/routes/discover'
@@ -32,6 +32,14 @@ import StoryOfTheYearPage from '@/routes/story-of-the-year'
 import ArchivePage from '@/routes/archive'
 import NotFoundPage from '@/routes/not-found'
 import type { JournalLang } from '@/components/concept-3/JournalShell'
+import { useSiteSettings } from '@/lib/site-settings-api'
+
+/** Shop pages exist only while CMS → Settings marks the shop public. */
+function ShopGate() {
+  const { data, isLoading } = useSiteSettings()
+  if (isLoading) return null
+  return data?.shopEnabled ? <Outlet /> : <NotFoundPage />
+}
 
 /** Public journal routes (paths relative to `/` or `/en/`). */
 export function LocaleRoot({ lang }: { lang: JournalLang }) {
@@ -75,11 +83,13 @@ export function LocaleRoot({ lang }: { lang: JournalLang }) {
       <Route path="partnerships" element={<PartnershipsPage />} />
       <Route path="contact" element={<ContactPage />} />
       <Route path="why-prizni" element={<WhyPrizniPage />} />
-      <Route path="shop" element={<ShopPage />} />
-      <Route path="shop/cart" element={<ShopCartPage />} />
-      <Route path="shop/track" element={<ShopTrackPage />} />
-      <Route path="shop/success" element={<ShopSuccessPage />} />
-      <Route path="shop/:slug" element={<ShopProductPage />} />
+      <Route element={<ShopGate />}>
+        <Route path="shop" element={<ShopPage />} />
+        <Route path="shop/cart" element={<ShopCartPage />} />
+        <Route path="shop/track" element={<ShopTrackPage />} />
+        <Route path="shop/success" element={<ShopSuccessPage />} />
+        <Route path="shop/:slug" element={<ShopProductPage />} />
+      </Route>
       <Route path="auth/verify" element={<AuthVerifyPage />} />
       <Route path="me" element={<ReaderMePage />} />
       <Route path="story-of-the-year" element={<StoryOfTheYearPage />} />

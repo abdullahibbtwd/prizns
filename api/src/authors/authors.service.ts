@@ -23,6 +23,8 @@ const authorSelect = {
   aliases: true,
   isActive: true,
   showOnAuthors: true,
+  isGuest: true,
+  userId: true,
   translationStatus: true,
   translationError: true,
   sourceLang: true,
@@ -46,12 +48,15 @@ const publicAuthorSelect = {
   bioEn: true,
   imageUrl: true,
   aliases: true,
+  isGuest: true,
   _count: {
     select: {
       articles: { where: { status: ArticleStatus.PUBLISHED } },
     },
   },
 } as const;
+
+export const GUEST_ROLE_BG = 'Гост автор';
 
 const publicListingFilter = { isActive: true, showOnAuthors: true } as const;
 
@@ -74,6 +79,7 @@ export class AuthorsService {
         roleBg: true,
         roleEn: true,
         imageUrl: true,
+        isGuest: true,
       },
     });
   }
@@ -114,6 +120,7 @@ export class AuthorsService {
       bioEn: string | null;
       imageUrl: string | null;
       aliases: string[];
+      isGuest: boolean;
       _count: { articles: number };
     },
   ) {
@@ -134,13 +141,15 @@ export class AuthorsService {
       bioBg: row.bioBg ?? '',
       image: row.imageUrl ?? '',
       aliases: row.aliases,
+      isGuest: row.isGuest,
       storyCount: row._count.articles,
       badges,
     };
   }
 
-  listCms() {
+  listCms(opts?: { guest?: boolean }) {
     return this.prisma.author.findMany({
+      where: opts?.guest !== undefined ? { isGuest: opts.guest } : undefined,
       orderBy: { nameBg: 'asc' },
       select: authorSelect,
     });
@@ -174,7 +183,7 @@ export class AuthorsService {
         slug,
         nameBg,
         nameEn: null,
-        roleBg: dto.roleBg?.trim() || 'Автор',
+        roleBg: dto.roleBg?.trim() || (dto.isGuest ? GUEST_ROLE_BG : 'Автор'),
         roleEn: null,
         locationBg: dto.locationBg?.trim() || null,
         locationEn: null,
@@ -186,6 +195,7 @@ export class AuthorsService {
         aliases: dto.aliases ?? [],
         isActive: dto.isActive ?? true,
         showOnAuthors: dto.showOnAuthors ?? true,
+        isGuest: dto.isGuest ?? false,
         translationStatus: TranslationStatus.PENDING,
         translationError: null,
         userId: dto.userId || undefined,
@@ -197,6 +207,21 @@ export class AuthorsService {
   /** Quick create used by the article editor author picker. */
   createQuick(nameBg: string) {
     return this.create({ nameBg });
+  }
+
+  /**
+   * Guest profile for a Write for Us contributor: reuses a guest with the same
+   * name, otherwise creates one (no login). Regular namesakes are never reused.
+   */
+  async findOrCreateGuest(nameBg: string): Promise<{ id: string }> {
+    const name = nameBg.trim();
+    const existing = await this.prisma.author.findFirst({
+      where: { isGuest: true, nameBg: { equals: name, mode: 'insensitive' } },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true },
+    });
+    if (existing) return existing;
+    return this.create({ nameBg: name, isGuest: true, showOnAuthors: true });
   }
 
   async update(id: string, dto: UpdateAuthorDto) {
@@ -243,6 +268,7 @@ export class AuthorsService {
         ...(dto.showOnAuthors !== undefined
           ? { showOnAuthors: dto.showOnAuthors }
           : {}),
+        ...(dto.isGuest !== undefined ? { isGuest: dto.isGuest } : {}),
         ...(bgChanged
           ? {
               nameEn: null,

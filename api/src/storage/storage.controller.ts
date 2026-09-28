@@ -11,10 +11,13 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { STAFF_ROLES } from '../auth/role-access';
 import { StorageService } from './storage.service';
 
 @Controller('storage')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class StorageController {
   constructor(private readonly storage: StorageService) {}
 
@@ -43,6 +46,7 @@ export class StorageController {
   }
 
   @Delete()
+  @Roles(...STAFF_ROLES)
   async remove(@Query('key') key: string) {
     await this.storage.remove(key);
     return { ok: true };

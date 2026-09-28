@@ -87,6 +87,15 @@ export class AuthController {
     return { user: { ...verified, sessionId: user.sessionId } };
   }
 
+  @Get('resend-verification')
+  @UseGuards(JwtAuthGuard)
+  @AllowUnverifiedEmail()
+  async resendVerificationStatus(@CurrentUser() user: AuthUserPayload) {
+    return {
+      retryAfterSeconds: await this.auth.verificationResendIn(user.id),
+    };
+  }
+
   @Post('resend-verification')
   @HttpCode(200)
   @UseGuards(JwtAuthGuard)
@@ -95,11 +104,14 @@ export class AuthController {
     @CurrentUser() user: AuthUserPayload,
     @Req() req: Request,
   ) {
-    await this.auth.sendEmailVerification(user.id, {
+    const result = await this.auth.sendEmailVerification(user.id, {
       replaceExisting: true,
       skipCooldown: false,
       ip: req.ip,
     });
-    return { ok: true };
+    return {
+      ok: true,
+      retryAfterSeconds: 'retryAfterSeconds' in result ? result.retryAfterSeconds : 0,
+    };
   }
 }

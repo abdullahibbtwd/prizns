@@ -25,6 +25,7 @@ import { ReaderModule } from './reader/reader.module';
 import { RedisModule } from './redis/redis.module';
 import { SeoModule } from './seo/seo.module';
 import { SeriesModule } from './series/series.module';
+import { SettingsModule } from './settings/settings.module';
 import { ShopModule } from './shop/shop.module';
 import { SocialModule } from './social/social.module';
 import { StorageModule } from './storage/storage.module';
@@ -48,6 +49,7 @@ import { UsersModule } from './users/users.module';
       validate: validateEnv,
     }),
     PrismaModule,
+    SettingsModule,
     RedisModule,
     JobsModule,
     AuthModule,

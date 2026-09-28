@@ -46,6 +46,7 @@ export type MediaClientAsset = {
   locationEn: string | null;
   creditBg: string | null;
   creditEn: string | null;
+  showInGallery: boolean;
   createdAt: Date;
 };
 
@@ -66,6 +67,7 @@ export class MediaService {
     pageSize?: number;
     q?: string;
     dedupe?: boolean;
+    showInGallery?: boolean;
   }) {
     const paginate = opts?.page != null || opts?.pageSize != null;
     const page = Math.max(1, Number(opts?.page) || 1);
@@ -76,6 +78,9 @@ export class MediaService {
     const q = opts?.q?.trim();
     const where = {
       ...(opts?.kind ? { kind: opts.kind } : {}),
+      ...(opts?.showInGallery !== undefined
+        ? { showInGallery: opts.showInGallery }
+        : {}),
       ...(q
         ? {
             OR: [
@@ -196,6 +201,7 @@ export class MediaService {
           status: MediaProcessStatus.DONE,
           ...(isImage
             ? {
+                showInGallery: true,
                 products: { none: {} },
                 productGalleryItems: { none: {} },
                 NOT: { key: { startsWith: 'shop/' } },
@@ -306,6 +312,8 @@ export class MediaService {
       titleBg?: string;
       locationBg?: string;
       uploadedById?: string;
+      /** Only media-library (and event story) uploads appear in the public gallery. */
+      showInGallery?: boolean;
     },
   ) {
     const tempPath = file.path;
@@ -340,6 +348,7 @@ export class MediaService {
         titleBg: opts?.titleBg?.trim() || null,
         locationBg: opts?.locationBg?.trim() || null,
         creditBg: opts?.creditBg?.trim() || null,
+        showInGallery: opts?.showInGallery ?? false,
       },
     });
 
@@ -524,6 +533,7 @@ export class MediaService {
     locationEn?: string | null;
     creditBg?: string | null;
     creditEn?: string | null;
+    showInGallery?: boolean;
     createdAt: Date;
   }): MediaClientAsset {
     const resolved = this.storage.resolvePublicUrl(row);
@@ -552,8 +562,17 @@ export class MediaService {
       locationEn: row.locationEn ?? null,
       creditBg: row.creditBg ?? null,
       creditEn: row.creditEn ?? null,
+      showInGallery: row.showInGallery ?? true,
       createdAt: row.createdAt,
     };
+  }
+
+  async setGalleryVisibility(ids: string[], showInGallery: boolean) {
+    const result = await this.prisma.mediaAsset.updateMany({
+      where: { id: { in: ids } },
+      data: { showInGallery },
+    });
+    return { updated: result.count, showInGallery };
   }
 
   withPublicUrl<T extends { key: string; url: string }>(row: T): T {

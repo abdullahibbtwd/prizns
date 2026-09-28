@@ -10,13 +10,16 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { STAFF_ROLES, SUPER_ADMIN_ROLES } from '../auth/role-access';
 import { TranslationService } from '../translation/translation.service';
 import { AuthorsService } from './authors.service';
 import { CreateAuthorDto } from './dto/create-author.dto';
 import { UpdateAuthorDto } from './dto/update-author.dto';
 
 @Controller('cms/authors')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class AuthorsController {
   constructor(
     private readonly authors: AuthorsService,
@@ -24,8 +27,12 @@ export class AuthorsController {
   ) {}
 
   @Get()
-  list(@Query('all') all?: string) {
-    if (all === '1' || all === 'true') return this.authors.listCms();
+  list(@Query('all') all?: string, @Query('guest') guest?: string) {
+    if (all === '1' || all === 'true') {
+      return this.authors.listCms({
+        guest: guest === 'true' ? true : guest === 'false' ? false : undefined,
+      });
+    }
     return this.authors.listActive();
   }
 
@@ -35,6 +42,7 @@ export class AuthorsController {
   }
 
   @Post()
+  @Roles(...STAFF_ROLES)
   async create(@Body() dto: CreateAuthorDto) {
     const author = await this.authors.create(dto);
     if (author.translationStatus === 'PENDING') {
@@ -44,6 +52,7 @@ export class AuthorsController {
   }
 
   @Patch(':id')
+  @Roles(...STAFF_ROLES)
   async update(@Param('id') id: string, @Body() dto: UpdateAuthorDto) {
     const author = await this.authors.update(id, dto);
     if (author.translationStatus === 'PENDING') {
@@ -53,6 +62,7 @@ export class AuthorsController {
   }
 
   @Delete(':id')
+  @Roles(...SUPER_ADMIN_ROLES)
   remove(@Param('id') id: string) {
     return this.authors.remove(id);
   }

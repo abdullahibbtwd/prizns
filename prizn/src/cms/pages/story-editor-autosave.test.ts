@@ -67,6 +67,17 @@ describe('shouldAutosaveDraft', () => {
       }),
     ).toBe(false)
   })
+
+  it('never autosaves a live story (edits wait for Update)', () => {
+    expect(
+      shouldAutosaveDraft({
+        dirty: true,
+        title: 'Village morning',
+        status: 'PUBLISHED',
+        busy: false,
+      }),
+    ).toBe(false)
+  })
 })
 
 describe('autosaveStatus', () => {
@@ -121,6 +132,12 @@ describe('story draft local backup', () => {
       ...values,
       body: [{ type: 'paragraph', textBg: 'Changed.' }],
     })
+    expect(a).not.toBe(b)
+  })
+
+  it('changes the snapshot when only the author changes', () => {
+    const a = serializeStoryDraft({ ...values, authorId: 'author-a' })
+    const b = serializeStoryDraft({ ...values, authorId: 'author-b' })
     expect(a).not.toBe(b)
   })
 })

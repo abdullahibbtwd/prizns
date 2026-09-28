@@ -55,18 +55,6 @@ export function EditorialHero({ lang }: EditorialHeroProps) {
       {/* Luxury Matte Dark Overlay */}
       <div className="absolute inset-0 z-0 bg-gradient-to-b from-black/50 via-black/35 to-black/70" />
 
-      {/* Top Brand Mark */}
-      <motion.div
-        initial={false}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35, delay: 0.1 }}
-        className="relative z-10 pt-16 md:pt-12 text-center"
-      >
-        <span className="font-heading text-lg md:text-xl tracking-[0.4em] uppercase font-light text-white/90">
-          {content.brand}
-        </span>
-      </motion.div>
-
       {/* Center Hero Heading */}
       <div className="relative z-10 max-w-4xl mx-auto text-center my-auto px-4">
         <motion.h1

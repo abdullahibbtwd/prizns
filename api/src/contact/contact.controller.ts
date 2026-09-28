@@ -12,11 +12,15 @@ import {
   ContactInquiryStatus,
 } from '@prisma/client'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
+import { RolesGuard } from '../auth/guards/roles.guard'
+import { Roles } from '../auth/decorators/roles.decorator'
+import { STAFF_ROLES } from '../auth/role-access'
 import { UpdateContactDto } from './dto/update-contact.dto'
 import { ContactService } from './contact.service'
 
 @Controller('cms/contact')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(...STAFF_ROLES)
 export class ContactController {
   constructor(private readonly contact: ContactService) {}
 

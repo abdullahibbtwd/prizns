@@ -5,6 +5,18 @@ import { buildCmsArticle } from '@/test/factories'
 import { renderPage } from '@/test/render-page'
 import CmsStoriesPage from './StoriesPage'
 
+const authState = vi.hoisted(() => ({
+  user: { id: 'u-admin', role: 'ADMIN', roles: ['ADMIN'] } as {
+    id: string
+    role: string
+    roles: string[]
+  },
+}))
+
+vi.mock('@/lib/auth', () => ({
+  useAuth: () => ({ user: authState.user, loading: false }),
+}))
+
 vi.mock('framer-motion', () => ({
   motion: {
     div: ({
@@ -110,6 +122,7 @@ describe('CmsStoriesPage', () => {
       totalPages: 1,
     })
     deleteCmsArticle.mockResolvedValue(undefined)
+    authState.user = { id: 'u-admin', role: 'ADMIN', roles: ['ADMIN'] }
   })
 
   it('lists categories in the filter and hides leftover city topics', async () => {
@@ -153,5 +166,31 @@ describe('CmsStoriesPage', () => {
     await waitFor(() => {
       expect(deleteCmsArticle).toHaveBeenCalledWith('art-1')
     })
+  })
+
+  it('hides delete and the author filter from authors', async () => {
+    authState.user = { id: 'u-author', role: 'AUTHOR', roles: ['AUTHOR'] }
+    renderPage(<CmsStoriesPage />)
+    await screen.findByText('Draft story')
+
+    expect(
+      screen.queryByRole('button', { name: 'cms.stories.delete' }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'cms.stories.filterAuthorAll' }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('lets moderators filter by author but not delete', async () => {
+    authState.user = { id: 'u-mod', role: 'MODERATOR', roles: ['MODERATOR'] }
+    renderPage(<CmsStoriesPage />)
+    await screen.findByText('Draft story')
+
+    expect(
+      screen.getByRole('button', { name: 'cms.stories.filterAuthorAll' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'cms.stories.delete' }),
+    ).not.toBeInTheDocument()
   })
 })

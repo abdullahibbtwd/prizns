@@ -1,6 +1,8 @@
 # Isolated infrastructure for API integration/e2e tests.
 # Start:  docker compose -f docker-compose.test.yml up -d --wait
+#         + scripts/start-test-minio.sh  (OSS MinIO binary — Docker images are gone/license-gated)
 # Stop:   docker compose -f docker-compose.test.yml down -v
+#         + scripts/stop-test-minio.sh
 
 name: prizn-test
 
@@ -28,20 +30,3 @@ services:
       interval: 3s
       timeout: 3s
       retries: 15
-
-  minio-test:
-    # Historical quay.io/minio/minio tags are gone/unauthorized; AIStor image is public.
-    image: quay.io/minio/aistor/minio:RELEASE.2024-12-21T04-40-25Z
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: minio_test
-      MINIO_ROOT_PASSWORD: minio_test_secret
-    ports:
-      - "9014:9000"
-      - "9015:9001"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 3s
-      timeout: 3s
-      retries: 15
-      start_period: 5s

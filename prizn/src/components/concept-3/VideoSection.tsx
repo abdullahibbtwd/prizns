@@ -29,6 +29,7 @@ function toVideoCard(article: CmsArticle) {
     locationBg: article.locationBg || '',
     image: article.image || '',
     excerpt: article.subtitle || article.subtitleBg || '',
+    excerptBg: article.subtitleBg || '',
     path: articlePath(article),
     videoUrl: article.videoUrl || '',
   }
@@ -173,7 +174,7 @@ export function VideoSection({ lang }: VideoSectionProps) {
                     </Link>
                   </h3>
                   <p className="mt-2 line-clamp-2 font-sans text-sm font-light leading-relaxed text-white/55">
-                    {item.excerpt}
+                    {lang === 'bg' ? item.excerptBg : item.excerpt}
                   </p>
                 </div>
               </motion.div>

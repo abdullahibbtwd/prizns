@@ -24,6 +24,7 @@ function toCampaignsCard(article: CmsArticle) {
     image: article.image || '',
     imageThumb: article.imageThumb || '',
     excerpt: article.subtitle || article.subtitleBg || '',
+    excerptBg: article.subtitleBg || '',
     path: articlePath(article),
   }
 }
@@ -85,7 +86,7 @@ export function CampaignsSection({ lang }: CampaignsSectionProps) {
                     {lang === 'bg' ? featured.titleBg : featured.title}
                   </h3>
                   <p className="mt-4 max-w-lg line-clamp-3 font-sans text-sm font-light leading-relaxed text-white/75 md:text-base">
-                    {featured.excerpt}
+                    {lang === 'bg' ? featured.excerptBg : featured.excerpt}
                   </p>
                   <span className="mt-6 inline-flex items-center gap-2 font-sans text-xs font-medium uppercase tracking-[0.22em] text-white">
                     {lang === 'bg' ? 'Научете повече' : 'Learn more'}
@@ -122,7 +123,7 @@ export function CampaignsSection({ lang }: CampaignsSectionProps) {
                     {lang === 'bg' ? item.titleBg : item.title}
                   </h3>
                   <p className="mt-2 line-clamp-2 font-sans text-sm font-light leading-relaxed text-[#1A1A1A]/60">
-                    {item.excerpt}
+                    {lang === 'bg' ? item.excerptBg : item.excerpt}
                   </p>
                 </Link>
               </motion.div>

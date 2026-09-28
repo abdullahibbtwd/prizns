@@ -14,9 +14,11 @@ import {
   convertCmsSubmission,
   deleteCmsSubmission,
   getCmsSubmission,
+  replyCmsSubmission,
   updateCmsSubmission,
   type SubmissionStatus,
 } from '@/lib/submissions-api'
+import { CmsCheckbox, CmsTextarea } from '@/cms/components/CmsFields'
 import { cn } from '@/lib/utils'
 import {
   Mail,
@@ -33,6 +35,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ArrowLeft,
+  Send,
 } from 'lucide-react'
 
 export default function CmsSubmissionDetailPage() {
@@ -43,6 +46,8 @@ export default function CmsSubmissionDetailPage() {
   const queryClient = useQueryClient()
   const [photoIndex, setPhotoIndex] = useState(0)
   const [toast, setToast] = useState('')
+  const [notifySubmitter, setNotifySubmitter] = useState(true)
+  const [replyText, setReplyText] = useState('')
 
   const detailQuery = useQuery({
     queryKey: ['cms-submission', id],
@@ -76,10 +81,21 @@ export default function CmsSubmissionDetailPage() {
     }: {
       submissionId: string
       status: SubmissionStatus
-    }) => updateCmsSubmission(submissionId, { status }),
+    }) => updateCmsSubmission(submissionId, { status, notifySubmitter }),
     onSuccess: async () => {
       await invalidate()
     },
+  })
+
+  const replyMutation = useMutation({
+    mutationFn: (submissionId: string) =>
+      replyCmsSubmission(submissionId, { message: replyText.trim() }),
+    onSuccess: async (updated) => {
+      await invalidate()
+      setReplyText('')
+      showToast(`Email sent to ${updated.email}.`)
+    },
+    onError: (err: Error) => showToast(err.message || 'Email failed'),
   })
 
   const convertMutation = useMutation({
@@ -323,7 +339,45 @@ export default function CmsSubmissionDetailPage() {
             </div>
           )}
 
-          <div className="mt-8 flex flex-wrap items-center gap-3 border-t border-[#E8E4DC] pt-6">
+          <div className="mt-8 space-y-3 rounded-2xl border border-[#E8E4DC] bg-[#FAF8F3] p-5">
+            <p className="flex items-center gap-2 font-heading text-base font-bold text-stone-900">
+              <Send className="size-4 text-[#0C2686]" /> Reply to {selected.name}
+            </p>
+            <CmsTextarea
+              value={replyText}
+              onChange={(e) => setReplyText(e.target.value)}
+              placeholder="Write a message — it is emailed to the writer and saved in the notes below."
+              maxLength={5000}
+            />
+            <div className="flex justify-end">
+              <PrimaryButton
+                disabled={!replyText.trim() || replyMutation.isPending}
+                onClick={() => replyMutation.mutate(selected.id)}
+              >
+                <Send className="size-4" />
+                {replyMutation.isPending ? 'Sending…' : `Email ${selected.email}`}
+              </PrimaryButton>
+            </div>
+            {selected.notes?.trim() ? (
+              <div className="border-t border-[#E8E4DC] pt-3">
+                <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">
+                  Notes & sent messages
+                </p>
+                <p className="mt-1 whitespace-pre-wrap text-sm text-stone-700">{selected.notes}</p>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="mt-6">
+            <CmsCheckbox
+              checked={notifySubmitter}
+              onChange={() => setNotifySubmitter((v) => !v)}
+              label="Email the writer when I change the status"
+              description="Sends a short bilingual update (in review, changes requested, approved, declined) if enabled in Settings."
+            />
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-[#E8E4DC] pt-6">
             <PrimaryButton
               disabled={convertMutation.isPending}
               onClick={() => {

@@ -196,6 +196,18 @@ export class UsersService {
     if (existing) {
       throw new ConflictException('A user with this email already exists');
     }
+    const linkAuthor = dto.linkAuthorId
+      ? await this.prisma.author.findUnique({
+          where: { id: dto.linkAuthorId },
+          select: { id: true, userId: true, showOnAuthors: true },
+        })
+      : null;
+    if (dto.linkAuthorId) {
+      if (!linkAuthor) throw new BadRequestException('Author profile not found');
+      if (linkAuthor.userId) {
+        throw new ConflictException('This author profile already has a login');
+      }
+    }
 
     const passwordHash = await bcrypt.hash(dto.password, 12);
     let row: UserRow;
@@ -218,6 +230,19 @@ export class UsersService {
         throw new ConflictException('A user with this email already exists');
       }
       throw error;
+    }
+
+    if (linkAuthor) {
+      const linked = await this.prisma.author.updateMany({
+        where: { id: linkAuthor.id, userId: null },
+        data: { userId: row.id, isGuest: false },
+      });
+      if (linked.count === 1) {
+        row = {
+          ...row,
+          author: { id: linkAuthor.id, showOnAuthors: linkAuthor.showOnAuthors },
+        };
+      }
     }
 
     const listing = await this.syncAuthorListing(

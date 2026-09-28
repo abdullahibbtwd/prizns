@@ -90,6 +90,8 @@ export interface JournalArticle {
   /** Optional link to `/authors/:slug` */
   authorSlug?: string
   authorImage?: string
+  /** Byline belongs to a guest author (Write for Us etc.). */
+  authorIsGuest?: boolean
   /** For voices: spoken by */
   speaker?: string
   speakerBg?: string

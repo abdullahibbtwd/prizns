@@ -2,6 +2,7 @@ import {
   usePublicArticles,
   usePublicSeries,
 } from '@/lib/public-content'
+import { useSiteSettings } from '@/lib/site-settings-api'
 
 /**
  * Lightweight presence checks for nav/footer + homepage empty-section hiding.
@@ -18,6 +19,9 @@ export function useSectionPresence() {
   const video = usePublicArticles('video', { limit: 1 })
   const series = usePublicSeries()
   const voices = usePublicArticles(undefined, { hasAudio: true, limit: 1 })
+  const siteSettings = useSiteSettings()
+  // Shop stays hidden until Settings confirms it is public (no flash while loading).
+  const hasShop = siteSettings.data?.shopEnabled ?? false
 
   const ready = (query: { isLoading: boolean }) => !query.isLoading
 
@@ -49,6 +53,7 @@ export function useSectionPresence() {
     hasNews: has(news),
     hasVideo: has(video),
     hasVoices,
+    hasShop,
     /** Path → whether the matching nav destination should stay visible. */
     isPathVisible(path: string): boolean {
       switch (path) {
@@ -70,6 +75,8 @@ export function useSectionPresence() {
           return has(video)
         case '/voices':
           return hasVoices
+        case '/shop':
+          return hasShop
         default:
           return true
       }

@@ -1,5 +1,9 @@
 import { Role } from '@prisma/client';
 import {
+  ALL_STORIES_ROLES,
+  STAFF_ROLES,
+  SUPER_ADMIN_ROLES,
+  canManageAllStories,
   hasAdminRole,
   normalizeRoles,
   primaryRole,
@@ -34,5 +38,20 @@ describe('role-access', () => {
     expect(
       hasAdminRole({ role: Role.EDITOR, roles: [Role.EDITOR, Role.ADMIN] }),
     ).toBe(true);
+  });
+
+  it('gives moderators (and legacy editors) staff powers but not super-admin ones', () => {
+    expect(STAFF_ROLES).toEqual(
+      expect.arrayContaining([Role.ADMIN, Role.MODERATOR, Role.EDITOR]),
+    );
+    expect(STAFF_ROLES).not.toContain(Role.AUTHOR);
+    expect(SUPER_ADMIN_ROLES).toEqual([Role.ADMIN]);
+    expect(ALL_STORIES_ROLES).toContain(Role.MODERATOR);
+  });
+
+  it('limits authors and contributors to their own stories', () => {
+    expect(canManageAllStories({ role: Role.MODERATOR })).toBe(true);
+    expect(canManageAllStories({ role: Role.AUTHOR, roles: [Role.AUTHOR] })).toBe(false);
+    expect(canManageAllStories({ role: Role.CONTRIBUTOR })).toBe(false);
   });
 });

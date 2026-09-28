@@ -21,6 +21,13 @@ export type TtsJobData = {
   articleId: string
 }
 
+/** FAILED stays eligible so BullMQ retries of a failed attempt still run. */
+const ACTIVE_OR_RETRYING: NarrationStatus[] = [
+  NarrationStatus.PENDING,
+  NarrationStatus.RUNNING,
+  NarrationStatus.FAILED,
+]
+
 @Injectable()
 export class TtsService {
   private readonly logger = new Logger(TtsService.name)
@@ -110,13 +117,18 @@ export class TtsService {
   }
 
   async processArticle(articleId: string): Promise<void> {
-    await this.prisma.article.update({
-      where: { id: articleId },
+    // IDLE/READY here means the editor uploaded or removed audio after queueing.
+    const started = await this.prisma.article.updateMany({
+      where: { id: articleId, narrationStatus: { in: ACTIVE_OR_RETRYING } },
       data: {
         narrationStatus: NarrationStatus.RUNNING,
         narrationError: null,
       },
     })
+    if (started.count === 0) {
+      this.logger.log(`Skipping TTS for ${articleId}: narration no longer requested`)
+      return
+    }
 
     try {
       const article = await this.prisma.article.findUniqueOrThrow({
@@ -199,14 +211,26 @@ export class TtsService {
 
       const previousAudioId = article.audioMediaId
 
-      await this.prisma.article.update({
-        where: { id: articleId },
+      const applied = await this.prisma.article.updateMany({
+        where: { id: articleId, narrationStatus: NarrationStatus.RUNNING },
         data: {
           audioMediaId: media.id,
           narrationStatus: NarrationStatus.READY,
           narrationError: null,
         },
       })
+      if (applied.count === 0) {
+        this.logger.log(
+          `Discarded TTS audio for ${articleId}: audio was changed in the editor during generation`,
+        )
+        await this.prisma.mediaAsset
+          .delete({ where: { id: media.id } })
+          .then(() => this.storage.remove(uploaded.key))
+          .catch((err: unknown) =>
+            this.logger.warn(`Could not remove discarded narration ${media.id}: ${String(err)}`),
+          )
+        return
+      }
 
       if (previousAudioId && previousAudioId !== media.id) {
         this.logger.log(
@@ -225,8 +249,8 @@ export class TtsService {
   }
 
   async markFailed(articleId: string, message: string) {
-    await this.prisma.article.update({
-      where: { id: articleId },
+    await this.prisma.article.updateMany({
+      where: { id: articleId, narrationStatus: { in: ACTIVE_OR_RETRYING } },
       data: {
         narrationStatus: NarrationStatus.FAILED,
         narrationError: message.slice(0, 2000),

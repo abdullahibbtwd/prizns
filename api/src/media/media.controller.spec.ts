@@ -55,7 +55,17 @@ describe('MediaController', () => {
         titleBg: 'Title',
         folder: 'cms',
         uploadedById: mockAuthUser.id,
+        showInGallery: false,
       }),
+    );
+  });
+
+  it('shows an upload in the gallery only when the uploader opts in', () => {
+    const file = { originalname: 'a.jpg' } as Express.Multer.File;
+    controller.upload(file, mockAuthUser, '', '', '', 'cms', 'true');
+    expect(media.createFromUpload).toHaveBeenLastCalledWith(
+      file,
+      expect.objectContaining({ showInGallery: true }),
     );
   });
 

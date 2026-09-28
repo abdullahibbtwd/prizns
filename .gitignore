@@ -40,3 +40,6 @@ api/generated/
 # WordPress migration package (local export → VPS import)
 wordpress-export/
 
+# Cached tool binaries (e.g. OSS MinIO for tests)
+.cache/
+

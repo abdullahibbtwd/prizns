@@ -76,9 +76,11 @@ export class CreateArticleDto {
   @IsString({ each: true })
   galleryMediaIds?: string[];
 
+  /** Omit to keep the current audio; `null` or '' removes it. */
   @IsOptional()
+  @ValidateIf((_, value) => value !== null && value !== '')
   @IsString()
-  audioMediaId?: string;
+  audioMediaId?: string | null;
 
   /** External video URL (YouTube, Vimeo, direct mp4, etc.). */
   @IsOptional()

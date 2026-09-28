@@ -7,6 +7,7 @@ import { StorageModule } from '../storage/storage.module';
 import { TranslationModule } from '../translation/translation.module';
 import { TtsModule } from '../tts/tts.module';
 import { MediaModule } from '../media/media.module';
+import { MailModule } from '../mail/mail.module';
 import { ArticlesController } from './articles.controller';
 import { ArticlesService } from './articles.service';
 
@@ -20,6 +21,7 @@ import { ArticlesService } from './articles.service';
     DigestModule,
     AiModule,
     MediaModule,
+    MailModule,
   ],
   controllers: [ArticlesController],
   providers: [ArticlesService],

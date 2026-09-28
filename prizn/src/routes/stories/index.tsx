@@ -8,7 +8,6 @@ import { ListingHeader } from '@/components/concept-3/ListingHeader'
 import { ListingPagination } from '@/components/concept-3/ListingPagination'
 import { EpisodeBadge } from '@/components/concept-3/EpisodeBadge'
 import { SponsoredBadge } from '@/components/concept-3/SponsoredBadge'
-import { RegionMap } from '@/components/concept-3/RegionMap'
 import { ResponsiveImage } from '@/components/ResponsiveImage'
 import {
   articlePath,
@@ -21,7 +20,7 @@ import { ListingBody, listingCountLabel } from '@/components/concept-3/ListingBo
 
 export default function StoriesPage() {
   const { t } = useTranslation()
-  const { location, page, q, setPage, setFilters } = useListingFilters()
+  const { location, page, q, setPage } = useListingFilters()
 
   const listing = usePublicArticleListing(q ? undefined : 'stories', {
     location: q ? undefined : location || undefined,
@@ -67,14 +66,6 @@ export default function StoriesPage() {
               t('storiesCount', { count: listing.total }),
             )}
           />
-
-          {!q ? (
-            <RegionMap
-              className="mx-auto max-w-7xl px-6 pt-10 md:px-12"
-              selectedSlug={location}
-              onSelect={(slug) => setFilters({ location: slug })}
-            />
-          ) : null}
 
           <div className="mx-auto max-w-7xl px-6 py-16 md:px-12 md:py-20">
             <ListingBody
@@ -126,10 +117,10 @@ export default function StoriesPage() {
                             <EpisodeBadge lang={lang} series={story.series} />
                           ) : null}
                         </div>
-                        {story.location?.trim() ? (
+                        {(lang === 'bg' ? story.locationBg : story.location)?.trim() ? (
                           <div className="absolute bottom-4 left-4 flex items-center gap-1.5 font-sans text-[11px] text-white/85">
                             <MapPin className="size-3" />
-                            {story.location}
+                            {lang === 'bg' ? story.locationBg : story.location}
                           </div>
                         ) : null}
                       </div>
@@ -137,10 +128,10 @@ export default function StoriesPage() {
                         {lang === 'bg' ? story.titleBg : story.title}
                       </h2>
                       <p className="mt-2 line-clamp-2 font-sans text-sm font-light leading-relaxed text-[#1A1A1A]/65">
-                        {story.excerpt}
+                        {lang === 'bg' ? story.excerptBg : story.excerpt}
                       </p>
                       <div className="mt-4 flex items-center justify-between text-[11px] uppercase tracking-[0.18em] text-[#1A1A1A]/50">
-                        <span>{story.author}</span>
+                        <span>{lang === 'bg' ? story.authorBg : story.author}</span>
                         <span className="inline-flex items-center gap-1">
                           <Clock className="size-3" />
                           {lang === 'bg' ? story.readTimeBg : story.readTime}

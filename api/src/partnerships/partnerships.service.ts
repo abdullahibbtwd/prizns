@@ -1,12 +1,57 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PartnershipInquiry, PartnershipStatus, Prisma } from '@prisma/client';
+import { escapeHtml, textToHtml } from '../mail/email-html';
+import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { SettingsService } from '../settings/settings.service';
 import { CreatePartnershipDto } from './dto/create-partnership.dto';
 import { UpdatePartnershipDto } from './dto/update-partnership.dto';
 
 @Injectable()
 export class PartnershipsService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(PartnershipsService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly mail: MailService,
+    private readonly settings: SettingsService,
+  ) {}
+
+  private async notifyAdmin(row: PartnershipInquiry) {
+    if (!this.settings.notifications().adminOnSubmission) return;
+    const cmsUrl = `${this.settings.siteUrl()}/cms/partnerships`;
+    try {
+      await this.mail.notifyAdmin({
+        replyTo: row.email,
+        subject: `[Prizni] Partnership inquiry: ${row.organization}`,
+        text: [
+          `${row.contactName} <${row.email}>${row.phone ? `, ${row.phone}` : ''}`,
+          `Organization: ${row.organization}`,
+          `Type: ${row.type}${row.budget ? ` · Budget: ${row.budget}` : ''}`,
+          row.website ? `Website: ${row.website}` : '',
+          '',
+          row.message,
+          '',
+          `CMS: ${cmsUrl}`,
+        ].join('\n'),
+        html: `
+          <p><strong>New partnership inquiry</strong></p>
+          <p>
+            ${escapeHtml(row.contactName)} &lt;${escapeHtml(row.email)}&gt;${row.phone ? `, ${escapeHtml(row.phone)}` : ''}<br/>
+            Organization: ${escapeHtml(row.organization)}<br/>
+            Type: ${escapeHtml(row.type)}${row.budget ? ` · Budget: ${escapeHtml(row.budget)}` : ''}
+            ${row.website ? `<br/>Website: ${escapeHtml(row.website)}` : ''}
+          </p>
+          ${textToHtml(row.message)}
+          <p><a href="${cmsUrl}">Open in CMS</a></p>
+        `,
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Partnership admin alert failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
 
   private toDto(row: PartnershipInquiry) {
     return {
@@ -43,6 +88,8 @@ export class PartnershipsService {
         message: dto.message.trim(),
       },
     });
+
+    await this.notifyAdmin(row);
 
     return this.toDto(row);
   }

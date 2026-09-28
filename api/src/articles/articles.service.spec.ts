@@ -7,6 +7,8 @@ import { BadgesService } from '../badges/badges.service';
 import { DigestService } from '../digest/digest.service';
 import { AiService } from '../ai/ai.service';
 import { MediaService } from '../media/media.service';
+import { MailService } from '../mail/mail.service';
+import { SettingsService } from '../settings/settings.service';
 import { createMockPrisma } from '../../test/helpers/mocks';
 import { buildArticleRow } from '../../test/helpers/factories';
 import { ArticlesService } from './articles.service';
@@ -25,6 +27,15 @@ describe('ArticlesService', () => {
   const media = {
     isOrphan: jest.fn().mockResolvedValue(true),
     remove: jest.fn().mockResolvedValue({ ok: true, id: 'media-1' }),
+  };
+  const mail = {
+    send: jest.fn().mockResolvedValue(undefined),
+    notifyAdmin: jest.fn().mockResolvedValue(undefined),
+    isConfigured: jest.fn().mockReturnValue(true),
+  };
+  const settings = {
+    notifications: jest.fn().mockReturnValue({ adminOnSubmission: true }),
+    siteUrl: jest.fn().mockReturnValue('https://prizn.test'),
   };
 
   let article: ReturnType<typeof buildArticleRow>;
@@ -106,6 +117,8 @@ describe('ArticlesService', () => {
         { provide: DigestService, useValue: digest },
         { provide: AiService, useValue: ai },
         { provide: MediaService, useValue: media },
+        { provide: MailService, useValue: mail },
+        { provide: SettingsService, useValue: settings },
       ],
     }).compile();
 
@@ -310,6 +323,168 @@ describe('ArticlesService', () => {
     expect(updated.titleBg).toBe('Updated title');
   });
 
+  describe('review workflow', () => {
+    const lastUpdateData = () =>
+      (prisma.article.update as jest.Mock).mock.calls.at(-1)?.[0]?.data as Record<
+        string,
+        unknown
+      >;
+    const storyIn = (saved: ArticleStatus, after = saved) =>
+      jest.fn().mockImplementation(async (args) => {
+        const where = args.where as { id?: string; section_slug?: unknown };
+        if (where.section_slug) return null;
+        return {
+          ...article,
+          id: where.id ?? article.id,
+          status: args.include ? after : saved,
+          reviewNote: null,
+          author: {
+            nameBg: 'Мария',
+            user: { email: 'maria@prizn.test', name: 'Maria', isActive: true },
+          },
+        };
+      });
+
+    beforeEach(() => {
+      mail.send.mockClear();
+      mail.notifyAdmin.mockClear();
+      settings.notifications.mockReturnValue({ adminOnSubmission: true });
+    });
+
+    it('stamps the submit time and clears the old note when a story enters review', async () => {
+      prisma.article.findUnique = storyIn(ArticleStatus.DRAFT, ArticleStatus.REVIEW);
+      await service.update(
+        'art-1',
+        { status: ArticleStatus.REVIEW } as never,
+        { notifyOnSubmit: true },
+      );
+      expect(lastUpdateData()).toEqual(
+        expect.objectContaining({
+          submittedForReviewAt: expect.any(Date),
+          reviewNote: null,
+          reviewNoteAt: null,
+        }),
+      );
+      expect(mail.notifyAdmin).toHaveBeenCalledWith(
+        expect.objectContaining({
+          subject: expect.stringContaining(article.titleBg),
+        }),
+      );
+    });
+
+    it('does not alert the inbox when the alert is switched off', async () => {
+      settings.notifications.mockReturnValue({ adminOnSubmission: false });
+      prisma.article.findUnique = storyIn(ArticleStatus.DRAFT, ArticleStatus.REVIEW);
+      await service.update(
+        'art-1',
+        { status: ArticleStatus.REVIEW } as never,
+        { notifyOnSubmit: true },
+      );
+      expect(mail.notifyAdmin).not.toHaveBeenCalled();
+    });
+
+    it('does not alert the inbox when a moderator moves a story to review', async () => {
+      prisma.article.findUnique = storyIn(ArticleStatus.DRAFT, ArticleStatus.REVIEW);
+      await service.update('art-1', { status: ArticleStatus.REVIEW } as never);
+      expect(mail.notifyAdmin).not.toHaveBeenCalled();
+    });
+
+    it('clears the note when a story is published', async () => {
+      prisma.article.findUnique = storyIn(
+        ArticleStatus.REVIEW,
+        ArticleStatus.PUBLISHED,
+      );
+      await service.update('art-1', { status: ArticleStatus.PUBLISHED } as never);
+      expect(lastUpdateData()).toEqual(
+        expect.objectContaining({ reviewNote: null, reviewNoteAt: null }),
+      );
+    });
+
+    it('sends a story in review back to draft with a note and emails the author', async () => {
+      prisma.article.findUnique = storyIn(ArticleStatus.REVIEW, ArticleStatus.DRAFT);
+      await service.requestChanges('art-1', '  Please fix the caption  ');
+      expect(prisma.article.update).toHaveBeenCalledWith({
+        where: { id: 'art-1' },
+        data: {
+          status: ArticleStatus.DRAFT,
+          reviewNote: 'Please fix the caption',
+          reviewNoteAt: expect.any(Date),
+        },
+      });
+      expect(mail.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          to: 'maria@prizn.test',
+          html: expect.stringContaining('Please fix the caption'),
+        }),
+      );
+    });
+
+    it('refuses to send back a story that is not in review', async () => {
+      prisma.article.findUnique = storyIn(ArticleStatus.PUBLISHED);
+      await expect(service.requestChanges('art-1', 'Fix it')).rejects.toThrow(
+        'Only stories in review can be sent back',
+      );
+      expect(prisma.article.update).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ reviewNote: 'Fix it' }),
+        }),
+      );
+    });
+
+    it('requires a note', async () => {
+      await expect(service.requestChanges('art-1', '   ')).rejects.toThrow(
+        'Add a note for the author',
+      );
+    });
+  });
+
+  describe('audio updates', () => {
+    const withAudio = { ...article, audioMediaId: 'media-old' };
+
+    beforeEach(() => {
+      prisma.article.findUnique = jest.fn().mockImplementation(async (args) => {
+        const where = args.where as { id?: string; section_slug?: unknown };
+        if (where.section_slug) return null;
+        return { ...withAudio, id: where.id ?? withAudio.id };
+      });
+    });
+
+    const updateData = () =>
+      (prisma.article.update as jest.Mock).mock.calls.at(-1)?.[0]?.data as Record<
+        string,
+        unknown
+      >;
+
+    it('removes audio and resets narration when null is sent', async () => {
+      await service.update('art-1', { audioMediaId: null });
+      expect(updateData()).toEqual(
+        expect.objectContaining({
+          audioMediaId: null,
+          audioDuration: null,
+          narrationStatus: 'IDLE',
+          narrationError: null,
+        }),
+      );
+    });
+
+    it('replaces audio with an uploaded file', async () => {
+      await service.update('art-1', { audioMediaId: 'media-new', audioDuration: '3:10' });
+      expect(updateData()).toEqual(
+        expect.objectContaining({
+          audioMediaId: 'media-new',
+          audioDuration: '3:10',
+          narrationStatus: 'IDLE',
+        }),
+      );
+    });
+
+    it('keeps audio untouched when the field is omitted', async () => {
+      await service.update('art-1', { titleBg: 'Other' });
+      expect(updateData()).not.toHaveProperty('audioMediaId');
+      expect(updateData()).not.toHaveProperty('narrationStatus');
+    });
+  });
+
   it('paginates public listing pages with skip/take and a total count', async () => {
     prisma.article.count = jest.fn().mockResolvedValue(48);
     const result = await service.listPublic('stories', undefined, {
@@ -422,5 +597,88 @@ describe('ArticlesService', () => {
     });
     expect(media.remove).toHaveBeenCalledWith('hero-1');
     expect(media.remove).toHaveBeenCalledWith('gal-1');
+  });
+
+  describe('story ownership', () => {
+    const author = { id: 'user-a', role: 'AUTHOR' as const, roles: ['AUTHOR' as const] };
+    const moderator = { id: 'user-m', role: 'MODERATOR' as const, roles: ['MODERATOR' as const] };
+
+    beforeEach(() => {
+      (prisma as unknown as { author: Record<string, jest.Mock> }).author = {
+        ...((prisma as unknown as { author?: Record<string, jest.Mock> }).author ?? {}),
+        findUnique: jest.fn().mockResolvedValue({ id: 'author-a' }),
+      };
+    });
+
+    it('lets moderators edit any story', async () => {
+      await expect(service.assertCanViewStory('art-1', moderator)).resolves.toBeUndefined();
+      await expect(
+        service.assertCanChangeStory('art-1', moderator, 'PUBLISHED' as never),
+      ).resolves.toBeUndefined();
+      expect(await service.storyScope(moderator)).toBeUndefined();
+    });
+
+    it('lets an author edit only their own story', async () => {
+      prisma.article.findUnique = jest
+        .fn()
+        .mockResolvedValue({ authorId: 'author-a', status: 'DRAFT' });
+      await expect(service.assertCanViewStory('art-1', author)).resolves.toBeUndefined();
+      await expect(service.assertCanChangeStory('art-1', author)).resolves.toBeUndefined();
+      prisma.article.findUnique = jest
+        .fn()
+        .mockResolvedValue({ authorId: 'author-b', status: 'DRAFT' });
+      await expect(service.assertCanChangeStory('art-2', author)).rejects.toThrow(
+        'You can only edit your own stories',
+      );
+    });
+
+    it('lets an author submit for review but not publish, schedule or archive', async () => {
+      prisma.article.findUnique = jest
+        .fn()
+        .mockResolvedValue({ authorId: 'author-a', status: 'DRAFT' });
+      await expect(
+        service.assertCanChangeStory('art-1', author, 'REVIEW' as never),
+      ).resolves.toBeUndefined();
+      for (const status of ['PUBLISHED', 'SCHEDULED', 'ARCHIVED']) {
+        await expect(
+          service.assertCanChangeStory('art-1', author, status as never),
+        ).rejects.toThrow('Only a moderator can publish');
+      }
+      expect(() =>
+        service.assertCanSetStatus(author, 'PUBLISHED' as never),
+      ).toThrow('Only a moderator can publish');
+      expect(() => service.assertCanSetStatus(author, 'REVIEW' as never)).not.toThrow();
+      expect(() => service.assertCanSetStatus(moderator, 'PUBLISHED' as never)).not.toThrow();
+    });
+
+    it('locks a live or scheduled story for its author', async () => {
+      for (const status of ['PUBLISHED', 'SCHEDULED']) {
+        prisma.article.findUnique = jest
+          .fn()
+          .mockResolvedValue({ authorId: 'author-a', status });
+        await expect(service.assertCanChangeStory('art-1', author)).rejects.toThrow(
+          'ask a moderator',
+        );
+      }
+    });
+
+    it('lets SEO editors edit live stories without changing their status', async () => {
+      const seo = { id: 'user-s', role: 'SEO_EDITOR' as const, roles: ['SEO_EDITOR' as const] };
+      prisma.article.findUnique = jest
+        .fn()
+        .mockResolvedValue({ authorId: 'author-b', status: 'PUBLISHED' });
+      await expect(service.assertCanChangeStory('art-1', seo)).resolves.toBeUndefined();
+      await expect(
+        service.assertCanChangeStory('art-1', seo, 'DRAFT' as never),
+      ).rejects.toThrow('Only a moderator can publish');
+    });
+
+    it('always credits an author as themselves', async () => {
+      expect(await service.authorIdForWrite(author, undefined)).toBe('author-a');
+      await expect(service.authorIdForWrite(author, 'author-b')).rejects.toThrow(
+        'You can only write stories as yourself',
+      );
+      expect(await service.authorIdForWrite(moderator, 'author-b')).toBe('author-b');
+    });
   });
 });

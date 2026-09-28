@@ -36,6 +36,22 @@ vi.mock('@/lib/public-content', async () => {
   }
 })
 
+vi.mock('@/lib/site-settings-api', () => ({
+  useSiteSettings: () => ({
+    data: {
+      social: {
+        facebook: 'https://facebook.com/prizni',
+        instagram: null,
+        youtube: null,
+        tiktok: null,
+      },
+      photographerCredit: { name: 'Ivan Petrov', url: null },
+      shopEnabled: false,
+      donations: { enabled: false, presets: [5, 10, 15], currency: 'EUR' },
+    },
+  }),
+}))
+
 vi.mock('@/hooks/useSectionPresence', () => ({
   useSectionPresence: () => ({
     hasStories: true,
@@ -63,6 +79,16 @@ describe('misc concept-3 sections', () => {
     renderSection(<JournalFooter lang="en" />)
     expect(screen.getByRole('link', { name: 'PRIZNI' })).toBeInTheDocument()
     expect(screen.getByRole('navigation', { name: 'Primary' })).toBeInTheDocument()
+  })
+
+  it('JournalFooter shows only the social links configured in CMS settings', () => {
+    renderSection(<JournalFooter lang="en" />)
+    expect(screen.getByRole('link', { name: /facebook/i })).toHaveAttribute(
+      'href',
+      'https://facebook.com/prizni',
+    )
+    expect(screen.queryByRole('link', { name: /instagram/i })).toBeNull()
+    expect(screen.getByText(/Ivan Petrov/)).toBeInTheDocument()
   })
 
   it('VideoSection renders featured and side videos', async () => {

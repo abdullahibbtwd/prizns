@@ -39,4 +39,10 @@ export class CreateUserDto {
   @IsOptional()
   @IsBoolean()
   showOnAuthors?: boolean;
+
+  /** Attach an existing author profile without a login (e.g. a guest author). */
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  linkAuthorId?: string;
 }

@@ -27,6 +27,7 @@ function toEventsCard(article: CmsArticle) {
     locationBg: article.locationBg || '',
     image: article.image || '',
     excerpt: article.subtitle || article.subtitleBg || '',
+    excerptBg: article.subtitleBg || '',
     path: articlePath(article),
   }
 }
@@ -129,9 +130,9 @@ export default function EventsPage() {
                           <h2 className="mt-2 font-heading text-2xl font-normal text-[#1A1A1A] transition-colors group-hover:text-[#0C2686] md:text-3xl">
                             {lang === 'bg' ? item.titleBg : item.title}
                           </h2>
-                          {item.excerpt?.trim() ? (
+                          {(lang === 'bg' ? item.excerptBg : item.excerpt)?.trim() ? (
                             <p className="mt-2 line-clamp-2 font-sans text-sm font-light leading-relaxed text-[#1A1A1A]/60">
-                              {item.excerpt}
+                              {lang === 'bg' ? item.excerptBg : item.excerpt}
                             </p>
                           ) : null}
                         </Link>

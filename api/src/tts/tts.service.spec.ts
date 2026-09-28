@@ -101,4 +101,67 @@ describe('TtsService', () => {
     );
     expect(queue.add).toHaveBeenCalled();
   });
+
+  describe('processArticle', () => {
+    const synth = jest.fn();
+
+    beforeEach(() => {
+      synth.mockReset().mockResolvedValue([{ audioContent: Buffer.from('mp3') }]);
+      jest
+        .spyOn(service as never, 'createTtsClient')
+        .mockReturnValue({ synthesizeSpeech: synth } as never);
+      prisma.article.findUniqueOrThrow = jest.fn().mockResolvedValue({
+        id: 'art-1',
+        titleBg: 'Заглавие',
+        body: [],
+        audioMediaId: null,
+        slug: 'story',
+      });
+      (prisma as unknown as { mediaAsset: Record<string, jest.Mock> }).mediaAsset = {
+        create: jest.fn().mockResolvedValue({ id: 'media-tts' }),
+        delete: jest.fn().mockResolvedValue({}),
+      };
+      storage.uploadBuffer.mockResolvedValue({
+        key: 'narration/story.mp3',
+        url: 'https://cdn/story.mp3',
+        mimeType: 'audio/mpeg',
+        originalName: 'story.mp3',
+        size: 3,
+      });
+      (storage as { remove?: jest.Mock }).remove = jest.fn().mockResolvedValue(undefined);
+    });
+
+    it('skips when the editor cancelled narration before the job started', async () => {
+      prisma.article.updateMany = jest.fn().mockResolvedValue({ count: 0 });
+      await service.processArticle('art-1');
+      expect(synth).not.toHaveBeenCalled();
+      expect(prisma.mediaAsset.create).not.toHaveBeenCalled();
+    });
+
+    it('attaches generated audio when narration is still running', async () => {
+      prisma.article.updateMany = jest.fn().mockResolvedValue({ count: 1 });
+      await service.processArticle('art-1');
+      expect(prisma.article.updateMany).toHaveBeenLastCalledWith({
+        where: { id: 'art-1', narrationStatus: NarrationStatus.RUNNING },
+        data: expect.objectContaining({
+          audioMediaId: 'media-tts',
+          narrationStatus: NarrationStatus.READY,
+        }),
+      });
+    });
+
+    it('discards generated audio when the editor uploaded or removed audio mid-run', async () => {
+      prisma.article.updateMany = jest
+        .fn()
+        .mockResolvedValueOnce({ count: 1 })
+        .mockResolvedValueOnce({ count: 0 });
+      await service.processArticle('art-1');
+      expect(prisma.mediaAsset.delete).toHaveBeenCalledWith({
+        where: { id: 'media-tts' },
+      });
+      expect((storage as { remove?: jest.Mock }).remove).toHaveBeenCalledWith(
+        'narration/story.mp3',
+      );
+    });
+  });
 });

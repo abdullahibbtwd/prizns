@@ -46,6 +46,13 @@ export function serializeStoryDraft(values: ArticleFormValues): string {
     subtitleBg: values.subtitleBg,
     body: values.body,
     locationBg: values.locationBg,
+    authorId: values.authorId,
+    dateIso: values.dateIso,
+    photoCreditBg: values.photoCreditBg,
+    endLabelBg: values.endLabelBg,
+    audioDuration: values.audioDuration,
+    audioMediaId: values.audioMediaId,
+    videoUrl: values.videoUrl,
     speakerBg: values.speakerBg,
     behindStoryBg: values.behindStoryBg,
     seoTitleBg: values.seoTitleBg,
@@ -70,7 +77,15 @@ export function shouldAutosaveDraft(opts: {
 }): boolean {
   if (!opts.dirty || opts.busy) return false
   if (!opts.title.trim()) return false
-  if (opts.status === 'SCHEDULED' || opts.status === 'ARCHIVED') return false
+  // Live stories change only on "Update" — half-typed edits must never reach
+  // readers. Their edits are still backed up locally.
+  if (
+    opts.status === 'PUBLISHED' ||
+    opts.status === 'SCHEDULED' ||
+    opts.status === 'ARCHIVED'
+  ) {
+    return false
+  }
   return true
 }
 

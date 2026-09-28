@@ -138,6 +138,26 @@ export default function CmsTagsPage() {
     },
   })
 
+  const nameEnMutation = useMutation({
+    mutationFn: (input: { id: string; nameEn: string }) =>
+      updateCmsTag(input.id, { nameEn: input.nameEn }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['cms-tags'] })
+      setToast({
+        open: true,
+        variant: 'success',
+        message: t('cms.tags.nameEnSaved'),
+      })
+    },
+    onError: (err: Error) => {
+      setToast({
+        open: true,
+        variant: 'error',
+        message: err.message || t('cms.tags.createFailed'),
+      })
+    },
+  })
+
   const geocodeMutation = useMutation({
     mutationFn: (id: string) => geocodeCmsTag(id),
     onSuccess: async (tag) => {
@@ -265,7 +285,14 @@ export default function CmsTagsPage() {
                           {tag.nameBg}
                         </p>
                         <p className="text-xs text-stone-500">
-                          {tag.nameEn || '—'} · /{tag.slug}
+                          <EnglishName
+                            tag={tag}
+                            disabled={nameEnMutation.isPending}
+                            onSave={(nameEn) =>
+                              nameEnMutation.mutate({ id: tag.id, nameEn })
+                            }
+                          />{' '}
+                          · /{tag.slug}
                           {groupKind === 'LOCATION' ? (
                             <>
                               {' '}
@@ -316,6 +343,67 @@ export default function CmsTagsPage() {
       )}
       {dialog}
     </div>
+  )
+}
+
+function EnglishName({
+  tag,
+  disabled,
+  onSave,
+}: {
+  tag: CmsTag
+  disabled: boolean
+  onSave: (nameEn: string) => void
+}) {
+  const { t } = useTranslation()
+  const [editing, setEditing] = useState(false)
+  const [value, setValue] = useState(tag.nameEn ?? '')
+
+  useEffect(() => {
+    setValue(tag.nameEn ?? '')
+  }, [tag.nameEn])
+
+  if (!editing) {
+    return (
+      <button
+        type="button"
+        onClick={() => setEditing(true)}
+        className="underline decoration-dotted underline-offset-2 hover:text-[#0C2686]"
+        title={t('cms.tags.editNameEn')}
+      >
+        EN: {tag.nameEn || '—'}
+      </button>
+    )
+  }
+
+  const save = () => {
+    const next = value.trim()
+    if (next && next !== tag.nameEn) onSave(next)
+    setEditing(false)
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1">
+      <input
+        value={value}
+        autoFocus
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') save()
+          if (e.key === 'Escape') setEditing(false)
+        }}
+        aria-label={t('cms.tags.editNameEn')}
+        className="w-40 rounded-md border border-[#E8E4DC] px-2 py-0.5 text-xs text-stone-800"
+      />
+      <button
+        type="button"
+        disabled={disabled || !value.trim()}
+        onClick={save}
+        className="rounded-md border border-[#E8E4DC] px-2 py-0.5 text-xs font-semibold text-[#0C2686] disabled:opacity-50"
+      >
+        {t('cms.tags.saveNameEn')}
+      </button>
+    </span>
   )
 }
 

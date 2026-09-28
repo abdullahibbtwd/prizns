@@ -117,4 +117,69 @@ describe('CmsDashboard', () => {
     expect(screen.queryByText('cms.dashboard.traffic')).not.toBeInTheDocument()
     expect(screen.getByText('cms.dashboard.drafts')).toBeInTheDocument()
   })
+
+  it('lists submitted stories in the review queue for moderators', async () => {
+    authUser.role = 'MODERATOR'
+    authUser.roles = ['MODERATOR']
+    getDashboardChecklist.mockResolvedValue({
+      draftArticles: 0,
+      reviewArticles: 1,
+      pendingSubmissions: 0,
+      publishedToday: 0,
+      scheduledArticles: 0,
+      failedTranslations: 0,
+      reviewQueue: [
+        {
+          id: 'art-7',
+          titleBg: 'Историята на Мария',
+          titleEn: 'Maria’s story',
+          authorBg: 'Мария',
+          authorEn: 'Maria',
+          submittedAt: '2026-09-28T09:00:00.000Z',
+        },
+      ],
+      changesRequested: [],
+    })
+    renderPage(<CmsDashboard />)
+    expect(
+      await screen.findByRole('heading', { name: 'cms.dashboard.reviewQueue' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('link', { name: /Maria’s story/ }),
+    ).toHaveAttribute('href', '/cms/stories/art-7')
+    expect(
+      screen.queryByRole('heading', { name: 'cms.dashboard.changesRequested' }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('shows authors the stories sent back with a note', async () => {
+    authUser.role = 'AUTHOR'
+    authUser.roles = ['AUTHOR']
+    getDashboardChecklist.mockResolvedValue({
+      draftArticles: 1,
+      reviewArticles: 0,
+      pendingSubmissions: 0,
+      publishedToday: 0,
+      scheduledArticles: 0,
+      failedTranslations: 0,
+      reviewQueue: [],
+      changesRequested: [
+        {
+          id: 'art-8',
+          titleBg: 'Моята история',
+          titleEn: null,
+          reviewNote: 'Please add a photo credit',
+          reviewNoteAt: '2026-09-28T10:00:00.000Z',
+        },
+      ],
+    })
+    renderPage(<CmsDashboard />)
+    expect(
+      await screen.findByRole('heading', { name: 'cms.dashboard.changesRequested' }),
+    ).toBeInTheDocument()
+    expect(screen.getByText('Please add a photo credit')).toBeInTheDocument()
+    expect(
+      screen.queryByRole('heading', { name: 'cms.dashboard.reviewQueue' }),
+    ).not.toBeInTheDocument()
+  })
 })

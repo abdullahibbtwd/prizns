@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { ChevronLeft, ChevronRight, Pencil, Plus, Search, Trash2 } from 'lucide-react'
@@ -17,6 +17,7 @@ import { useCmsConfirm } from '@/cms/components/CmsConfirmDialog'
 import { Alert } from '@/components/ui/Alert'
 import { JournalSelect } from '@/components/ui/JournalSelect'
 import { useAuth } from '@/lib/auth'
+import { getCmsAuthor } from '@/lib/cms-content-api'
 import {
   createCmsUser,
   deleteCmsUser,
@@ -38,6 +39,8 @@ const EMPTY_FORM = {
   confirmPassword: '',
   roles: ['EDITOR'] as CmsUserRole[],
   showOnAuthors: false,
+  linkAuthorId: '',
+  linkAuthorName: '',
 }
 
 function itemRoles(item: Pick<CmsUser, 'role' | 'roles'>): CmsUserRole[] {
@@ -71,6 +74,26 @@ export default function CmsUsersPage() {
     showOnAuthors: boolean
   } | null>(null)
   const [form, setForm] = useState(EMPTY_FORM)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const linkAuthorParam = isAdmin ? searchParams.get('linkAuthor') : null
+  const linkAuthorQuery = useQuery({
+    queryKey: ['cms-author', linkAuthorParam],
+    queryFn: () => getCmsAuthor(linkAuthorParam!),
+    enabled: Boolean(linkAuthorParam),
+  })
+  useEffect(() => {
+    const author = linkAuthorQuery.data
+    if (!author || author.userId) return
+    setForm({
+      ...EMPTY_FORM,
+      name: author.nameBg,
+      roles: ['AUTHOR'],
+      showOnAuthors: author.showOnAuthors,
+      linkAuthorId: author.id,
+      linkAuthorName: author.nameBg,
+    })
+    setCreateOpen(true)
+  }, [linkAuthorQuery.data])
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [toast, setToast] = useState<{
@@ -135,6 +158,11 @@ export default function CmsUsersPage() {
   const closeCreate = () => {
     setCreateOpen(false)
     setForm(EMPTY_FORM)
+    if (searchParams.has('linkAuthor')) {
+      const next = new URLSearchParams(searchParams)
+      next.delete('linkAuthor')
+      setSearchParams(next, { replace: true })
+    }
     setShowPassword(false)
     setShowConfirmPassword(false)
   }
@@ -180,6 +208,7 @@ export default function CmsUsersPage() {
         password: form.password,
         roles: form.roles,
         showOnAuthors: form.showOnAuthors,
+        ...(form.linkAuthorId ? { linkAuthorId: form.linkAuthorId } : {}),
       }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['cms-users'] })
@@ -570,6 +599,15 @@ export default function CmsUsersPage() {
             createMutation.mutate()
           }}
         >
+          {form.linkAuthorId ? (
+            <Alert
+              open
+              mode="inline"
+              variant="info"
+              duration={0}
+              message={t('cms.users.linkingAuthor', { name: form.linkAuthorName })}
+            />
+          ) : null}
           <CmsField label={t('cms.users.name')} htmlFor="cms-user-name">
             <CmsInput
               id="cms-user-name"

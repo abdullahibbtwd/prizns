@@ -37,6 +37,7 @@ import {
   Award,
   Trophy,
   LogOut,
+  Settings,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { cmsGlobalSearch } from '@/lib/cms-search-api'
@@ -108,7 +109,7 @@ export const cmsNavGroups: CmsNavGroup[] = [
     items: [
       { labelKey: 'cms.nav.profile', to: '/cms/profile', icon: CircleUser },
       { labelKey: 'cms.nav.users', to: '/cms/users', icon: Users },
-      // { labelKey: 'cms.nav.settings', to: '/cms/settings', icon: Settings },
+      { labelKey: 'cms.nav.settings', to: '/cms/settings', icon: Settings },
       { labelKey: 'cms.nav.ai', to: '/cms/ai', icon: Bot },
     ],
   },

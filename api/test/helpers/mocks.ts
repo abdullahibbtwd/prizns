@@ -2,6 +2,8 @@ import type { ConfigService } from '@nestjs/config';
 import type { JwtService } from '@nestjs/jwt';
 import type { PrismaService } from '../../src/prisma/prisma.service';
 import type { RedisService } from '../../src/redis/redis.service';
+import type { SiteSettings } from '@prisma/client';
+import { SettingsService } from '../../src/settings/settings.service';
 
 /** Minimal Prisma mock; extend per test with model delegates. */
 export function createMockPrisma(
@@ -41,11 +43,28 @@ export function createMockConfig(
   };
 }
 
+/**
+ * Real SettingsService with no saved row, so every value falls back to `env`
+ * exactly like a fresh install. `row` seeds CMS-saved settings.
+ */
+export function createSettings(
+  env: Record<string, unknown> = {},
+  row: Partial<SiteSettings> = {},
+): SettingsService {
+  const settings = new SettingsService(
+    {} as never,
+    createMockConfig(env) as never,
+  );
+  Object.assign((settings as unknown as { row: SiteSettings }).row, row);
+  return settings;
+}
+
 export function createMockRedis(): jest.Mocked<Pick<RedisService, 'client' | 'ping'>> {
   const client = {
     get: jest.fn(),
     set: jest.fn(),
     del: jest.fn(),
+    ttl: jest.fn().mockResolvedValue(-2),
   };
   return {
     client: client as never,

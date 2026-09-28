@@ -29,6 +29,7 @@ function toNewsCard(article: CmsArticle) {
     image: article.image || '',
     imageThumb: article.imageThumb || '',
     excerpt: article.subtitle || article.subtitleBg || '',
+    excerptBg: article.subtitleBg || '',
     path: articlePath(article),
   }
 }
@@ -120,7 +121,7 @@ export default function NewsPage() {
                           {lang === 'bg' ? item.titleBg : item.title}
                         </h2>
                         <p className="mt-3 max-w-xl line-clamp-2 font-sans text-sm font-light leading-relaxed text-[#1A1A1A]/65 md:text-base">
-                          {item.excerpt}
+                          {lang === 'bg' ? item.excerptBg : item.excerpt}
                         </p>
                         {((lang === 'bg' ? item.locationBg : item.location) || '').trim() ? (
                           <p className="mt-4 inline-flex items-center gap-1.5 font-sans text-[11px] uppercase tracking-[0.18em] text-[#1A1A1A]/45">

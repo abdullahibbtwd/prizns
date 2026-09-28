@@ -23,10 +23,16 @@ export function listCmsArticles(params?: {
   q?: string;
   sponsored?: boolean;
   categorySlug?: string;
+  sort?: "published" | "updated" | "created" | "title";
+  editedFrom?: string;
+  editedTo?: string;
   page?: number;
   pageSize?: number;
 }) {
   const search = new URLSearchParams();
+  if (params?.sort) search.set("sort", params.sort);
+  if (params?.editedFrom) search.set("editedFrom", params.editedFrom);
+  if (params?.editedTo) search.set("editedTo", params.editedTo);
   if (params?.section) search.set("section", params.section);
   if (params?.status) search.set("status", params.status);
   if (params?.authorId) search.set("authorId", params.authorId);
@@ -46,8 +52,10 @@ export function getCmsArticle(id: string) {
 export function createCmsArticle(
   body: Omit<
     Partial<ArticleFormValues>,
-    "seriesId" | "seriesMode" | "videoUrl" | "videoMediaId" | "sponsorName" | "seoTitleBg" | "seoDescriptionBg"
+    "seriesId" | "seriesMode" | "videoUrl" | "videoMediaId" | "audioMediaId" | "sponsorName" | "seoTitleBg" | "seoDescriptionBg"
   > & {
+    /** Omit to keep the current audio; `null` removes it. */
+    audioMediaId?: string | null;
     titleBg: string;
     categoryBg: string;
     section: string;
@@ -67,8 +75,10 @@ export function updateCmsArticle(
   id: string,
   body: Omit<
     Partial<ArticleFormValues>,
-    "seriesId" | "seriesMode" | "videoUrl" | "videoMediaId" | "sponsorName" | "seoTitleBg" | "seoDescriptionBg"
+    "seriesId" | "seriesMode" | "videoUrl" | "videoMediaId" | "audioMediaId" | "sponsorName" | "seoTitleBg" | "seoDescriptionBg"
   > & {
+    /** Omit to keep the current audio; `null` removes it. */
+    audioMediaId?: string | null;
     seriesId?: string | null;
     heroMediaId?: string | null;
     videoUrl?: string | null;
@@ -83,6 +93,10 @@ export function updateCmsArticle(
 
 export function deleteCmsArticle(id: string) {
   return api.delete<{ ok: boolean; id: string }>(`/cms/articles/${id}`);
+}
+
+export function requestArticleChanges(id: string, note: string) {
+  return api.post<CmsArticle>(`/cms/articles/${id}/request-changes`, { note });
 }
 
 export function queueArticleTranslation(id: string) {
@@ -103,8 +117,14 @@ export function listCmsAuthors() {
   return api.get<CmsAuthorOption[]>("/cms/authors");
 }
 
-export function createCmsAuthor(nameBg: string) {
-  return api.post<CmsAuthorOption>("/cms/authors", { nameBg });
+export function createCmsAuthor(
+  nameBg: string,
+  opts?: { isGuest?: boolean },
+) {
+  return api.post<CmsAuthorOption>("/cms/authors", {
+    nameBg,
+    ...(opts?.isGuest ? { isGuest: true } : {}),
+  });
 }
 
 export async function uploadCmsMedia(
@@ -116,6 +136,8 @@ export async function uploadCmsMedia(
         titleBg?: string
         locationBg?: string
         folder?: string
+        /** Public /gallery visibility; the server hides uploads unless this is true. */
+        showInGallery?: boolean
       },
 ) {
   assertCmsFileSize(file)
@@ -132,6 +154,7 @@ export async function uploadCmsMedia(
       ...(meta.creditBg ? { creditBg: meta.creditBg } : {}),
       ...(meta.titleBg ? { titleBg: meta.titleBg } : {}),
       ...(meta.locationBg ? { locationBg: meta.locationBg } : {}),
+      ...(meta.showInGallery ? { showInGallery: 'true' } : {}),
     },
   )
   return waitForCmsMedia(pending)
@@ -170,6 +193,14 @@ export function deleteCmsMedia(id: string) {
   return api.delete<{ ok: boolean; id: string }>(`/cms/media/${id}`)
 }
 
+/** Hide/show in the public /gallery feed; articles keep using the photo. */
+export function setCmsMediaGalleryVisibility(ids: string[], showInGallery: boolean) {
+  return api.patch<{ updated: number; showInGallery: boolean }>(
+    '/cms/media/gallery-visibility',
+    { ids, showInGallery },
+  )
+}
+
 export type CmsMediaPageResult = {
   items: MediaAsset[]
   total: number
@@ -182,12 +213,14 @@ export function listCmsMedia(
   opts?: {
     kind?: 'IMAGE' | 'VIDEO' | 'AUDIO'
     q?: string
+    gallery?: 'shown' | 'hidden'
     page?: number
     pageSize?: number
   },
 ) {
   const params = new URLSearchParams()
   if (opts?.kind) params.set('kind', opts.kind)
+  if (opts?.gallery) params.set('gallery', opts.gallery)
   if (opts?.q?.trim()) params.set('q', opts.q.trim())
   if (opts?.page != null) params.set('page', String(opts.page))
   if (opts?.pageSize != null) params.set('pageSize', String(opts.pageSize))

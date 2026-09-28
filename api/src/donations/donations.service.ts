@@ -7,45 +7,37 @@ import {
   ServiceUnavailableException,
   forwardRef,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { ArticleStatus, DonationStatus, Prisma } from '@prisma/client';
 import Stripe from 'stripe';
 import { absoluteSiteUrl } from '../common/money.util';
 import { PrismaService } from '../prisma/prisma.service';
+import { SettingsService } from '../settings/settings.service';
 import { ShopService } from '../shop/shop.service';
 import { CreateCheckoutDto } from './dto/create-checkout.dto';
 
 @Injectable()
 export class DonationsService {
   private readonly logger = new Logger(DonationsService.name);
-  private stripe: Stripe | null = null;
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly config: ConfigService,
+    private readonly settings: SettingsService,
     @Inject(forwardRef(() => ShopService))
     private readonly shop: ShopService,
-  ) {
-    const secret = this.config.get<string>('STRIPE_SECRET_KEY')?.trim();
-    if (secret) {
-      this.stripe = new Stripe(secret);
-    }
-  }
+  ) {}
 
   private requireStripe(): Stripe {
-    if (!this.stripe) {
+    const stripe = this.settings.stripe();
+    if (!stripe) {
       throw new ServiceUnavailableException(
-        'Stripe is not configured. Set STRIPE_SECRET_KEY to enable donations.',
+        'Donations are not connected yet. Add the Stripe secret key in CMS → Settings.',
       );
     }
-    return this.stripe;
+    return stripe;
   }
 
   private siteUrl(): string {
-    const raw =
-      this.config.get<string>('PUBLIC_SITE_URL')?.trim() ||
-      'http://localhost:5175';
-    return raw.replace(/\/+$/, '');
+    return this.settings.siteUrl();
   }
 
   /**
@@ -53,9 +45,7 @@ export class DonationsService {
    * Donor amounts on Support are EUR.
    */
   private stripeCurrency(): string {
-    const raw =
-      this.config.get<string>('STRIPE_CURRENCY')?.trim().toLowerCase() || 'eur';
-    return raw === 'bgn' ? 'eur' : raw;
+    return this.settings.stripeCurrency();
   }
 
   async createCheckout(dto: CreateCheckoutDto) {
@@ -160,10 +150,10 @@ export class DonationsService {
 
   async handleWebhook(rawBody: Buffer, signature: string | undefined) {
     const stripe = this.requireStripe();
-    const secret = this.config.get<string>('STRIPE_WEBHOOK_SECRET')?.trim();
+    const secret = this.settings.stripeWebhookSecret();
     if (!secret) {
       throw new ServiceUnavailableException(
-        'Stripe webhook secret is not configured. Set STRIPE_WEBHOOK_SECRET.',
+        'Stripe webhook secret is not configured. Add it in CMS → Settings.',
       );
     }
     if (!signature) {

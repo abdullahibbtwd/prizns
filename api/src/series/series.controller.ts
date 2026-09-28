@@ -10,6 +10,9 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { STAFF_ROLES } from '../auth/role-access';
 import { TranslationService } from '../translation/translation.service';
 import {
   CreateSeriesDto,
@@ -19,7 +22,7 @@ import {
 import { SeriesService } from './series.service';
 
 @Controller('cms/series')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class SeriesController {
   constructor(
     private readonly series: SeriesService,
@@ -37,6 +40,7 @@ export class SeriesController {
   }
 
   @Post()
+  @Roles(...STAFF_ROLES)
   async create(@Body() dto: CreateSeriesDto) {
     const series = await this.series.create(dto);
     if (series.translationStatus === 'PENDING') {
@@ -46,6 +50,7 @@ export class SeriesController {
   }
 
   @Patch(':id')
+  @Roles(...STAFF_ROLES)
   async update(@Param('id') id: string, @Body() dto: UpdateSeriesDto) {
     const series = await this.series.update(id, dto);
     if (series.translationStatus === 'PENDING') {
@@ -55,11 +60,13 @@ export class SeriesController {
   }
 
   @Put(':id/episodes')
+  @Roles(...STAFF_ROLES)
   setEpisodes(@Param('id') id: string, @Body() dto: SetSeriesEpisodesDto) {
     return this.series.setEpisodes(id, dto);
   }
 
   @Delete(':id')
+  @Roles(...STAFF_ROLES)
   remove(@Param('id') id: string) {
     return this.series.remove(id);
   }

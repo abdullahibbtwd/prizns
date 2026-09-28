@@ -8,6 +8,18 @@ const listCmsMedia = vi.fn()
 const deleteCmsMedia = vi.fn()
 const uploadCmsMedia = vi.fn()
 
+const authState = vi.hoisted(() => ({
+  user: { id: 'u-admin', role: 'ADMIN', roles: ['ADMIN'] } as {
+    id: string
+    role: string
+    roles: string[]
+  },
+}))
+
+vi.mock('@/lib/auth', () => ({
+  useAuth: () => ({ user: authState.user, loading: false }),
+}))
+
 vi.mock('@/lib/articles-api', () => ({
   listCmsMedia: (...args: unknown[]) => listCmsMedia(...args),
   deleteCmsMedia: (...args: unknown[]) => deleteCmsMedia(...args),

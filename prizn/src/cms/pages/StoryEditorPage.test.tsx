@@ -6,14 +6,10 @@ import { buildCmsArticle } from '@/test/factories'
 import { renderPage } from '@/test/render-page'
 import CmsStoryEditorPage from './StoryEditorPage'
 
-async function confirmPublishWithoutAudio(
-  user: ReturnType<typeof userEvent.setup>,
-) {
+async function confirmPublish(user: ReturnType<typeof userEvent.setup>) {
   const dialog = await screen.findByRole('dialog')
   await user.click(
-    within(dialog).getByRole('button', {
-      name: 'cms.editor.publishWithoutNarrationConfirm',
-    }),
+    within(dialog).getByRole('button', { name: 'cms.editor.publish' }),
   )
 }
 
@@ -30,11 +26,26 @@ async function confirmNarrationGenerate(
 
 const getCmsArticle = vi.fn()
 const listCmsAuthors = vi.fn()
+const createCmsAuthor = vi.fn()
 const listCmsSeries = vi.fn()
 const listCmsTags = vi.fn()
 const createCmsArticle = vi.fn()
 const updateCmsArticle = vi.fn()
 const queueArticleNarration = vi.fn()
+const uploadCmsMedia = vi.fn()
+const requestArticleChanges = vi.fn()
+
+const authState = vi.hoisted(() => ({
+  user: { id: 'u-admin', role: 'ADMIN', roles: ['ADMIN'] } as {
+    id: string
+    role: string
+    roles: string[]
+  },
+}))
+
+vi.mock('@/lib/auth', () => ({
+  useAuth: () => ({ user: authState.user, loading: false }),
+}))
 
 vi.mock('@/hooks/useJournalLang', () => ({
   useJournalLang: () => ({ lang: 'en', setLang: vi.fn() }),
@@ -46,11 +57,12 @@ vi.mock('@/lib/articles-api', () => ({
   createCmsArticle: (...args: unknown[]) => createCmsArticle(...args),
   updateCmsArticle: (...args: unknown[]) => updateCmsArticle(...args),
   deleteCmsArticle: vi.fn(),
-  createCmsAuthor: vi.fn(),
+  createCmsAuthor: (...args: unknown[]) => createCmsAuthor(...args),
   queueArticleTranslation: vi.fn(),
-  uploadCmsMedia: vi.fn(),
+  uploadCmsMedia: (...args: unknown[]) => uploadCmsMedia(...args),
   queueArticleNarration: (...args: unknown[]) => queueArticleNarration(...args),
   clearArticleNarration: vi.fn(),
+  requestArticleChanges: (...args: unknown[]) => requestArticleChanges(...args),
 }))
 
 vi.mock('@/lib/cms-content-api', () => ({
@@ -111,7 +123,7 @@ describe('CmsStoryEditorPage publishing actions', () => {
     renderEditor('/cms/stories/art-1')
     const title = await screen.findByDisplayValue('Village life')
     await user.type(title, ' edited')
-    expect(screen.getByRole('button', { name: 'cms.editor.publish' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'cms.editor.update' })).toBeEnabled()
   })
 
   it('disables Publish when the story is already published and saved', async () => {
@@ -124,11 +136,11 @@ describe('CmsStoryEditorPage publishing actions', () => {
     renderEditor('/cms/stories/art-1')
     await waitFor(() => {
       expect(
-        screen.getByRole('button', { name: 'cms.editor.publish' }),
+        screen.getByRole('button', { name: 'cms.editor.update' }),
       ).toBeDisabled()
     })
     expect(
-      screen.getByRole('button', { name: /cms.editor.saveDraft/ }),
+      screen.getByRole('button', { name: /cms.editor.unpublish/ }),
     ).toBeEnabled()
   })
 
@@ -169,7 +181,7 @@ describe('CmsStoryEditorPage publishing actions', () => {
     renderEditor('/cms/stories/art-1')
     await screen.findByRole('button', { name: 'cms.editor.publish' })
     await user.click(screen.getByRole('button', { name: 'cms.editor.publish' }))
-    await confirmPublishWithoutAudio(user)
+    await confirmPublish(user)
 
     await waitFor(() => {
       expect(updateCmsArticle).toHaveBeenCalledWith(
@@ -199,7 +211,7 @@ describe('CmsStoryEditorPage publishing actions', () => {
     renderEditor('/cms/stories/art-1')
     const publish = await screen.findByRole('button', { name: 'cms.editor.publish' })
     await user.click(publish)
-    await confirmPublishWithoutAudio(user)
+    await confirmPublish(user)
 
     const busy = await screen.findByRole('button', {
       name: /cms.editor.publishingNow/,
@@ -234,7 +246,7 @@ describe('CmsStoryEditorPage publishing actions', () => {
     renderEditor('/cms/stories/art-1')
     await screen.findByRole('button', { name: 'cms.editor.publish' })
     await user.click(screen.getByRole('button', { name: 'cms.editor.publish' }))
-    await confirmPublishWithoutAudio(user)
+    await confirmPublish(user)
 
     await waitFor(() => {
       expect(updateCmsArticle).toHaveBeenCalledWith(
@@ -244,7 +256,7 @@ describe('CmsStoryEditorPage publishing actions', () => {
     })
   })
 
-  it('queues narration when publishing with the narrate option', async () => {
+  it('asks for a plain publish confirmation with no audio options', async () => {
     const user = userEvent.setup()
     const draft = buildCmsArticle({
       status: 'DRAFT',
@@ -259,19 +271,22 @@ describe('CmsStoryEditorPage publishing actions', () => {
     await user.click(screen.getByRole('button', { name: 'cms.editor.publish' }))
 
     const dialog = await screen.findByRole('dialog')
-    await user.click(
-      within(dialog).getByRole('button', {
-        name: 'cms.editor.publishAndNarrate',
-      }),
+    expect(within(dialog).getByText('cms.editor.publishConfirmTitle')).toBeInTheDocument()
+    expect(within(dialog).getAllByRole('button').map((b) => b.textContent)).toEqual(
+      expect.not.arrayContaining([expect.stringMatching(/narrat|audio/i)]),
     )
+    await user.click(within(dialog).getByRole('button', { name: 'cms.editor.cancel' }))
+    expect(updateCmsArticle).not.toHaveBeenCalled()
 
+    await user.click(screen.getByRole('button', { name: 'cms.editor.publish' }))
+    await confirmPublish(user)
     await waitFor(() => {
       expect(updateCmsArticle).toHaveBeenCalledWith(
         'art-1',
         expect.objectContaining({ status: 'PUBLISHED' }),
       )
-      expect(queueArticleNarration).toHaveBeenCalledWith('art-1')
     })
+    expect(queueArticleNarration).not.toHaveBeenCalled()
   })
 
   it('queues narration on a published story without demoting it to draft', async () => {
@@ -285,7 +300,7 @@ describe('CmsStoryEditorPage publishing actions', () => {
     renderEditor('/cms/stories/art-1')
     await waitFor(() => {
       expect(
-        screen.getByRole('button', { name: 'cms.editor.publish' }),
+        screen.getByRole('button', { name: 'cms.editor.update' }),
       ).toBeDisabled()
     })
 
@@ -298,11 +313,328 @@ describe('CmsStoryEditorPage publishing actions', () => {
       expect(queueArticleNarration).toHaveBeenCalledWith('art-1')
     })
     expect(
-      screen.getByRole('button', { name: 'cms.editor.publish' }),
+      screen.getByRole('button', { name: 'cms.editor.update' }),
     ).toBeDisabled()
     expect(
-      screen.queryByText('cms.editor.unpublishedEdits'),
+      screen.queryByText('cms.editor.liveEditsPending'),
     ).not.toBeInTheDocument()
+  })
+})
+
+describe('CmsStoryEditorPage audio', () => {
+  const liveWithAudio = () =>
+    buildCmsArticle({
+      status: 'PUBLISHED',
+      titleBg: 'Village life',
+      bodyRaw: [{ type: 'paragraph', textBg: 'Lead paragraph.' }],
+      audioMediaId: 'aud-1',
+      audioUrl: 'https://cdn.test/narration.mp3',
+      narrationStatus: 'READY',
+    })
+
+  beforeEach(() => {
+    listCmsAuthors.mockResolvedValue([])
+    listCmsSeries.mockResolvedValue([])
+    listCmsTags.mockResolvedValue([])
+    updateCmsArticle.mockReset()
+    uploadCmsMedia.mockReset()
+    getCmsArticle.mockReset()
+    getCmsArticle.mockResolvedValue(liveWithAudio())
+    updateCmsArticle.mockImplementation(async (_id, body) => ({
+      ...liveWithAudio(),
+      ...body,
+    }))
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('removes audio only when the editor clicks Update', async () => {
+    const user = userEvent.setup()
+    renderEditor('/cms/stories/art-1')
+    await user.click(
+      await screen.findByRole('button', { name: /cms.editor.narrationRemove/ }),
+    )
+    expect(screen.getByText('cms.editor.narrationRemovePending')).toBeInTheDocument()
+    expect(updateCmsArticle).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: 'cms.editor.update' }))
+    await waitFor(() => {
+      expect(updateCmsArticle).toHaveBeenCalledWith(
+        'art-1',
+        expect.objectContaining({ audioMediaId: null }),
+      )
+    })
+  })
+
+  it('undoing a removal leaves nothing to save', async () => {
+    const user = userEvent.setup()
+    renderEditor('/cms/stories/art-1')
+    await user.click(
+      await screen.findByRole('button', { name: /cms.editor.narrationRemove/ }),
+    )
+    expect(screen.getByRole('button', { name: 'cms.editor.update' })).toBeEnabled()
+    await user.click(screen.getByRole('button', { name: /cms.editor.narrationUndo/ }))
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'cms.editor.update' })).toBeDisabled()
+    })
+  })
+
+  it('leaves audio alone when saving other edits', async () => {
+    const user = userEvent.setup()
+    renderEditor('/cms/stories/art-1')
+    const title = await screen.findByDisplayValue('Village life')
+    await user.type(title, ' edited')
+    await user.click(screen.getByRole('button', { name: 'cms.editor.update' }))
+    await waitFor(() => expect(updateCmsArticle).toHaveBeenCalled())
+    expect(updateCmsArticle.mock.calls[0]![1]).not.toHaveProperty('audioMediaId')
+  })
+
+  it('uploads a chosen recording on Update instead of generating', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:recording')
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+    vi.spyOn(HTMLMediaElement.prototype, 'src', 'set').mockImplementation(
+      function (this: HTMLMediaElement) {
+        queueMicrotask(() => this.onerror?.(new Event('error')))
+      },
+    )
+    uploadCmsMedia.mockResolvedValue({ id: 'aud-new' })
+    renderEditor('/cms/stories/art-1')
+
+    const input = await screen.findByLabelText('cms.editor.narrationUpload')
+    await user.upload(
+      input,
+      new File(['mp3'], 'voice.mp3', { type: 'audio/mpeg' }),
+    )
+    expect(await screen.findByText('cms.editor.narrationUnsaved')).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: /cms.editor.narrationRegenerate|cms.editor.narrationGenerate/ }),
+    ).toBeDisabled()
+
+    await user.click(screen.getByRole('button', { name: 'cms.editor.update' }))
+    await waitFor(() => {
+      expect(updateCmsArticle).toHaveBeenCalledWith(
+        'art-1',
+        expect.objectContaining({ audioMediaId: 'aud-new' }),
+      )
+    })
+    expect(uploadCmsMedia).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('CmsStoryEditorPage roles', () => {
+  beforeEach(() => {
+    listCmsAuthors.mockResolvedValue([
+      {
+        id: 'author-1',
+        slug: 'iva',
+        nameBg: 'Ива',
+        nameEn: 'Iva',
+        roleBg: 'Автор',
+        roleEn: null,
+        imageUrl: null,
+      },
+    ])
+    listCmsSeries.mockResolvedValue([])
+    listCmsTags.mockResolvedValue([])
+    getCmsArticle.mockReset()
+    createCmsAuthor.mockReset()
+  })
+
+  afterEach(() => {
+    authState.user = { id: 'u-admin', role: 'ADMIN', roles: ['ADMIN'] }
+  })
+
+  it('locks the author to the writer and hides delete for authors', async () => {
+    authState.user = { id: 'u-author', role: 'AUTHOR', roles: ['AUTHOR'] }
+    getCmsArticle.mockResolvedValue(
+      buildCmsArticle({ status: 'DRAFT', titleBg: 'My story', authorId: 'author-1' }),
+    )
+    renderEditor('/cms/stories/art-1')
+    await screen.findByDisplayValue('My story')
+
+    expect(await screen.findByText('Iva')).toBeInTheDocument()
+    expect(screen.getByText('cms.editor.authorOwnOnly')).toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: /cms.editor.addAuthor/ }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: /cms.stories.delete/ }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('lets authors submit for review but not publish', async () => {
+    authState.user = { id: 'u-author', role: 'AUTHOR', roles: ['AUTHOR'] }
+    getCmsArticle.mockResolvedValue(
+      buildCmsArticle({ status: 'DRAFT', titleBg: 'My story', authorId: 'author-1' }),
+    )
+    renderEditor('/cms/stories/art-1')
+    await screen.findByDisplayValue('My story')
+
+    expect(
+      screen.getByRole('button', { name: 'cms.editor.submitForReview' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: /cms.editor.saveDraft/ }),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'cms.editor.publish' }),
+    ).not.toBeInTheDocument()
+    expect(screen.getByText('cms.editor.reviewHint')).toBeInTheDocument()
+  })
+
+  it('locks a published story for its author', async () => {
+    authState.user = { id: 'u-author', role: 'AUTHOR', roles: ['AUTHOR'] }
+    getCmsArticle.mockResolvedValue(
+      buildCmsArticle({
+        status: 'PUBLISHED',
+        titleBg: 'Live story',
+        authorId: 'author-1',
+      }),
+    )
+    renderEditor('/cms/stories/art-1')
+    await screen.findByDisplayValue('Live story')
+
+    for (const name of [
+      'cms.editor.update',
+      'cms.editor.submitForReview',
+      /cms.editor.unpublish/,
+    ]) {
+      expect(screen.queryByRole('button', { name })).not.toBeInTheDocument()
+    }
+  })
+
+  it('lets moderators add a guest author from the story', async () => {
+    const user = userEvent.setup()
+    authState.user = { id: 'u-mod', role: 'MODERATOR', roles: ['MODERATOR'] }
+    createCmsAuthor.mockResolvedValue({
+      id: 'guest-1',
+      slug: 'guest',
+      nameBg: 'Гост',
+      nameEn: null,
+      roleBg: 'Гост автор',
+      roleEn: null,
+      imageUrl: null,
+      isGuest: true,
+    })
+    getCmsArticle.mockResolvedValue(
+      buildCmsArticle({ status: 'DRAFT', titleBg: 'Their story' }),
+    )
+    renderEditor('/cms/stories/art-1')
+    await screen.findByDisplayValue('Their story')
+
+    expect(
+      screen.queryByRole('button', { name: /cms.stories.delete/ }),
+    ).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /cms.editor.addAuthor/ }))
+    await user.type(screen.getByLabelText('cms.editor.authorName'), 'Гост')
+    await user.click(screen.getByRole('checkbox', { name: /cms.authors.guestLabel/ }))
+    await user.click(screen.getByRole('button', { name: 'cms.editor.createAuthor' }))
+
+    await waitFor(() => {
+      expect(createCmsAuthor).toHaveBeenCalledWith('Гост', { isGuest: true })
+    })
+  })
+
+  it('shows delete to super admins', async () => {
+    getCmsArticle.mockResolvedValue(
+      buildCmsArticle({ status: 'DRAFT', titleBg: 'Any story' }),
+    )
+    renderEditor('/cms/stories/art-1')
+    await screen.findByDisplayValue('Any story')
+    expect(
+      screen.getByRole('button', { name: /cms.stories.delete/ }),
+    ).toBeInTheDocument()
+  })
+})
+
+describe('CmsStoryEditorPage send back for changes', () => {
+  beforeEach(() => {
+    listCmsAuthors.mockResolvedValue([])
+    listCmsSeries.mockResolvedValue([])
+    listCmsTags.mockResolvedValue([])
+    getCmsArticle.mockReset()
+    requestArticleChanges.mockReset()
+  })
+
+  afterEach(() => {
+    authState.user = { id: 'u-admin', role: 'ADMIN', roles: ['ADMIN'] }
+  })
+
+  it('lets a moderator send a story in review back with a note', async () => {
+    const user = userEvent.setup()
+    authState.user = { id: 'u-mod', role: 'MODERATOR', roles: ['MODERATOR'] }
+    getCmsArticle.mockResolvedValue(
+      buildCmsArticle({ id: 'art-1', status: 'REVIEW', titleBg: 'Submitted' }),
+    )
+    requestArticleChanges.mockResolvedValue(
+      buildCmsArticle({
+        id: 'art-1',
+        status: 'DRAFT',
+        titleBg: 'Submitted',
+        reviewNote: 'Please add a photo credit',
+      }),
+    )
+    renderEditor('/cms/stories/art-1')
+    await screen.findByDisplayValue('Submitted')
+
+    await user.click(screen.getByRole('button', { name: /cms.editor.sendBack$/ }))
+    const dialog = await screen.findByRole('dialog')
+    const confirm = within(dialog).getByRole('button', {
+      name: /cms.editor.sendBackConfirm/,
+    })
+    expect(confirm).toBeDisabled()
+    await user.type(
+      within(dialog).getByLabelText('cms.editor.sendBackNote'),
+      'Please add a photo credit',
+    )
+    await user.click(confirm)
+
+    await waitFor(() => {
+      expect(requestArticleChanges).toHaveBeenCalledWith(
+        'art-1',
+        'Please add a photo credit',
+      )
+    })
+    expect(await screen.findByText('cms.editor.sentBackTitle')).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: /cms.editor.sendBack$/ }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('hides send back from authors', async () => {
+    authState.user = { id: 'u-author', role: 'AUTHOR', roles: ['AUTHOR'] }
+    getCmsArticle.mockResolvedValue(
+      buildCmsArticle({ status: 'REVIEW', titleBg: 'Mine', authorId: 'author-1' }),
+    )
+    renderEditor('/cms/stories/art-1')
+    await screen.findByDisplayValue('Mine')
+    expect(
+      screen.queryByRole('button', { name: /cms.editor.sendBack$/ }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('shows the moderator note to the author and lets them resubmit', async () => {
+    authState.user = { id: 'u-author', role: 'AUTHOR', roles: ['AUTHOR'] }
+    getCmsArticle.mockResolvedValue(
+      buildCmsArticle({
+        status: 'DRAFT',
+        titleBg: 'Mine',
+        authorId: 'author-1',
+        reviewNote: 'Please add a photo credit',
+      }),
+    )
+    renderEditor('/cms/stories/art-1')
+    await screen.findByDisplayValue('Mine')
+
+    expect(screen.getByText('cms.editor.changesRequestedTitle')).toBeInTheDocument()
+    expect(screen.getByText('Please add a photo credit')).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'cms.editor.submitForReview' }),
+    ).toBeInTheDocument()
   })
 })
 

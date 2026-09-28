@@ -40,12 +40,15 @@ export type HumanStoryCard = {
   title: string
   titleBg: string
   author: string
+  authorBg: string
   readTime: string
   readTimeBg: string
   location: string
+  locationBg: string
   image: string
   imageThumb?: string
   excerpt: string
+  excerptBg: string
   sponsored?: boolean
   sponsorName?: string | null
   series?: {
@@ -120,12 +123,15 @@ export function toHumanStoryCard(article: CmsArticle): HumanStoryCard {
     title: article.title || article.titleBg,
     titleBg: article.titleBg,
     author: article.author || article.authorBg || '',
+    authorBg: article.authorBg || article.author || '',
     readTime: article.readTime || article.readTimeBg,
     readTimeBg: article.readTimeBg,
     location: article.location || article.locationBg,
+    locationBg: article.locationBg || '',
     image: article.image || '',
     imageThumb: article.imageThumb || '',
     excerpt: article.subtitle || article.subtitleBg,
+    excerptBg: article.subtitleBg,
     sponsored: Boolean(article.sponsored),
     sponsorName: article.sponsorName ?? null,
     series: series

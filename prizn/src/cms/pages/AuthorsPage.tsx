@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
@@ -13,6 +14,10 @@ import { deleteCmsAuthor, listCmsAuthors } from '@/lib/cms-content-api'
 import { useJournalLang } from '@/hooks/useJournalLang'
 import { pickLang } from '@/lib/pick-lang'
 import { cn } from '@/lib/utils'
+import { useAuth } from '@/lib/auth'
+import { isCmsSuperAdmin } from '@/lib/cms-roles'
+
+type GuestFilter = 'all' | 'regular' | 'guest'
 
 export default function CmsAuthorsPage() {
   const { t } = useTranslation()
@@ -23,7 +28,27 @@ export default function CmsAuthorsPage() {
     queryKey: ['cms-authors-desk'],
     queryFn: () => listCmsAuthors(true),
   })
-  const authors = authorsQuery.data ?? []
+  const allAuthors = authorsQuery.data ?? []
+  const [guestFilter, setGuestFilter] = useState<GuestFilter>('all')
+  const { user } = useAuth()
+  const canDelete = isCmsSuperAdmin(user)
+  const guestCount = allAuthors.filter((author) => author.isGuest).length
+  const authors = allAuthors.filter((author) =>
+    guestFilter === 'all'
+      ? true
+      : guestFilter === 'guest'
+        ? author.isGuest
+        : !author.isGuest,
+  )
+  const guestFilters: Array<{ id: GuestFilter; label: string; count: number }> = [
+    { id: 'all', label: t('cms.authors.filterAll'), count: allAuthors.length },
+    {
+      id: 'regular',
+      label: t('cms.authors.filterRegular'),
+      count: allAuthors.length - guestCount,
+    },
+    { id: 'guest', label: t('cms.authors.filterGuest'), count: guestCount },
+  ]
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteCmsAuthor(id),
@@ -49,7 +74,7 @@ export default function CmsAuthorsPage() {
       <CmsPageHeader
         title={t('cms.authors.title')}
         description={t('cms.authors.description')}
-        badge={t('cms.authors.items', { count: authors.length })}
+        badge={t('cms.authors.items', { count: allAuthors.length })}
         actions={
           <Link to="/cms/authors/new">
             <PrimaryButton>
@@ -60,6 +85,26 @@ export default function CmsAuthorsPage() {
         }
       />
 
+      <div className="mb-6 flex flex-wrap gap-2" role="tablist">
+        {guestFilters.map((filter) => (
+          <button
+            key={filter.id}
+            type="button"
+            role="tab"
+            aria-selected={guestFilter === filter.id}
+            onClick={() => setGuestFilter(filter.id)}
+            className={cn(
+              'rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors',
+              guestFilter === filter.id
+                ? 'border-[#0C2686] bg-[#0C2686] text-white'
+                : 'border-[#E8E4DC] bg-white text-stone-600 hover:border-[#0C2686]/40',
+            )}
+          >
+            {filter.label} ({filter.count})
+          </button>
+        ))}
+      </div>
+
       {authorsQuery.isLoading && (
         <p className="text-sm text-stone-500">{t('cms.authors.loading')}</p>
       )}
@@ -67,7 +112,13 @@ export default function CmsAuthorsPage() {
         <p className="text-sm text-rose-700">{t('cms.authors.loadFailed')}</p>
       )}
 
-      {!authorsQuery.isLoading && authors.length === 0 && (
+      {!authorsQuery.isLoading && allAuthors.length > 0 && authors.length === 0 && (
+        <CmsCard className="p-8 text-center text-sm text-stone-500">
+          {t('cms.authors.emptyFilter')}
+        </CmsCard>
+      )}
+
+      {!authorsQuery.isLoading && allAuthors.length === 0 && (
         <CmsCard className="p-8 text-center text-sm text-stone-500">
           {t('cms.authors.empty')}{' '}
           <Link to="/cms/authors/new" className="font-semibold text-[#0C2686]">
@@ -97,9 +148,16 @@ export default function CmsAuthorsPage() {
                 )}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-transparent to-transparent" />
                 <div className="absolute bottom-3 left-3 right-3 text-white">
-                  <span className="rounded-full bg-amber-500/90 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-950">
-                    {pickLang(lang, author.roleEn, author.roleBg)}
-                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    <span className="rounded-full bg-amber-500/90 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-950">
+                      {pickLang(lang, author.roleEn, author.roleBg)}
+                    </span>
+                    {author.isGuest && (
+                      <span className="rounded-full bg-white/90 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[#0C2686]">
+                        {t('cms.authors.guestBadge')}
+                      </span>
+                    )}
+                  </div>
                   <h2 className="mt-1.5 font-heading text-xl font-bold">
                     {pickLang(lang, author.nameEn, author.nameBg)}
                   </h2>
@@ -149,17 +207,19 @@ export default function CmsAuthorsPage() {
                   >
                     <Edit className="size-3.5" /> {t('cms.authors.edit')}
                   </Link>
-                  <button
-                    type="button"
-                    onClick={() => void confirmDelete(author)}
-                    disabled={deleteMutation.isPending}
-                    className="inline-flex items-center gap-1 font-semibold text-rose-700 disabled:opacity-50"
-                  >
-                    <Trash2 className="size-3.5" />
-                    {deleteMutation.isPending
-                      ? t('cms.authors.deleting')
-                      : t('cms.authors.delete')}
-                  </button>
+                  {canDelete && (
+                    <button
+                      type="button"
+                      onClick={() => void confirmDelete(author)}
+                      disabled={deleteMutation.isPending}
+                      className="inline-flex items-center gap-1 font-semibold text-rose-700 disabled:opacity-50"
+                    >
+                      <Trash2 className="size-3.5" />
+                      {deleteMutation.isPending
+                        ? t('cms.authors.deleting')
+                        : t('cms.authors.delete')}
+                    </button>
+                  )}
                 </div>
               </div>
             </CmsCard>

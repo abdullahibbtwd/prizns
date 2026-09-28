@@ -9,11 +9,15 @@ import {
 } from '@nestjs/common';
 import { PartnershipStatus } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { STAFF_ROLES } from '../auth/role-access';
 import { UpdatePartnershipDto } from './dto/update-partnership.dto';
 import { PartnershipsService } from './partnerships.service';
 
 @Controller('cms/partnerships')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(...STAFF_ROLES)
 export class PartnershipsController {
   constructor(private readonly partnerships: PartnershipsService) {}
 
