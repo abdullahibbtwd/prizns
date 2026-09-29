@@ -36,6 +36,7 @@ import {
 } from '@/components/concept-3/ArticleHeroGallery'
 import { ArticleImageCollage } from '@/components/concept-3/ArticleImageCollage'
 import { RichText } from '@/components/RichText'
+import { richTextIsEmpty, sanitizeRichText } from '@/lib/rich-text'
 import {
   getPublicArticle,
   listRelatedArticles,
@@ -350,7 +351,9 @@ function ArticleBlockView({
     return (
       <blockquote className="my-10 border-l-2 border-[#0C2686] bg-[#0C2686]/5 px-6 py-6 md:px-8 rounded-r-xl">
         <div className="font-sans text-base md:text-lg font-light italic leading-relaxed text-[#1A1A1A]/80">
-          “<RichText as="span" html={pick(lang, block.text, block.textBg)} />”
+          {lang === 'bg' ? '„' : '“'}
+          <RichText as="span" html={pick(lang, block.text, block.textBg)} />
+          {lang === 'bg' ? '“' : '”'}
         </div>
         {cite ? (
           <cite className="mt-3 block font-sans text-xs uppercase tracking-widest text-[#0C2686] not-italic">
@@ -362,16 +365,23 @@ function ArticleBlockView({
   }
 
   if (block.type === 'note') {
+    const text = pick(lang, block.text, block.textBg)
+    const label = pick(lang, block.label, block.labelBg).trim()
+    const hasText = !richTextIsEmpty(sanitizeRichText(text))
+    if (!hasText && !label) return null
+    const contentClass =
+      'text-balance text-center font-heading text-[1.375rem] font-medium leading-snug text-[#1A1A1A] md:text-[1.5rem]'
     return (
-      <aside className="rounded-[16px] border border-[#EAE6DF] bg-white px-6 py-5 md:px-8">
-        <span className="mb-2 block font-sans text-[11px] font-medium uppercase tracking-[0.22em] text-[#0C2686]">
-          {pick(lang, block.label, block.labelBg)}
-        </span>
-        <RichText
-          as="p"
-          className="font-sans text-sm md:text-base font-light leading-relaxed text-[#1A1A1A]/75"
-          html={pick(lang, block.text, block.textBg)}
+      <aside className="mx-auto w-full rounded-[14px] sm:w-[90%] border border-[#EAE6DF] bg-white px-6 py-4 shadow-[0_2px_16px_rgba(12,38,134,0.05)] md:px-8 md:py-5">
+        <span
+          aria-hidden
+          className="mx-auto mb-3 block h-[2px] w-6 rounded-full bg-[#0C2686]/60"
         />
+        {hasText ? (
+          <RichText as="p" className={contentClass} html={text} />
+        ) : (
+          <h2 className={contentClass}>{label}</h2>
+        )}
       </aside>
     )
   }

@@ -132,7 +132,9 @@ function AuthorContent({
 
             <blockquote className="mt-8 border-l-2 border-[#0C2686] bg-[#0C2686]/5 py-5 pl-5 pr-4 md:pl-6">
               <p className="font-heading text-xl italic leading-snug text-[#1A1A1A] md:text-2xl">
-                “{pick(lang, author.quote, author.quoteBg)}”
+                {lang === 'bg'
+                  ? `„${pick(lang, author.quote, author.quoteBg)}“`
+                  : `“${pick(lang, author.quote, author.quoteBg)}”`}
               </p>
             </blockquote>
 

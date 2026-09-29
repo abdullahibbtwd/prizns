@@ -97,7 +97,7 @@ export default function AuthorsPage() {
                             {author.storyCount} {lang === 'bg' ? 'истории' : 'stories'}
                           </p>
                           <p className="mt-3 font-heading text-[15px] italic leading-relaxed text-[#1A1A1A]/60">
-                            “{lang === 'bg' ? author.quoteBg : author.quote}”
+                            {lang === 'bg' ? `„${author.quoteBg}“` : `“${author.quote}”`}
                           </p>
                         </div>
                       </Link>

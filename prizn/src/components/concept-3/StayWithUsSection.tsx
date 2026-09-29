@@ -68,35 +68,57 @@ export function StayWithUsSection({ lang }: StayWithUsSectionProps) {
 
           <article
             id="partnerships"
-            className="flex min-h-0 flex-col justify-end rounded-[20px] border border-[#EAE6DF] bg-white p-5 sm:p-7 lg:p-9"
+            className="relative flex min-h-0 overflow-hidden rounded-[20px] bg-[#1A1A1A] text-white"
           >
-            <span className="inline-flex size-10 items-center justify-center rounded-full border border-[#0C2686]/20 text-[#0C2686] sm:size-12">
-              <Handshake className="size-4 sm:size-5" />
-            </span>
-            <span className="mt-4 font-sans text-[10px] font-medium uppercase tracking-[0.28em] text-[#0C2686] sm:text-[11px]">
-              {lang === 'bg' ? 'Заедно' : 'Together'}
-            </span>
-            <h3 className="mt-2 font-heading text-2xl font-light tracking-tight text-[#1A1A1A] sm:text-3xl lg:text-4xl">
-              {lang === 'bg' ? 'Партньорства' : 'Partnerships'}
-            </h3>
-            <p className="mt-3 max-w-md font-sans text-xs font-light leading-relaxed text-[#1A1A1A]/65 sm:text-sm line-clamp-2 lg:line-clamp-none">
-              {lang === 'bg'
-                ? 'Работим с културни институции, местни общности и марки, които споделят нашата мисия.'
-                : 'We collaborate with cultural institutions, local communities, and brands that share our mission.'}
-            </p>
-            <Link
-              to="/partnerships"
-              className="mt-5 inline-flex w-fit cursor-pointer items-center gap-2 rounded-full border border-[#0C2686] px-5 py-2.5 font-sans text-[10px] font-medium uppercase tracking-[0.2em] text-[#0C2686] transition-all hover:bg-[#0C2686] hover:text-white sm:px-6 sm:text-xs"
-            >
-              {lang === 'bg' ? 'Свържете се с нас' : 'Get in touch'}
-            </Link>
+            <div
+              className="absolute inset-0 bg-cover bg-center opacity-50"
+              style={{ backgroundImage: 'url(/sections/partnerships.webp)' }}
+              aria-hidden
+            />
+            <div
+              className="absolute inset-0 bg-gradient-to-t from-black via-black/45 to-black/10"
+              aria-hidden
+            />
+            <div className="relative z-10 flex h-full flex-col justify-end p-5 sm:p-7 lg:p-9">
+              <span className="inline-flex size-10 items-center justify-center rounded-full border border-white/30 text-white sm:size-12">
+                <Handshake className="size-4 sm:size-5" />
+              </span>
+              <span className="mt-4 font-sans text-[10px] font-medium uppercase tracking-[0.28em] text-white/65 sm:text-[11px]">
+                {lang === 'bg' ? 'Заедно' : 'Together'}
+              </span>
+              <h3 className="mt-2 font-heading text-2xl font-light tracking-tight sm:text-3xl lg:text-4xl">
+                {lang === 'bg' ? 'Партньорства' : 'Partnerships'}
+              </h3>
+              <p className="mt-3 max-w-md font-sans text-xs font-light leading-relaxed text-white/75 sm:text-sm line-clamp-2 lg:line-clamp-none">
+                {lang === 'bg'
+                  ? 'Работим с културни институции, местни общности и марки, които споделят нашата мисия.'
+                  : 'We collaborate with cultural institutions, local communities, and brands that share our mission.'}
+              </p>
+              <Link
+                to="/partnerships"
+                className="mt-5 inline-flex w-fit cursor-pointer items-center gap-2 rounded-full border border-white px-5 py-2.5 font-sans text-[10px] font-medium uppercase tracking-[0.2em] text-white transition-all hover:bg-white hover:text-[#1A1A1A] sm:px-6 sm:text-xs"
+              >
+                {lang === 'bg' ? 'Свържете се с нас' : 'Get in touch'}
+              </Link>
+            </div>
           </article>
 
           <article
             id="newsletter"
-            className="flex min-h-0 flex-col justify-end overflow-hidden rounded-[20px] bg-[#0C2686] p-5 text-white sm:p-7 lg:p-9"
+            className="relative flex min-h-0 overflow-hidden rounded-[20px] bg-[#0C2686] text-white"
           >
-            <NewsletterSection lang={lang} variant="panel" />
+            <div
+              className="absolute inset-0 bg-cover bg-center opacity-40"
+              style={{ backgroundImage: 'url(/river.jpg)' }}
+              aria-hidden
+            />
+            <div
+              className="absolute inset-0 bg-gradient-to-t from-[#0C2686] via-[#0C2686]/70 to-[#0C2686]/20"
+              aria-hidden
+            />
+            <div className="relative z-10 flex h-full w-full flex-col justify-end p-5 sm:p-7 lg:p-9">
+              <NewsletterSection lang={lang} variant="panel" />
+            </div>
           </article>
         </div>
       </div>

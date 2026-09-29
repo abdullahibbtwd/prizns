@@ -28,8 +28,11 @@ if [[ ! -x "$BIN" ]]; then
   echo "Downloading OSS MinIO ${RELEASE}…"
   TMP="$(mktemp -d)"
   curl -fsSL -o "$TMP/minio.rpm" "$RPM_URL"
+  # The RPM stores absolute paths (/usr/local/bin/minio, /lib/systemd/...).
+  # Strip the leading "/" and take only the binary, or a non-root CI runner
+  # fails writing into the real /lib and /usr.
   if command -v rpm2cpio >/dev/null && command -v cpio >/dev/null; then
-    (cd "$TMP" && rpm2cpio minio.rpm | cpio -idm)
+    (cd "$TMP" && rpm2cpio minio.rpm | cpio -idm --no-absolute-filenames '*bin/minio')
   else
     # macOS / systems without rpm2cpio: use Docker only to extract the binary.
     if ! command -v docker >/dev/null; then
@@ -37,7 +40,7 @@ if [[ ! -x "$BIN" ]]; then
       exit 1
     fi
     docker run --rm -v "$TMP:/work" -w /work alpine:3.20 \
-      sh -c "apk add --no-cache rpm2cpio cpio >/dev/null && rpm2cpio minio.rpm | cpio -idm"
+      sh -c "apk add --no-cache rpm2cpio cpio >/dev/null && rpm2cpio minio.rpm | cpio -idm --no-absolute-filenames '*bin/minio'"
   fi
   FOUND="$(find "$TMP" -type f -name minio | head -1)"
   if [[ -z "$FOUND" ]]; then
