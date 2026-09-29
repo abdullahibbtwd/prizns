@@ -21,15 +21,16 @@ export const journalContent = {
     ],
   },
   editorsLetter: {
-    title: "Editor's Letter",
-    tagline: "Писмо от редактора",
-    quoteLines: [
-      "Every village has a story.",
-      "Every tradition carries memory.",
-      "Every person leaves a trace.",
-    ],
-    welcome: "Welcome to another journey through Northwestern Bulgaria.",
-    signature: "- Albena",
+    title: "Letter from the Founder",
+    tagline: "Писмо от основателя",
+    body:
+      "In the Northwest, kindness is often quiet, hidden behind pain or everyday life. I created Prizni to give it a stage. Because I believe that love is not an abstract idea but an action – a way of living, of supporting “our own”, and of showing the other face of the region. This is the shared space for our heroes, our readers and our shared human stories.",
+    bodyBg:
+      "В Северозапада доброто често е тихо, скрито зад болката или ежедневието. Създадох „Призни“, за да му дадем сцена. Защото вярвам, че любовта не е абстрактно понятие, а действие – начин да живеем, да подкрепяме „своите“ и да покажем другото лице на региона. Това е общото пространство за нашите герои, читатели и споделени човешки истории.",
+    signature: "– Tsvetomir Tsvetkov",
+    signatureBg: "– Цветомир Цветков",
+    role: "Founder, Prizni",
+    roleBg: "Основател, Prizni",
   },
   featuredStory: {
     category: "Human Stories",
