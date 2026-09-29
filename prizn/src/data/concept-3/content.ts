@@ -3,8 +3,6 @@ export const journalContent = {
     brand: "PRIZNI",
     title: "The Untold Stories of Northwestern Bulgaria",
     bgTitle: "Неразказаните истории на Северозапада",
-    edition: "Summer Edition 2026",
-    editionBg: "Лятно издание 2026",
     cta: "Begin Reading",
     ctaBg: "Започнете четенето",
     heroImage: "/hero/01.webp",

@@ -65,19 +65,6 @@ export function EditorialHero({ lang }: EditorialHeroProps) {
         >
           {lang === 'bg' ? content.bgTitle : content.title}
         </motion.h1>
-
-        <motion.div
-          initial={false}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.35, delay: 0.2 }}
-          className="mt-6 flex items-center justify-center gap-3"
-        >
-          <div className="h-px w-8 bg-white/40" />
-          <span className="font-sans text-[11px] md:text-xs uppercase tracking-[0.35em] text-white/80 font-light">
-            {lang === 'bg' ? content.editionBg : content.edition}
-          </span>
-          <div className="h-px w-8 bg-white/40" />
-        </motion.div>
       </div>
 
       {/* Bottom Action - Begin Reading */}
