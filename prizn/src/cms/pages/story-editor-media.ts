@@ -37,6 +37,7 @@ export function mediaThumbUrl(item: StoryMediaItem): string {
 export function mergeLoadedMedia(article: {
   gallery?: Array<{ id: string; url: string; kind?: string | null }>
   heroMediaId?: string | null
+  heroKind?: 'image' | 'video'
   image?: string
   videoUrl?: string | null
   videoMediaId?: string | null
@@ -51,8 +52,14 @@ export function mergeLoadedMedia(article: {
     }
   })
 
-  if (items.length === 0 && article.heroMediaId && article.image) {
-    items.push({
+  // WordPress imports store the cover only as heroMediaId, outside the gallery.
+  if (
+    article.heroMediaId &&
+    article.image &&
+    article.heroKind !== 'video' &&
+    !items.some((item) => item.id === article.heroMediaId)
+  ) {
+    items.unshift({
       id: article.heroMediaId,
       url: article.image,
       kind: 'image',

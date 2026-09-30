@@ -62,6 +62,30 @@ describe('mergeLoadedMedia', () => {
     ).toEqual(['img-1', 'embed-youtube-dQw4w9WgXcQ'])
   })
 
+  it('puts an imported hero first when it is missing from the gallery', () => {
+    expect(
+      mergeLoadedMedia({
+        gallery: [
+          { id: 'img-1', url: '/one.jpg', kind: 'IMAGE' },
+          { id: 'img-2', url: '/two.jpg', kind: 'IMAGE' },
+        ],
+        heroMediaId: 'hero',
+        image: '/hero.jpg',
+      }).map((item) => item.id),
+    ).toEqual(['hero', 'img-1', 'img-2'])
+  })
+
+  it('does not add a video hero poster as a photo', () => {
+    expect(
+      mergeLoadedMedia({
+        gallery: [{ id: 'img-1', url: '/one.jpg', kind: 'IMAGE' }],
+        heroMediaId: 'vid-1',
+        heroKind: 'video',
+        image: '/one.jpg',
+      }).map((item) => item.id),
+    ).toEqual(['img-1'])
+  })
+
   it('does not duplicate an uploaded video already in the gallery', () => {
     expect(
       mergeLoadedMedia({
