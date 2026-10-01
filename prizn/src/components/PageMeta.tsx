@@ -1,5 +1,11 @@
 import { Helmet } from 'react-helmet-async'
-import { absoluteShareUrl } from '@/lib/share-image'
+import {
+  absoluteShareUrl,
+  imageMimeFromUrl,
+  isOgJpegUrl,
+  OG_IMAGE_HEIGHT,
+  OG_IMAGE_WIDTH,
+} from '@/lib/share-image'
 import { stripLocalePrefix, withLocale } from '@/lib/locale-path'
 
 const SITE_NAME = 'Prizni'
@@ -16,14 +22,6 @@ function siteOrigin() {
     return window.location.origin
   }
   return 'https://prizni.bg'
-}
-
-function imageMime(url: string) {
-  const path = url.split('?')[0].toLowerCase()
-  if (path.endsWith('.png')) return 'image/png'
-  if (path.endsWith('.webp')) return 'image/webp'
-  if (path.endsWith('.gif')) return 'image/gif'
-  return 'image/jpeg'
 }
 
 export type PageMetaProps = {
@@ -103,7 +101,13 @@ export function PageMeta({
       <meta property="og:url" content={canonical} />
       <meta property="og:image" content={ogImage} />
       <meta property="og:image:alt" content={imageAlt} />
-      <meta property="og:image:type" content={imageMime(ogImage)} />
+      <meta property="og:image:type" content={imageMimeFromUrl(ogImage)} />
+      {isOgJpegUrl(ogImage) ? (
+        <meta property="og:image:width" content={String(OG_IMAGE_WIDTH)} />
+      ) : null}
+      {isOgJpegUrl(ogImage) ? (
+        <meta property="og:image:height" content={String(OG_IMAGE_HEIGHT)} />
+      ) : null}
       <meta property="og:locale" content={lang === 'bg' ? 'bg_BG' : 'en_US'} />
       <meta
         property="og:locale:alternate"

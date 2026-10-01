@@ -109,7 +109,7 @@ describe('SeoService', () => {
       publishedAt: new Date('2026-01-10'),
       updatedAt: new Date('2026-01-15'),
       heroMedia: {
-        url: 'https://cdn.example/wp-content/uploads/2024/hero-150x150.jpg',
+        url: 'https://cdn.example/media/prizn/cms/hero.webp',
       },
       author: { nameBg: 'Мая', nameEn: 'Maya' },
     });
@@ -124,8 +124,11 @@ describe('SeoService', () => {
       'hreflang="en" href="https://prizni.bg/en/stories/village-life"',
     );
     expect(result.html).toContain(
-      'property="og:image" content="https://cdn.example/wp-content/uploads/2024/hero.jpg"',
+      'property="og:image" content="https://cdn.example/media/prizn/cms/hero-og.jpg"',
     );
+    expect(result.html).toContain('property="og:image:type" content="image/jpeg"');
+    expect(result.html).toContain('property="og:image:width" content="1200"');
+    expect(result.html).toContain('property="og:image:height" content="630"');
     expect(result.html).toContain('"@type":"Article"');
     expect(result.html).toContain('"headline":"Селски живот SEO"');
   });

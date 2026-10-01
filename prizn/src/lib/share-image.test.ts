@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { absoluteShareUrl, preferShareImageUrl } from './share-image'
+import {
+  absoluteShareUrl,
+  isOgJpegUrl,
+  preferShareImageUrl,
+  toOgImageUrl,
+} from './share-image'
 
 describe('preferShareImageUrl', () => {
   it('strips WordPress sized suffixes', () => {
@@ -14,6 +19,16 @@ describe('preferShareImageUrl', () => {
     expect(preferShareImageUrl('/media/prizni/cms/abc-thumb.webp')).toBe(
       '/media/prizni/cms/abc.webp',
     )
+  })
+
+  it('derives -og.jpg for webp share URLs', () => {
+    expect(toOgImageUrl('/media/prizn/cms/abc.webp')).toBe(
+      '/media/prizn/cms/abc-og.jpg',
+    )
+    expect(
+      absoluteShareUrl('https://stage2.prizni.bg', '/media/prizn/cms/abc.webp'),
+    ).toBe('https://stage2.prizni.bg/media/prizn/cms/abc-og.jpg')
+    expect(isOgJpegUrl('https://x/a-og.jpg')).toBe(true)
   })
 
   it('absolutizes relative paths', () => {

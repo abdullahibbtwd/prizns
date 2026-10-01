@@ -5,6 +5,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import { toPrismaSectionFilter } from '../articles/section.util';
 import {
   absoluteShareUrl,
+  imageMimeFromUrl,
+  isOgJpegUrl,
+  OG_IMAGE_HEIGHT,
+  OG_IMAGE_WIDTH,
 } from '../common/share-image.util';
 
 const STATIC_ROUTES = [
@@ -736,9 +740,12 @@ ${items}
     const enPath = meta.barePath === '/' ? '/en' : `/en${meta.barePath}`;
     const bgHref = this.escapeHtml(`${base}${bgPath}`);
     const enHref = this.escapeHtml(`${base}${enPath}`);
-    const imageType = meta.image.toLowerCase().includes('.png')
-      ? 'image/png'
-      : 'image/jpeg';
+    const imageType = imageMimeFromUrl(meta.image);
+    const imageSizeTags = isOgJpegUrl(meta.image)
+      ? `<meta property="og:image:width" content="${OG_IMAGE_WIDTH}" />
+<meta property="og:image:height" content="${OG_IMAGE_HEIGHT}" />
+`
+      : '';
     const robots = meta.noIndex
       ? '<meta name="robots" content="noindex,nofollow" />\n'
       : '';
@@ -766,7 +773,7 @@ ${robots}<meta property="og:site_name" content="${SITE_NAME}" />
 <meta property="og:image" content="${image}" />
 <meta property="og:image:alt" content="${title}" />
 <meta property="og:image:type" content="${imageType}" />
-<meta property="og:locale" content="${ogLocale}" />
+${imageSizeTags}<meta property="og:locale" content="${ogLocale}" />
 <meta property="og:locale:alternate" content="${ogLocaleAlt}" />
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content="${title}" />

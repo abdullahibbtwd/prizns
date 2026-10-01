@@ -288,6 +288,29 @@ export class StorageService implements OnModuleInit {
     await this.prisma.fileObject.deleteMany({ where: { key: safeKey } });
   }
 
+  /** True when the object exists in the configured bucket (no FileObject row required). */
+  async objectExists(key: string): Promise<boolean> {
+    const safeKey = assertSafeObjectKey(key);
+    try {
+      await this.client.statObject(this.bucket, safeKey);
+      return true;
+    } catch (error: unknown) {
+      if (isMinioNotFound(error)) return false;
+      throw error;
+    }
+  }
+
+  /** Download an object as a Buffer (used by OG backfill and similar tools). */
+  async getObjectBuffer(key: string): Promise<Buffer> {
+    const safeKey = assertSafeObjectKey(key);
+    const stream = await this.client.getObject(this.bucket, safeKey);
+    const chunks: Buffer[] = [];
+    for await (const chunk of stream) {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    }
+    return Buffer.concat(chunks);
+  }
+
   private async assertRegisteredKey(key: string) {
     const record = await this.prisma.fileObject.findFirst({
       where: { key, bucket: this.bucket },
@@ -297,4 +320,11 @@ export class StorageService implements OnModuleInit {
       throw new NotFoundException('File not found');
     }
   }
+}
+
+function isMinioNotFound(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const code = (error as { code?: string }).code;
+  const statusCode = (error as { statusCode?: number }).statusCode;
+  return code === 'NotFound' || code === 'NoSuchKey' || statusCode === 404;
 }

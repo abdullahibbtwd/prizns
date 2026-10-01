@@ -38,7 +38,8 @@
     "import:wordpress:package": "node dist/wordpress-import/import-wordpress.js --package=../wordpress-export --users",
     "import:wordpress:merge": "node dist/wordpress-import/merge-wordpress-categories.js",
     "nginx:legacy-redirects": "node dist/wordpress-import/generate-nginx-redirects.js",
-    "gallery:hide-story-photos": "node dist/media/hide-story-photos.js"
+    "gallery:hide-story-photos": "node dist/media/hide-story-photos.js",
+    "generate:og-images": "ts-node --transpile-only src/media/generate-og-images.ts"
   },
   "prisma": {
     "seed": "node prisma/run-seed.cjs"

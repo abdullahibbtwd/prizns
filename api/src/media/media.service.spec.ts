@@ -21,6 +21,8 @@ describe('MediaService', () => {
     publicUrlFor: jest.fn((key: string) => `https://cdn.example/${key}`),
     resolvePublicUrl: jest.fn((row: { url: string }) => row.url),
     remove: jest.fn().mockResolvedValue(undefined),
+    objectExists: jest.fn().mockResolvedValue(false),
+    getObjectBuffer: jest.fn(),
   };
   const queue = { add: jest.fn().mockResolvedValue({ id: 'job-1' }) };
 
@@ -86,6 +88,7 @@ describe('MediaService', () => {
       },
     });
     queue.add.mockClear();
+    storage.objectExists.mockReset().mockResolvedValue(false);
     storage.uploadBuffer.mockReset().mockImplementation(async (input: { key?: string }) => ({
       key: input.key,
       url: `https://cdn.example/${input.key}`,
@@ -245,7 +248,13 @@ describe('MediaService', () => {
         mimeType: 'image/jpeg',
       });
 
-      expect(storage.uploadBuffer).toHaveBeenCalledTimes(2);
+      expect(storage.uploadBuffer).toHaveBeenCalledTimes(3);
+      expect(storage.uploadBuffer).toHaveBeenCalledWith(
+        expect.objectContaining({
+          key: 'cms/media-1-og.jpg',
+          mimeType: 'image/jpeg',
+        }),
+      );
       expect(prisma.mediaAsset.update).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({

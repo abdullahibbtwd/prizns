@@ -14,6 +14,8 @@ jest.mock('minio', () => ({
     putObject: jest.fn().mockResolvedValue(undefined),
     presignedGetObject: jest.fn().mockResolvedValue('https://signed.example/file'),
     removeObject: jest.fn().mockResolvedValue(undefined),
+    statObject: jest.fn().mockResolvedValue({ size: 1 }),
+    getObject: jest.fn(),
   })),
 }));
 
@@ -120,5 +122,15 @@ describe('StorageService', () => {
     expect(prisma.fileObject.deleteMany).toHaveBeenCalledWith({
       where: { key: 'uploads/a.jpg' },
     });
+  });
+
+  it('reports object existence via MinIO stat', async () => {
+    await expect(service.objectExists('cms/a-og.jpg')).resolves.toBe(true);
+    const client = (service as unknown as { client: { statObject: jest.Mock } })
+      .client;
+    client.statObject.mockRejectedValueOnce({ code: 'NotFound' });
+    await expect(service.objectExists('cms/missing-og.jpg')).resolves.toBe(
+      false,
+    );
   });
 });

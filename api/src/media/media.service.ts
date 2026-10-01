@@ -432,9 +432,13 @@ export class MediaService {
   }
 
   private async processImageJob(id: string, data: MediaJobData) {
-    const derivatives = await processImageDerivatives(data.tempPath);
     const fullKey = `${data.folder}/${id}.webp`;
     const thumbKey = `${data.folder}/${id}-thumb.webp`;
+    const ogKey = `${data.folder}/${id}-og.jpg`;
+    const ogExists = await this.storage.objectExists(ogKey);
+    const derivatives = await processImageDerivatives(data.tempPath, {
+      skipOg: ogExists,
+    });
 
     const uploaded = await this.storage.uploadBuffer({
       buffer: derivatives.full,
@@ -450,6 +454,17 @@ export class MediaService {
       folder: data.folder,
       key: thumbKey,
     });
+    // Dedicated JPEG for Facebook/LinkedIn OG — URL is derived at read time.
+    // Skip when an OG object already exists (idempotent re-process).
+    if (!ogExists && derivatives.og) {
+      await this.storage.uploadBuffer({
+        buffer: derivatives.og,
+        mimeType: 'image/jpeg',
+        originalName: `${id}-og.jpg`,
+        folder: data.folder,
+        key: ogKey,
+      });
+    }
 
     await this.prisma.mediaAsset.update({
       where: { id },

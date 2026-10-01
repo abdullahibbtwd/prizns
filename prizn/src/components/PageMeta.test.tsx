@@ -33,6 +33,40 @@ describe('PageMeta', () => {
     expect(bgAlt?.getAttribute('href')).toMatch(/\/places\/belogradchik$/)
   })
 
+  it('rewrites webp heroes to -og.jpg with dimensions', () => {
+    render(
+      <HelmetProvider>
+        <PageMeta
+          title="Skald"
+          description="Story"
+          path="/stories/skald"
+          image="/media/prizn/cms/abc.webp"
+          type="article"
+          lang="bg"
+        />
+      </HelmetProvider>,
+    )
+    const ogImage = document.head.querySelector('meta[property="og:image"]')
+    expect(ogImage?.getAttribute('content')).toContain(
+      '/media/prizn/cms/abc-og.jpg',
+    )
+    expect(
+      document.head
+        .querySelector('meta[property="og:image:type"]')
+        ?.getAttribute('content'),
+    ).toBe('image/jpeg')
+    expect(
+      document.head
+        .querySelector('meta[property="og:image:width"]')
+        ?.getAttribute('content'),
+    ).toBe('1200')
+    expect(
+      document.head
+        .querySelector('meta[property="og:image:height"]')
+        ?.getAttribute('content'),
+    ).toBe('630')
+  })
+
   it('falls back to the default share image', () => {
     render(
       <HelmetProvider>
@@ -42,6 +76,9 @@ describe('PageMeta', () => {
     const ogImage = document.head.querySelector('meta[property="og:image"]')
     expect(ogImage?.getAttribute('content')).toMatch(/^https?:\/\//)
     expect(ogImage?.getAttribute('content')).toContain('/og-default.png')
+    expect(
+      document.head.querySelector('meta[property="og:image:width"]'),
+    ).toBeNull()
     expect(
       document.head.querySelector('meta[name="twitter:card"]')?.getAttribute('content'),
     ).toBe('summary_large_image')
