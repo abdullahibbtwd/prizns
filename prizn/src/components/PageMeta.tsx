@@ -12,7 +12,7 @@ const SITE_NAME = 'Prizni'
 /** Bulgarian default — shown when a page omits its own description. */
 const DEFAULT_DESCRIPTION =
   'Prizni — човешки истории, места и традиции от Северозападна България.'
-export const DEFAULT_SHARE_IMAGE = '/og-default.png'
+export const DEFAULT_SHARE_IMAGE = '/hero/06-og.jpg'
 const DEFAULT_SHARE_ALT = 'Prizni — истории от Северозападна България'
 
 function siteOrigin() {

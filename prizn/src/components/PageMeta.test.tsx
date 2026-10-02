@@ -75,10 +75,12 @@ describe('PageMeta', () => {
     )
     const ogImage = document.head.querySelector('meta[property="og:image"]')
     expect(ogImage?.getAttribute('content')).toMatch(/^https?:\/\//)
-    expect(ogImage?.getAttribute('content')).toContain('/og-default.png')
+    expect(ogImage?.getAttribute('content')).toContain('/hero/06-og.jpg')
     expect(
-      document.head.querySelector('meta[property="og:image:width"]'),
-    ).toBeNull()
+      document.head.querySelector('meta[property="og:image:width"]')?.getAttribute(
+        'content',
+      ),
+    ).toBe('1200')
     expect(
       document.head.querySelector('meta[name="twitter:card"]')?.getAttribute('content'),
     ).toBe('summary_large_image')

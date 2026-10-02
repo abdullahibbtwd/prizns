@@ -52,8 +52,20 @@ describe('SeoService', () => {
     const result = await service.botShellHtml('/stories');
     expect(result.status).toBe(200);
     expect(result.html).toContain('<title>Prizni</title>');
-    expect(result.html).toContain('https://prizni.bg/og-default.png');
+    expect(result.html).toContain('https://prizni.bg/hero/06-og.jpg');
     expect(result.html).toContain('summary_large_image');
+  });
+
+  it('returns homepage bot shell with hero OG jpeg', async () => {
+    const result = await service.botShellHtml('/');
+    expect(result.status).toBe(200);
+    expect(result.html).toContain(
+      'property="og:image" content="https://prizni.bg/hero/06-og.jpg"',
+    );
+    expect(result.html).toContain('property="og:image:type" content="image/jpeg"');
+    expect(result.html).toContain('property="og:image:width" content="1200"');
+    expect(result.html).toContain('property="og:image:height" content="630"');
+    expect(result.html).toContain('Prizni — истории от Северозападна България');
   });
 
   it('returns 404 bot shell for unknown article slugs', async () => {

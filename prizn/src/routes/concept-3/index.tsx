@@ -33,6 +33,8 @@ export default function HomePage() {
                 : 'A warm digital journal of human stories, places, and traditions from Northwestern Bulgaria.'
             }
             path="/"
+            image="/hero/06-og.jpg"
+            type="website"
           />
           <EditorialHero lang={lang} />
           <FeaturedStoryCard lang={lang} />

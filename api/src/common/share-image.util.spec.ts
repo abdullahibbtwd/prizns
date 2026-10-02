@@ -42,8 +42,8 @@ describe('share-image.util', () => {
         '/media/prizn/cms/abc.webp',
       ),
     ).toBe('https://stage2.prizni.bg/media/prizn/cms/abc-og.jpg');
-    expect(absoluteShareUrl('https://stage2.prizni.bg', '/og-default.png')).toBe(
-      'https://stage2.prizni.bg/og-default.png',
+    expect(absoluteShareUrl('https://stage2.prizni.bg', '/hero/06-og.jpg')).toBe(
+      'https://stage2.prizni.bg/hero/06-og.jpg',
     );
   });
 

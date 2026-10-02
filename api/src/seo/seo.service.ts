@@ -52,6 +52,14 @@ const CONTENT_SECTIONS = new Set([
 const SITE_NAME = 'Prizni';
 const DEFAULT_DESCRIPTION =
   'Prizni — човешки истории, места и традиции от Северозападна България.';
+/** Facebook-safe JPEG (1200×630) derived from public/hero/06.webp — not WebP. */
+const DEFAULT_OG_IMAGE = '/hero/06-og.jpg';
+const HOME_TITLE_BG = 'Prizni — истории от Северозападна България';
+const HOME_TITLE_EN = 'Prizni — stories from Northwestern Bulgaria';
+const HOME_DESCRIPTION_BG =
+  'Топъл дигитален журнал за човешки истории, места и традиции от Северозападна България.';
+const HOME_DESCRIPTION_EN =
+  'A warm digital journal of human stories, places, and traditions from Northwestern Bulgaria.';
 const NOT_FOUND_TITLE = 'Страницата не е намерена';
 const NOT_FOUND_DESCRIPTION =
   'Тази връзка не води към публикувана страница в Prizni.';
@@ -124,7 +132,7 @@ export class SeoService {
         DEFAULT_DESCRIPTION;
       const image =
         absoluteShareUrl(base, article.heroMedia?.url) ||
-        `${base}/og-default.png`;
+        `${base}${DEFAULT_OG_IMAGE}`;
       const authorName =
         this.pickLocalized(
           lang,
@@ -530,7 +538,7 @@ ${items}
         canonical,
         barePath,
         lang,
-        image: `${base}/og-default.png`,
+        image: `${base}${DEFAULT_OG_IMAGE}`,
         type: 'website',
         noIndex: true,
       }),
@@ -564,7 +572,7 @@ ${items}
         DEFAULT_DESCRIPTION;
       const image =
         absoluteShareUrl(base, article.heroMedia?.url) ||
-        `${base}/og-default.png`;
+        `${base}${DEFAULT_OG_IMAGE}`;
       const authorName =
         this.pickLocalized(
           lang,
@@ -632,7 +640,7 @@ ${items}
         this.pickLocalized(lang, author.bioBg, author.bioEn) ||
         DEFAULT_DESCRIPTION;
       const image =
-        absoluteShareUrl(base, author.imageUrl) || `${base}/og-default.png`;
+        absoluteShareUrl(base, author.imageUrl) || `${base}${DEFAULT_OG_IMAGE}`;
       const authorPath = `/authors/${author.slug}`;
       const authorCanonical =
         lang === 'en' ? `${base}/en${authorPath}` : `${base}${authorPath}`;
@@ -679,7 +687,7 @@ ${items}
         DEFAULT_DESCRIPTION;
       const image =
         absoluteShareUrl(base, product.imageMedia?.url) ||
-        `${base}/og-default.png`;
+        `${base}${DEFAULT_OG_IMAGE}`;
       return {
         status: 200,
         html: this.renderHtml({
@@ -698,23 +706,28 @@ ${items}
       return this.notFoundShell(canonical, base, path, lang);
     }
 
+    const isHome = path === '/';
+    const homeTitle = lang === 'en' ? HOME_TITLE_EN : HOME_TITLE_BG;
+    const homeDescription =
+      lang === 'en' ? HOME_DESCRIPTION_EN : HOME_DESCRIPTION_BG;
+
     return {
       status: 200,
       html: this.renderHtml({
-        title: SITE_NAME,
-        description: DEFAULT_DESCRIPTION,
+        title: isHome ? homeTitle : SITE_NAME,
+        description: isHome ? homeDescription : DEFAULT_DESCRIPTION,
         canonical,
         barePath: path,
         lang,
-        image: `${base}/og-default.png`,
+        image: `${base}${DEFAULT_OG_IMAGE}`,
         type: 'website',
         jsonLd: {
           '@context': 'https://schema.org',
-          '@type': 'Organization',
+          '@type': isHome ? 'WebSite' : 'Organization',
           name: SITE_NAME,
           url: base,
           logo: `${base}/prizni.svg`,
-          description: DEFAULT_DESCRIPTION,
+          description: isHome ? homeDescription : DEFAULT_DESCRIPTION,
         },
       }),
     };

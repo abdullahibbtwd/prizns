@@ -33,7 +33,7 @@ describe('preferShareImageUrl', () => {
 
   it('absolutizes relative paths', () => {
     expect(
-      absoluteShareUrl('https://stage2.prizni.bg', '/og-default.png'),
-    ).toBe('https://stage2.prizni.bg/og-default.png')
+      absoluteShareUrl('https://stage2.prizni.bg', '/hero/06-og.jpg'),
+    ).toBe('https://stage2.prizni.bg/hero/06-og.jpg')
   })
 })
