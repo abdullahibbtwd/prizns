@@ -480,8 +480,16 @@ export default function CmsStoryEditorPage() {
     const rawSection =
       article.section === 'human_stories' ? 'human-stories' : article.section
     const isLegacyFeaturedSection = rawSection === 'featured'
-    const section = (
+    const storedSection = (
       isLegacyFeaturedSection ? 'human-stories' : rawSection
+    ) as ArticleFormValues['section']
+    // Prefer section derived from linked categories so a desynced DB row
+    // (e.g. category=Events, section=places) shows the Events form, not Places.
+    const categorySlugs = (article.categories ?? []).map((row) => row.slug)
+    const section = (
+      categorySlugs.length > 0
+        ? sectionFromCategorySlugs(categorySlugs, storedSection)
+        : storedSection
     ) as ArticleFormValues['section']
     const mappedBody =
       article.bodyRaw && article.bodyRaw.length > 0

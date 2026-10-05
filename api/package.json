@@ -35,6 +35,7 @@
     "repair:publish-quality": "ts-node --transpile-only src/wordpress-import/repair-publish-quality.ts",
     "repair:tags": "ts-node --transpile-only src/wordpress-import/repair-tags.ts",
     "repair:slugs": "ts-node --transpile-only src/wordpress-import/repair-slugs.ts",
+    "repair:section-from-category": "ts-node --transpile-only src/wordpress-import/repair-section-from-category.ts",
     "import:wordpress:package": "node dist/wordpress-import/import-wordpress.js --package=../wordpress-export --users",
     "import:wordpress:merge": "node dist/wordpress-import/merge-wordpress-categories.js",
     "nginx:legacy-redirects": "node dist/wordpress-import/generate-nginx-redirects.js",
