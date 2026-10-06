@@ -31,12 +31,10 @@ export function joinDatetimeLocal(date: string, time: string): string {
  * Interpret datetime-local as Europe/Sofia wall time and store UTC ISO.
  * Avoids browser-local TZ drift for editors outside Sofia.
  */
-export function publishedAtPayload(
-  status: ArticleStatus,
-  scheduledAt: string,
-): string | undefined {
-  if (status !== 'SCHEDULED' || !scheduledAt.trim()) return undefined
-  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(scheduledAt.trim())
+export function sofiaLocalToUtcIso(datetimeLocal: string): string | undefined {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(
+    datetimeLocal.trim(),
+  )
   if (!match) return undefined
   const [, y, mo, d, h, mi] = match
   const asUtc = new Date(`${y}-${mo}-${d}T${h}:${mi}:00.000Z`)
@@ -51,8 +49,30 @@ export function publishedAtPayload(
   return new Date(asUtc.getTime() - offsetMs).toISOString()
 }
 
+/**
+ * Build `publishedAt` for the API.
+ * - SCHEDULED: go-live datetime from the schedule picker
+ * - PUBLISHED: calendar day from the Headline meta Date menu (noon Sofia)
+ * - otherwise: omit so the API keeps / defaults as before
+ */
+export function publishedAtPayload(
+  status: ArticleStatus,
+  scheduledAt: string,
+  dateIso = '',
+): string | undefined {
+  if (status === 'SCHEDULED') {
+    if (!scheduledAt.trim()) return undefined
+    return sofiaLocalToUtcIso(scheduledAt)
+  }
+  if (status === 'PUBLISHED' && /^\d{4}-\d{2}-\d{2}$/.test(dateIso.trim())) {
+    // Noon Sofia avoids DST midnight edge cases when the public API formats the day.
+    return sofiaLocalToUtcIso(`${dateIso.trim()}T12:00`)
+  }
+  return undefined
+}
+
 export function isScheduleDueNow(scheduledAt: string, now = new Date()): boolean {
-  const iso = publishedAtPayload('SCHEDULED', scheduledAt)
+  const iso = sofiaLocalToUtcIso(scheduledAt)
   if (!iso) return false
   const date = new Date(iso)
   return !Number.isNaN(date.getTime()) && date.getTime() <= now.getTime()

@@ -3,6 +3,7 @@ import {
   formatArticleDate,
   formatCmsListDate,
   formatJournalDate,
+  parseDateBgToIso,
   toSofiaDateIso,
 } from './format-date'
 
@@ -32,6 +33,14 @@ describe('toSofiaDateIso', () => {
   it('uses Europe/Sofia calendar date instead of UTC slice', () => {
     // 21:30 UTC on Sept 9 = 00:30 Sofia on Sept 10 (EEST)
     expect(toSofiaDateIso('2026-09-09T21:30:00.000Z')).toBe('2026-09-10')
+  })
+})
+
+describe('parseDateBgToIso', () => {
+  it('parses Bulgarian editorial dates and ISO strings', () => {
+    expect(parseDateBgToIso('4 март 2020')).toBe('2020-03-04')
+    expect(parseDateBgToIso('2020-03-04')).toBe('2020-03-04')
+    expect(parseDateBgToIso('Лято 2026')).toBe('')
   })
 })
 

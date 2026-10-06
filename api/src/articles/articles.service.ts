@@ -298,13 +298,12 @@ export class ArticlesService {
     }
 
     if (dto.status === ArticleStatus.PUBLISHED) {
+      // Editorial backdate / Date menu: honor an explicit publishedAt first.
+      if (dto.publishedAt) return new Date(dto.publishedAt);
+      if (dto.publishedAt !== undefined) return null;
       if (!existing) return new Date();
       if (existing.status === ArticleStatus.PUBLISHED) {
-        return dto.publishedAt !== undefined
-          ? dto.publishedAt
-            ? new Date(dto.publishedAt)
-            : null
-          : undefined;
+        return undefined;
       }
       if (
         existing.publishedAt &&
@@ -711,7 +710,16 @@ export class ArticlesService {
 
   private toIsoDate(value: Date | null | undefined): string {
     if (!value || Number.isNaN(value.getTime())) return '';
-    return value.toISOString().slice(0, 10);
+    // Calendar day in Europe/Sofia — matches CMS Date menu / editorial timezone.
+    const parts = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Europe/Sofia',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(value);
+    const get = (type: Intl.DateTimeFormatPartTypes) =>
+      parts.find((part) => part.type === type)?.value ?? '';
+    return `${get('year')}-${get('month')}-${get('day')}`;
   }
 
   toPublicDto(article: ArticleWithRelations): PublicArticleDto {

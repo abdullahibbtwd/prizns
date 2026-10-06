@@ -236,6 +236,37 @@ describe('ArticlesService', () => {
     );
   });
 
+  it('honors an editorial backdate when publishing', async () => {
+    const when = '2020-03-04T10:00:00.000Z';
+    await service.create({
+      section: 'places',
+      categoryBg: 'Places',
+      titleBg: 'Backdated',
+      status: ArticleStatus.PUBLISHED,
+      publishedAt: when,
+      dateBg: '4 март 2020',
+    });
+    expect(prisma.article.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: ArticleStatus.PUBLISHED,
+          publishedAt: new Date(when),
+          dateBg: '4 март 2020',
+        }),
+      }),
+    );
+
+    article.status = ArticleStatus.DRAFT;
+    article.publishedAt = null;
+    await service.update('art-1', {
+      status: ArticleStatus.PUBLISHED,
+      publishedAt: when,
+    });
+    const data = (prisma.article.update as jest.Mock).mock.calls.at(-1)[0]
+      .data as { publishedAt: Date };
+    expect(data.publishedAt).toEqual(new Date(when));
+  });
+
   it('publishes a future scheduled story immediately when asked', async () => {
     const future = new Date('2099-01-01T10:00:00.000Z');
     article.status = ArticleStatus.SCHEDULED;

@@ -94,7 +94,7 @@ import {
   toDatetimeLocalValue,
   type EditorSaveAction,
 } from '@/cms/pages/story-editor-actions'
-import { toSofiaDateIso } from '@/lib/format-date'
+import { parseDateBgToIso, toSofiaDateIso } from '@/lib/format-date'
 import {
   stripEmptyBodyBlocks,
   validateStoryForPublish,
@@ -520,7 +520,12 @@ export default function CmsStoryEditorPage() {
       readTimeUnit:
         article.section === 'video' ? 'minutes' : readTime.unit,
       locationBg: article.locationBg,
-      dateIso: toSofiaDateIso(article.publishedAt) || '',
+      // Prefer editorial dateBg so a prior backdate still fills the Date menu
+      // even if publishedAt was stamped to "now" on an older publish.
+      dateIso:
+        parseDateBgToIso(article.dateBg) ||
+        toSofiaDateIso(article.publishedAt) ||
+        '',
       scheduledAt:
         article.status === 'SCHEDULED'
           ? toDatetimeLocalValue(article.publishedAt)
@@ -782,7 +787,11 @@ export default function CmsStoryEditorPage() {
           dateBg: formatDateBg(
             values.dateIso || values.scheduledAt.slice(0, 10),
           ),
-          publishedAt: publishedAtPayload(values.status, values.scheduledAt),
+          publishedAt: publishedAtPayload(
+            values.status,
+            values.scheduledAt,
+            values.dateIso,
+          ),
           photoCreditBg: values.photoCreditBg,
           endLabelBg: values.endLabelBg,
           speakerBg: values.speakerBg || undefined,

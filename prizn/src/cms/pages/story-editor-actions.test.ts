@@ -34,13 +34,18 @@ describe('story editor schedule helpers', () => {
     expect(joinDatetimeLocal('', '08:15')).toBe('')
   })
 
-  it('only sends publishedAt when the story is scheduled (Sofia wall time)', () => {
+  it('sends publishedAt for scheduled go-live and published editorial dates', () => {
     expect(publishedAtPayload('DRAFT', '2026-09-01T08:15')).toBeUndefined()
     expect(publishedAtPayload('SCHEDULED', '')).toBeUndefined()
     // 08:15 Sofia in September = 05:15 UTC
     expect(publishedAtPayload('SCHEDULED', '2026-09-01T08:15')).toBe(
       '2026-09-01T05:15:00.000Z',
     )
+    // Editorial Date menu → noon Sofia (EEST in March = 09:00 UTC)
+    expect(publishedAtPayload('PUBLISHED', '', '2020-03-04')).toBe(
+      '2020-03-04T10:00:00.000Z',
+    )
+    expect(publishedAtPayload('PUBLISHED', '', '')).toBeUndefined()
   })
 
   it('treats a past schedule as due now', () => {

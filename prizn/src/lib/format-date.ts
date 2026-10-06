@@ -33,6 +33,37 @@ export function toSofiaDateIso(value: string | Date | null | undefined): string 
   return `${year}-${month}-${day}`
 }
 
+const BG_MONTHS: Record<string, string> = {
+  януари: '01',
+  февруари: '02',
+  март: '03',
+  април: '04',
+  май: '05',
+  юни: '06',
+  юли: '07',
+  август: '08',
+  септември: '09',
+  октомври: '10',
+  ноември: '11',
+  декември: '12',
+}
+
+/**
+ * Parse editorial `dateBg` ("4 март 2020" or ISO) back to YYYY-MM-DD.
+ * Used to rehydrate the Date menu when publishedAt was stamped on publish.
+ */
+export function parseDateBgToIso(dateBg: string | null | undefined): string {
+  const raw = dateBg?.trim() ?? ''
+  if (!raw) return ''
+  const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(raw)
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`
+  const bg = /^(\d{1,2})\s+([а-яА-Яёий]+)\s+(\d{4})$/u.exec(raw)
+  if (!bg) return ''
+  const month = BG_MONTHS[bg[2].toLowerCase()]
+  if (!month) return ''
+  return `${bg[3]}-${month}-${bg[1].padStart(2, '0')}`
+}
+
 /** datetime-local value in Europe/Sofia. */
 export function toSofiaDatetimeLocal(
   value?: string | Date | null,
