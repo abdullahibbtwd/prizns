@@ -92,7 +92,7 @@ export class DigestService {
 
     if (!this.mail.isConfigured()) {
       this.logger.warn(
-        `Skip auto digest for ${articleId}: RESEND not configured`,
+        `Skip auto digest for ${articleId}: SMTP not configured`,
       )
       return
     }
@@ -181,7 +181,7 @@ export class DigestService {
   async sendNow(dto: SendDigestDto) {
     if (!this.mail.isConfigured()) {
       throw new ServiceUnavailableException(
-        'RESEND_API_KEY is not configured',
+        'SMTP email is not configured',
       )
     }
 

@@ -152,6 +152,33 @@ describe('ReaderAuthService', () => {
     expect(prisma.magicLinkToken.create).toHaveBeenCalled();
   });
 
+  it('emails the magic link once SMTP is configured', async () => {
+    mail.isConfigured.mockReturnValue(true);
+    mail.send.mockResolvedValue({ ids: ['m-1'], recipientCount: 1 });
+    prisma.reader.findUnique = jest.fn().mockResolvedValue({
+      ...reader,
+      lastLoginAt: null,
+    });
+    prisma.reader.upsert = jest.fn().mockResolvedValue({
+      ...reader,
+      lastLoginAt: null,
+    });
+    prisma.magicLinkToken.create = jest.fn().mockResolvedValue({ id: 'ml-1' });
+
+    await service.requestMagicLink(
+      { email: 'new@example.com', locale: 'en' },
+      { ip: '127.0.0.1' },
+    );
+
+    expect(mail.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: 'new@example.com',
+        subject: expect.any(String),
+        html: expect.stringContaining('/auth/verify?token='),
+      }),
+    );
+  });
+
   it('verifies magic link and issues session', async () => {
     const tokenRow = {
       id: 'ml-1',

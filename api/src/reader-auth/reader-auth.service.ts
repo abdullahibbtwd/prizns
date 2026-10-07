@@ -387,10 +387,10 @@ export class ReaderAuthService {
       }
     } else if (this.config.get<string>('NODE_ENV') !== 'production') {
       this.logger.warn(
-        `RESEND not configured — magic link for ${email}: ${verifyUrl}`,
+        `SMTP not configured — magic link for ${email}: ${verifyUrl}`,
       )
     } else {
-      this.logger.error('RESEND_API_KEY missing; cannot send magic link email')
+      this.logger.error('SMTP not configured; cannot send magic link email')
     }
 
     return { ok: true, authenticated: false }

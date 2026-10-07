@@ -5,7 +5,8 @@ const INTEGRATION_KEYS = [
   'STRIPE_SECRET_KEY',
   'STRIPE_WEBHOOK_SECRET',
   'GEMINI_API_KEY',
-  'RESEND_API_KEY',
+  'SMTP_PASSWORD',
+  'SMTP_ENABLED',
 ] as const;
 
 /** Load test environment variables before AppModule / Prisma init. */

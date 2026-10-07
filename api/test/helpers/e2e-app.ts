@@ -36,7 +36,7 @@ const noopProcessor = {
   onFailed: jest.fn().mockResolvedValue(undefined),
 };
 
-/** Mock Resend so contact/digest/shop flows never hit the network. */
+/** Keep SMTP/email unset so contact/digest/shop flows never hit the network. */
 export const mockMailService = {
   isConfigured: () => true,
   send: jest.fn().mockResolvedValue({
@@ -97,7 +97,8 @@ function createE2eConfigService(): ConfigService {
     'STRIPE_SECRET_KEY',
     'STRIPE_WEBHOOK_SECRET',
     'GEMINI_API_KEY',
-    'RESEND_API_KEY',
+    'SMTP_PASSWORD',
+    'SMTP_ENABLED',
   ]) {
     delete env[key];
   }
@@ -112,7 +113,8 @@ function createE2eConfigService(): ConfigService {
       key === 'STRIPE_SECRET_KEY' ||
       key === 'STRIPE_WEBHOOK_SECRET' ||
       key === 'GEMINI_API_KEY' ||
-      key === 'RESEND_API_KEY'
+      key === 'SMTP_PASSWORD' ||
+      key === 'SMTP_ENABLED'
     ) {
       return undefined;
     }

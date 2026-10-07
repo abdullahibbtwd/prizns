@@ -42,13 +42,22 @@ export class SettingsController {
     @CurrentUser() user: AuthUserPayload,
   ) {
     const to = dto.to?.trim() || user.email;
+    // Verify auth/TLS against the mail server first, then deliver a real message.
+    const connection = await this.mail.verifyConnection();
     await this.mail.send({
       to,
       subject: 'Prizni · test email',
       text: 'Email sending from Prizni works. / Изпращането на имейли от Prizni работи.',
       html: '<p>Email sending from Prizni works.</p><p>Изпращането на имейли от Prizni работи.</p>',
     });
-    return { ok: true as const, to, from: this.settings.mailFrom() };
+    return {
+      ok: true as const,
+      to,
+      from: connection.from,
+      host: connection.host,
+      port: connection.port,
+      security: connection.security,
+    };
   }
 }
 

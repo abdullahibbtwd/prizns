@@ -357,7 +357,7 @@ export class SubmissionsService {
     if (!before) throw new NotFoundException('Submission not found');
     if (!this.mail.isConfigured()) {
       throw new ServiceUnavailableException(
-        'Email is not configured. Add a Resend API key in CMS → Settings.',
+        'Email is not configured. Enable SMTP in CMS → Settings.',
       );
     }
     const row = dto.status

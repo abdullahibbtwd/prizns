@@ -4,6 +4,7 @@ import {
   IsArray,
   IsBoolean,
   IsEmail,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -11,6 +12,9 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
+
+export const SMTP_SECURITY_VALUES = ['none', 'starttls', 'ssl'] as const;
+export type SmtpSecurityDto = (typeof SMTP_SECURITY_VALUES)[number];
 
 /**
  * Omitted fields are left unchanged. An empty string clears a value
@@ -71,14 +75,43 @@ export class UpdateSiteSettingsDto {
   stripeWebhookSecret?: string;
 
   @IsOptional()
+  @IsBoolean()
+  smtpEnabled?: boolean;
+
+  @IsOptional()
   @IsString()
-  @MaxLength(300)
-  resendApiKey?: string;
+  @MaxLength(255)
+  smtpHost?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(65535)
+  smtpPort?: number | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  smtpUser?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  smtpPassword?: string;
+
+  @IsOptional()
+  @IsIn(SMTP_SECURITY_VALUES)
+  smtpSecurity?: SmtpSecurityDto;
 
   @IsOptional()
   @IsString()
   @MaxLength(200)
   mailFrom?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  mailFromName?: string;
 
   @IsOptional()
   @IsString()

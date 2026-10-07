@@ -200,10 +200,41 @@ class EnvironmentVariables {
   @IsString()
   TTS_PITCH?: string;
 
+  /** SMTP (CMS Settings overrides these env fallbacks). */
   @IsOptional()
   @IsString()
-  RESEND_API_KEY?: string;
+  SMTP_ENABLED?: string;
 
+  @IsOptional()
+  @IsString()
+  SMTP_HOST?: string;
+
+  @IsOptional()
+  @IsString()
+  SMTP_PORT?: string;
+
+  @IsOptional()
+  @IsString()
+  SMTP_USER?: string;
+
+  @IsOptional()
+  @IsString()
+  SMTP_PASSWORD?: string;
+
+  /** none | starttls | ssl */
+  @IsOptional()
+  @IsString()
+  SMTP_SECURITY?: string;
+
+  @IsOptional()
+  @IsString()
+  SMTP_FROM?: string;
+
+  @IsOptional()
+  @IsString()
+  SMTP_FROM_NAME?: string;
+
+  /** @deprecated Prefer SMTP_FROM — still accepted as a legacy fallback. */
   @IsOptional()
   @IsString()
   RESEND_FROM?: string;

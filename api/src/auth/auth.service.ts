@@ -208,13 +208,13 @@ export class AuthService {
 
     if (this.config.get<string>('NODE_ENV') !== 'production') {
       this.logger.warn(
-        `RESEND not configured — ${logLabel} for ${to}${
+        `SMTP not configured — ${logLabel} for ${to}${
           devDetail ? `: ${devDetail}` : ''
         }`,
       );
       return;
     }
-    this.logger.error(`RESEND_API_KEY missing; cannot send ${logLabel}`);
+    this.logger.error(`SMTP not configured; cannot send ${logLabel}`);
   }
 
   async sendEmailVerification(

@@ -3,8 +3,12 @@ import {
   Logger,
   ServiceUnavailableException,
 } from '@nestjs/common'
-import { Resend } from 'resend'
-import { SettingsService } from '../settings/settings.service'
+import * as nodemailer from 'nodemailer'
+import type { Transporter } from 'nodemailer'
+import {
+  SettingsService,
+  type SmtpSecurity,
+} from '../settings/settings.service'
 
 export type SendEmailInput = {
   to: string | string[]
@@ -14,35 +18,110 @@ export type SendEmailInput = {
   replyTo?: string
 }
 
+type SmtpTransportConfig = {
+  host: string
+  port: number
+  user: string | null
+  password: string | null
+  security: SmtpSecurity
+}
+
 @Injectable()
 export class MailService {
   private readonly logger = new Logger(MailService.name)
-  private client: { key: string; resend: Resend } | null = null
+  private client: { fingerprint: string; transporter: Transporter } | null =
+    null
 
   constructor(private readonly settings: SettingsService) {}
 
-  /** Resend client for the current key (CMS Settings first, then env). */
-  private resend(): Resend | null {
-    const key = this.settings.resendApiKey()
-    if (!key) {
+  private transportConfig(): SmtpTransportConfig | null {
+    if (!this.settings.smtpEnabled()) return null
+    const host = this.settings.smtpHost()
+    if (!host) return null
+    return {
+      host,
+      port: this.settings.smtpPort(),
+      user: this.settings.smtpUser(),
+      password: this.settings.smtpPassword(),
+      security: this.settings.smtpSecurity(),
+    }
+  }
+
+  private fingerprint(cfg: SmtpTransportConfig) {
+    return [
+      cfg.host,
+      cfg.port,
+      cfg.user ?? '',
+      cfg.password ?? '',
+      cfg.security,
+    ].join('|')
+  }
+
+  /** Nodemailer transporter for the current SMTP settings (CMS first, then env). */
+  private transporter(): Transporter | null {
+    const cfg = this.transportConfig()
+    if (!cfg) {
       this.client = null
       return null
     }
-    if (this.client?.key !== key) {
-      this.client = { key, resend: new Resend(key) }
+    const fingerprint = this.fingerprint(cfg)
+    if (this.client?.fingerprint !== fingerprint) {
+      const secure = cfg.security === 'ssl'
+      this.client = {
+        fingerprint,
+        transporter: nodemailer.createTransport({
+          host: cfg.host,
+          port: cfg.port,
+          secure,
+          ...(cfg.security === 'starttls'
+            ? { requireTLS: true }
+            : cfg.security === 'none'
+              ? { ignoreTLS: true }
+              : {}),
+          ...(cfg.user
+            ? { auth: { user: cfg.user, pass: cfg.password ?? '' } }
+            : {}),
+        }),
+      }
     }
-    return this.client.resend
+    return this.client.transporter
   }
 
   isConfigured() {
-    return Boolean(this.resend())
+    return Boolean(this.transporter())
+  }
+
+  /** Probe host/port/auth without sending a message. */
+  async verifyConnection() {
+    const transporter = this.transporter()
+    const cfg = this.transportConfig()
+    if (!transporter || !cfg) {
+      throw new ServiceUnavailableException(
+        'Email is not configured. Enable SMTP and set the host in CMS → Settings.',
+      )
+    }
+    try {
+      await transporter.verify()
+      return {
+        ok: true as const,
+        host: cfg.host,
+        port: cfg.port,
+        security: cfg.security,
+        user: cfg.user,
+        from: this.settings.mailFrom(),
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      this.logger.error(`SMTP verify failed: ${message}`)
+      throw new ServiceUnavailableException(`SMTP connection failed: ${message}`)
+    }
   }
 
   async send(input: SendEmailInput) {
-    const resend = this.resend()
-    if (!resend) {
+    const transporter = this.transporter()
+    if (!transporter) {
       throw new ServiceUnavailableException(
-        'Email is not configured. Add a Resend API key in CMS → Settings.',
+        'Email is not configured. Enable SMTP in CMS → Settings.',
       )
     }
 
@@ -54,21 +133,21 @@ export class MailService {
     // One recipient per send so addresses stay private.
     const ids: string[] = []
     for (const recipient of to) {
-      const { data, error } = await resend.emails.send({
-        from: this.settings.mailFrom(),
-        to: recipient,
-        subject: input.subject,
-        html: input.html,
-        text: input.text,
-        ...(input.replyTo ? { replyTo: input.replyTo } : {}),
-      })
-      if (error) {
-        this.logger.error(`Resend failed for ${recipient}: ${error.message}`)
-        throw new ServiceUnavailableException(
-          `Email send failed: ${error.message}`,
-        )
+      try {
+        const info = await transporter.sendMail({
+          from: this.settings.mailFrom(),
+          to: recipient,
+          subject: input.subject,
+          html: input.html,
+          text: input.text,
+          ...(input.replyTo ? { replyTo: input.replyTo } : {}),
+        })
+        if (info.messageId) ids.push(info.messageId)
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        this.logger.error(`SMTP failed for ${recipient}: ${message}`)
+        throw new ServiceUnavailableException(`Email send failed: ${message}`)
       }
-      if (data?.id) ids.push(data.id)
     }
     return { ids, recipientCount: to.length }
   }
