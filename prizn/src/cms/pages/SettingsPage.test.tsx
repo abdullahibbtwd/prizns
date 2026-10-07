@@ -77,6 +77,35 @@ describe('CmsSettingsPage', () => {
     ).not.toBeInTheDocument()
   })
 
+  it('turns SMTP on automatically when a host is saved', async () => {
+    const user = userEvent.setup()
+    updateCmsSiteSettings.mockImplementation(async (body: Record<string, unknown>) =>
+      settings({
+        email: {
+          ...settings().email,
+          enabled: Boolean(body.smtpEnabled),
+          host: String(body.smtpHost ?? ''),
+          configured: Boolean(body.smtpEnabled && body.smtpHost),
+          mailFrom: String(body.mailFrom ?? ''),
+          mailFromName: String(body.mailFromName ?? ''),
+        },
+        updatedAt: '2026-10-07T12:00:00.000Z',
+      }),
+    )
+    renderPage(<CmsSettingsPage />)
+    await user.type(await screen.findByLabelText('cms.settings.smtpHost'), 'mail.company.bg')
+    await user.click(screen.getByRole('button', { name: 'cms.settings.save' }))
+
+    await waitFor(() => {
+      expect(updateCmsSiteSettings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          smtpHost: 'mail.company.bg',
+          smtpEnabled: true,
+        }),
+      )
+    })
+  })
+
   it('shows one save bar with the change count, and discard restores values', async () => {
     const user = userEvent.setup()
     renderPage(<CmsSettingsPage />)

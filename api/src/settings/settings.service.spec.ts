@@ -95,8 +95,23 @@ describe('SettingsService SMTP config', () => {
   });
 
   it('defaults port to 587 and security to starttls', () => {
-    const settings = createSettings({}, { smtpEnabled: true, smtpHost: 'x' });
+    const settings = createSettings(
+      {},
+      { smtpEnabled: true, smtpHost: 'mail.example.com' },
+    );
     expect(settings.smtpPort()).toBe(587);
     expect(settings.smtpSecurity()).toBe('starttls');
+  });
+
+  it('marks email as configured only when enabled and host are set', () => {
+    expect(createSettings({}, { smtpEnabled: true }).getCms().email.configured).toBe(
+      false,
+    );
+    expect(
+      createSettings(
+        {},
+        { smtpEnabled: true, smtpHost: 'smtp.company.com' },
+      ).getCms().email.configured,
+    ).toBe(true);
   });
 });

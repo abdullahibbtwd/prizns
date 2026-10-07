@@ -46,7 +46,6 @@ type Form = {
   photographerCreditUrl: string
   shopPublic: boolean
   presets: string
-  smtpEnabled: boolean
   smtpHost: string
   smtpPort: string
   smtpUser: string
@@ -74,7 +73,6 @@ const SECTION_FIELDS: Record<SectionId, Array<keyof Form | SecretKey>> = {
   shop: ['shopPublic'],
   donations: ['presets', 'stripeSecretKey', 'stripeWebhookSecret'],
   email: [
-    'smtpEnabled',
     'smtpHost',
     'smtpPort',
     'smtpUser',
@@ -109,7 +107,6 @@ function toForm(s: CmsSiteSettings): Form {
     photographerCreditUrl: s.photographerCreditUrl,
     shopPublic: s.shopPublic,
     presets: s.donationPresets.join(', '),
-    smtpEnabled: Boolean(email?.enabled),
     smtpHost: email?.host ?? '',
     smtpPort: email?.port != null ? String(email.port) : '',
     smtpUser: email?.user ?? '',
@@ -245,6 +242,7 @@ export default function CmsSettingsPage() {
   const [toast, setToast] = useState<Toast>({ open: false, variant: 'success', message: '' })
   const [stripeResult, setStripeResult] = useState<{ ok: boolean; text: string } | null>(null)
   const [emailResult, setEmailResult] = useState<{ ok: boolean; text: string } | null>(null)
+  const [smtpVerified, setSmtpVerified] = useState(false)
   const [testEmailTo, setTestEmailTo] = useState('')
   const [copied, setCopied] = useState(false)
 
@@ -298,6 +296,7 @@ export default function CmsSettingsPage() {
       setSecrets(EMPTY_SECRETS)
       setStripeResult(null)
       setEmailResult(null)
+      setSmtpVerified(false)
       showToast('success', t('cms.settings.saved'))
     },
     onError: (error) => showToast('error', errorText(error)),
@@ -331,7 +330,8 @@ export default function CmsSettingsPage() {
 
   const emailTest = useMutation({
     mutationFn: () => testCmsEmail(testEmailTo.trim() || undefined),
-    onSuccess: (r) =>
+    onSuccess: (r) => {
+      setSmtpVerified(true)
       setEmailResult({
         ok: true,
         text: t('cms.settings.testEmailSentDetail', {
@@ -340,8 +340,12 @@ export default function CmsSettingsPage() {
           host: r.host,
           port: r.port,
         }),
-      }),
-    onError: (error) => setEmailResult({ ok: false, text: errorText(error) }),
+      })
+    },
+    onError: (error) => {
+      setSmtpVerified(false)
+      setEmailResult({ ok: false, text: errorText(error) })
+    },
   })
 
   const canSave = dirty && !presetsError && !smtpPortError && !saveMutation.isPending
@@ -353,6 +357,7 @@ export default function CmsSettingsPage() {
     const portRaw = form.smtpPort.trim()
     const smtpPort = portRaw ? Number(portRaw) : null
     if (portRaw && (!Number.isInteger(smtpPort) || smtpPort! < 1 || smtpPort! > 65535)) return
+    const smtpHost = form.smtpHost.trim()
     const body: UpdateSiteSettings = {
       facebookUrl: form.facebookUrl,
       instagramUrl: form.instagramUrl,
@@ -362,8 +367,9 @@ export default function CmsSettingsPage() {
       photographerCreditUrl: form.photographerCreditUrl,
       shopPublic: form.shopPublic,
       donationPresets: presets,
-      smtpEnabled: form.smtpEnabled,
-      smtpHost: form.smtpHost,
+      // Host present → sending on; clear host → sending off (no separate toggle).
+      smtpEnabled: Boolean(smtpHost),
+      smtpHost,
       smtpPort,
       smtpUser: form.smtpUser,
       smtpSecurity: form.smtpSecurity,
@@ -485,11 +491,17 @@ export default function CmsSettingsPage() {
   }
 
   const stripeConnected = Boolean(data.stripe?.secretKey?.configured)
-  const emailConnected = Boolean(data.email?.configured)
+  const emailConfigured = Boolean(data.email?.configured)
   const donationsEdited = sectionEdited('donations')
   const emailEdited = sectionEdited('email')
   const editedLabel = t('cms.settings.edited')
   const email = data.email
+  const emailStatusOk = smtpVerified && emailConfigured && !emailEdited
+  const emailStatusLabel = !emailConfigured
+    ? t('cms.settings.statusNotConfigured')
+    : smtpVerified && !emailEdited
+      ? t('cms.settings.statusVerified')
+      : t('cms.settings.statusConfigured')
 
   return (
     <div className="space-y-6 pb-28">
@@ -701,16 +713,7 @@ export default function CmsSettingsPage() {
         help={t('cms.settings.emailHelp')}
         edited={emailEdited}
         editedLabel={editedLabel}
-        status={
-          <StatusBadge
-            ok={emailConnected}
-            label={
-              emailConnected
-                ? t('cms.settings.statusConnected')
-                : t('cms.settings.statusNotConnected')
-            }
-          />
-        }
+        status={<StatusBadge ok={emailStatusOk} label={emailStatusLabel} />}
       >
         <Steps
           items={[
@@ -718,13 +721,6 @@ export default function CmsSettingsPage() {
             t('cms.settings.emailStep2'),
             t('cms.settings.emailStep3'),
           ]}
-        />
-
-        <CmsCheckbox
-          checked={form.smtpEnabled}
-          onChange={() => set('smtpEnabled', !form.smtpEnabled)}
-          label={t('cms.settings.smtpEnabled')}
-          description={t('cms.settings.smtpEnabledHelp')}
         />
 
         <div className="grid gap-4 md:grid-cols-2">
@@ -844,18 +840,22 @@ export default function CmsSettingsPage() {
               setEmailResult(null)
               emailTest.mutate()
             }}
-            disabled={!emailConnected || emailEdited || emailTest.isPending}
+            disabled={!emailConfigured || emailEdited || emailTest.isPending}
           >
             {emailTest.isPending ? t('cms.settings.testing') : t('cms.settings.testEmail')}
           </GhostButton>
         </div>
         {emailEdited ? (
           <p className="text-xs text-amber-700">{t('cms.settings.saveBeforeTest')}</p>
+        ) : !emailConfigured ? (
+          <p className="text-xs text-stone-500">{t('cms.settings.testAfterSave')}</p>
         ) : emailResult ? (
           <p className={cn('text-sm', emailResult.ok ? 'text-emerald-700' : 'text-rose-700')}>
             {emailResult.text}
           </p>
-        ) : null}
+        ) : (
+          <p className="text-xs text-stone-500">{t('cms.settings.smtpVerifyHint')}</p>
+        )}
       </Section>
 
       <AnimatePresence>

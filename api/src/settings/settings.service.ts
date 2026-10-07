@@ -424,12 +424,22 @@ export class SettingsService implements OnModuleInit, OnModuleDestroy {
   private cleanHost(value: string | undefined, label: string) {
     const v = this.cleanText(value);
     if (!v) return v;
-    if (/\s/.test(v) || v.includes('://')) {
+    if (/\s/.test(v) || v.includes('://') || v.includes('@')) {
       throw new BadRequestException(
-        `${label}: enter a hostname only (e.g. mail.example.com)`,
+        `${label}: enter a hostname only (e.g. mail.example.com), not an email address`,
       );
     }
-    return v;
+    // Hostname or IPv4 — reject obvious garbage like "mail@" leftovers.
+    if (
+      !/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/i.test(v) &&
+      !/^(?:\d{1,3}\.){3}\d{1,3}$/.test(v) &&
+      v !== 'localhost'
+    ) {
+      throw new BadRequestException(
+        `${label}: enter a valid hostname (e.g. smtp.company.com)`,
+      );
+    }
+    return v.toLowerCase();
   }
 
   private sealSecret(
