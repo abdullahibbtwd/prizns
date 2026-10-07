@@ -19,7 +19,7 @@ import {
   GhostButton,
   PrimaryButton,
 } from '@/cms/components/CmsUI'
-import { CmsCheckbox, CmsField, CmsInput } from '@/cms/components/CmsFields'
+import { CmsCheckbox, CmsField, CmsInput, CmsSelect } from '@/cms/components/CmsFields'
 import { CmsPasswordInput } from '@/cms/components/CmsPasswordInput'
 import { useCmsConfirm } from '@/cms/components/CmsConfirmDialog'
 import { Alert } from '@/components/ui/Alert'
@@ -32,6 +32,7 @@ import {
   updateCmsSiteSettings,
   type CmsSiteSettings,
   type SecretStatus,
+  type SmtpSecurity,
   type UpdateSiteSettings,
 } from '@/lib/site-settings-api'
 import { cn } from '@/lib/utils'
@@ -45,19 +46,25 @@ type Form = {
   photographerCreditUrl: string
   shopPublic: boolean
   presets: string
+  smtpEnabled: boolean
+  smtpHost: string
+  smtpPort: string
+  smtpUser: string
+  smtpSecurity: SmtpSecurity
   mailFrom: string
+  mailFromName: string
   adminNotifyEmail: string
   notifyAdminOnSubmission: boolean
   notifySubmitterOnReceipt: boolean
   notifySubmitterOnDecision: boolean
 }
 
-type SecretKey = 'stripeSecretKey' | 'stripeWebhookSecret' | 'resendApiKey'
-const SECRET_KEYS: SecretKey[] = ['stripeSecretKey', 'stripeWebhookSecret', 'resendApiKey']
+type SecretKey = 'stripeSecretKey' | 'stripeWebhookSecret' | 'smtpPassword'
+const SECRET_KEYS: SecretKey[] = ['stripeSecretKey', 'stripeWebhookSecret', 'smtpPassword']
 const EMPTY_SECRETS: Record<SecretKey, string> = {
   stripeSecretKey: '',
   stripeWebhookSecret: '',
-  resendApiKey: '',
+  smtpPassword: '',
 }
 
 type SectionId = 'social' | 'credit' | 'shop' | 'donations' | 'email'
@@ -67,8 +74,14 @@ const SECTION_FIELDS: Record<SectionId, Array<keyof Form | SecretKey>> = {
   shop: ['shopPublic'],
   donations: ['presets', 'stripeSecretKey', 'stripeWebhookSecret'],
   email: [
-    'resendApiKey',
+    'smtpEnabled',
+    'smtpHost',
+    'smtpPort',
+    'smtpUser',
+    'smtpPassword',
+    'smtpSecurity',
     'mailFrom',
+    'mailFromName',
     'adminNotifyEmail',
     'notifyAdminOnSubmission',
     'notifySubmitterOnReceipt',
@@ -78,7 +91,15 @@ const SECTION_FIELDS: Record<SectionId, Array<keyof Form | SecretKey>> = {
 
 type Toast = { open: boolean; variant: 'success' | 'error'; message: string }
 
+const EMPTY_SECRET: SecretStatus = {
+  configured: false,
+  source: null,
+  hint: null,
+  unreadable: false,
+}
+
 function toForm(s: CmsSiteSettings): Form {
+  const email = s.email
   return {
     facebookUrl: s.facebookUrl,
     instagramUrl: s.instagramUrl,
@@ -88,11 +109,17 @@ function toForm(s: CmsSiteSettings): Form {
     photographerCreditUrl: s.photographerCreditUrl,
     shopPublic: s.shopPublic,
     presets: s.donationPresets.join(', '),
-    mailFrom: s.email.mailFrom,
-    adminNotifyEmail: s.email.adminNotifyEmail,
-    notifyAdminOnSubmission: s.email.notifyAdminOnSubmission,
-    notifySubmitterOnReceipt: s.email.notifySubmitterOnReceipt,
-    notifySubmitterOnDecision: s.email.notifySubmitterOnDecision,
+    smtpEnabled: Boolean(email?.enabled),
+    smtpHost: email?.host ?? '',
+    smtpPort: email?.port != null ? String(email.port) : '',
+    smtpUser: email?.user ?? '',
+    smtpSecurity: email?.security || email?.securityEffective || 'starttls',
+    mailFrom: email?.mailFrom ?? '',
+    mailFromName: email?.mailFromName ?? '',
+    adminNotifyEmail: email?.adminNotifyEmail ?? '',
+    notifyAdminOnSubmission: email?.notifyAdminOnSubmission ?? true,
+    notifySubmitterOnReceipt: email?.notifySubmitterOnReceipt ?? true,
+    notifySubmitterOnDecision: email?.notifySubmitterOnDecision ?? true,
   }
 }
 
@@ -213,7 +240,7 @@ export default function CmsSettingsPage() {
   const [visible, setVisible] = useState<Record<SecretKey, boolean>>({
     stripeSecretKey: false,
     stripeWebhookSecret: false,
-    resendApiKey: false,
+    smtpPassword: false,
   })
   const [toast, setToast] = useState<Toast>({ open: false, variant: 'success', message: '' })
   const [stripeResult, setStripeResult] = useState<{ ok: boolean; text: string } | null>(null)
@@ -246,6 +273,14 @@ export default function CmsSettingsPage() {
     form && changed.has('presets') && !parsePresets(form.presets)
       ? t('cms.settings.invalidPresets')
       : null
+  const smtpPortError = (() => {
+    if (!form || !changed.has('smtpPort')) return null
+    const raw = form.smtpPort.trim()
+    if (!raw) return null
+    const n = Number(raw)
+    if (!Number.isInteger(n) || n < 1 || n > 65535) return t('cms.settings.invalidSmtpPort')
+    return null
+  })()
 
   const showToast = (variant: Toast['variant'], message: string) =>
     setToast({ open: true, variant, message })
@@ -297,16 +332,27 @@ export default function CmsSettingsPage() {
   const emailTest = useMutation({
     mutationFn: () => testCmsEmail(testEmailTo.trim() || undefined),
     onSuccess: (r) =>
-      setEmailResult({ ok: true, text: t('cms.settings.testEmailSent', { to: r.to }) }),
+      setEmailResult({
+        ok: true,
+        text: t('cms.settings.testEmailSentDetail', {
+          to: r.to,
+          from: r.from,
+          host: r.host,
+          port: r.port,
+        }),
+      }),
     onError: (error) => setEmailResult({ ok: false, text: errorText(error) }),
   })
 
-  const canSave = dirty && !presetsError && !saveMutation.isPending
+  const canSave = dirty && !presetsError && !smtpPortError && !saveMutation.isPending
 
   const handleSave = useCallback(() => {
     if (!form || !canSave) return
     const presets = parsePresets(form.presets)
     if (!presets) return
+    const portRaw = form.smtpPort.trim()
+    const smtpPort = portRaw ? Number(portRaw) : null
+    if (portRaw && (!Number.isInteger(smtpPort) || smtpPort! < 1 || smtpPort! > 65535)) return
     const body: UpdateSiteSettings = {
       facebookUrl: form.facebookUrl,
       instagramUrl: form.instagramUrl,
@@ -316,7 +362,13 @@ export default function CmsSettingsPage() {
       photographerCreditUrl: form.photographerCreditUrl,
       shopPublic: form.shopPublic,
       donationPresets: presets,
+      smtpEnabled: form.smtpEnabled,
+      smtpHost: form.smtpHost,
+      smtpPort,
+      smtpUser: form.smtpUser,
+      smtpSecurity: form.smtpSecurity,
       mailFrom: form.mailFrom,
+      mailFromName: form.mailFromName,
       adminNotifyEmail: form.adminNotifyEmail,
       notifyAdminOnSubmission: form.notifyAdminOnSubmission,
       notifySubmitterOnReceipt: form.notifySubmitterOnReceipt,
@@ -380,7 +432,7 @@ export default function CmsSettingsPage() {
     if (ok) removeMutation.mutate(key)
   }
 
-  const secretHint = (key: SecretKey, status: SecretStatus) => {
+  const secretHint = (key: SecretKey, status: SecretStatus = EMPTY_SECRET) => {
     if (secrets[key].trim()) {
       return { tone: 'text-amber-700', text: t('cms.settings.secretPending') }
     }
@@ -396,8 +448,13 @@ export default function CmsSettingsPage() {
     return { tone: 'text-stone-500', text: t('cms.settings.secretEmpty') }
   }
 
-  const secretField = (key: SecretKey, label: string, status: SecretStatus) => {
-    const hint = secretHint(key, status)
+  const secretField = (
+    key: SecretKey,
+    label: string,
+    status: SecretStatus | undefined,
+  ) => {
+    const safe = status ?? EMPTY_SECRET
+    const hint = secretHint(key, safe)
     return (
       <CmsField label={label} htmlFor={key}>
         <CmsPasswordInput
@@ -412,7 +469,7 @@ export default function CmsSettingsPage() {
         />
         <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
           <span className={hint.tone}>{hint.text}</span>
-          {(status.source === 'settings' || status.unreadable) && !secrets[key].trim() ? (
+          {(safe.source === 'settings' || safe.unreadable) && !secrets[key].trim() ? (
             <button
               type="button"
               onClick={() => void removeSecret(key)}
@@ -427,11 +484,12 @@ export default function CmsSettingsPage() {
     )
   }
 
-  const stripeConnected = data.stripe.secretKey.configured
-  const emailConnected = data.email.apiKey.configured
+  const stripeConnected = Boolean(data.stripe?.secretKey?.configured)
+  const emailConnected = Boolean(data.email?.configured)
   const donationsEdited = sectionEdited('donations')
   const emailEdited = sectionEdited('email')
   const editedLabel = t('cms.settings.edited')
+  const email = data.email
 
   return (
     <div className="space-y-6 pb-28">
@@ -551,7 +609,7 @@ export default function CmsSettingsPage() {
             ok={stripeConnected}
             label={
               stripeConnected
-                ? data.stripe.mode === 'live'
+                ? data.stripe?.mode === 'live'
                   ? t('cms.settings.statusLive')
                   : t('cms.settings.statusTest')
                 : t('cms.settings.statusNotConnected')
@@ -583,20 +641,28 @@ export default function CmsSettingsPage() {
         />
 
         <div className="grid gap-4 md:grid-cols-2">
-          {secretField('stripeSecretKey', t('cms.settings.stripeSecret'), data.stripe.secretKey)}
-          {secretField(
-            'stripeWebhookSecret',
-            t('cms.settings.stripeWebhook'),
-            data.stripe.webhookSecret,
-          )}
+        {secretField(
+          'stripeSecretKey',
+          t('cms.settings.stripeSecret'),
+          data.stripe?.secretKey,
+        )}
+        {secretField(
+          'stripeWebhookSecret',
+          t('cms.settings.stripeWebhook'),
+          data.stripe?.webhookSecret,
+        )}
         </div>
 
         <CmsField label={t('cms.settings.webhookUrl')}>
           <div className="flex gap-2">
-            <CmsInput readOnly value={data.stripe.webhookUrl} className="font-mono text-xs" />
+            <CmsInput
+              readOnly
+              value={data.stripe?.webhookUrl ?? ''}
+              className="font-mono text-xs"
+            />
             <GhostButton
               onClick={() => {
-                void navigator.clipboard.writeText(data.stripe.webhookUrl)
+                void navigator.clipboard.writeText(data.stripe?.webhookUrl ?? '')
                 setCopied(true)
                 window.setTimeout(() => setCopied(false), 1500)
               }}
@@ -654,23 +720,87 @@ export default function CmsSettingsPage() {
           ]}
         />
 
-        {secretField('resendApiKey', t('cms.settings.resendKey'), data.email.apiKey)}
+        <CmsCheckbox
+          checked={form.smtpEnabled}
+          onChange={() => set('smtpEnabled', !form.smtpEnabled)}
+          label={t('cms.settings.smtpEnabled')}
+          description={t('cms.settings.smtpEnabledHelp')}
+        />
 
         <div className="grid gap-4 md:grid-cols-2">
+          <CmsField label={t('cms.settings.smtpHost')} htmlFor="smtpHost">
+            <CmsInput
+              id="smtpHost"
+              placeholder={email?.hostEffective ?? 'mail.example.com'}
+              value={form.smtpHost}
+              onChange={(e) => set('smtpHost', e.target.value)}
+              autoComplete="off"
+            />
+          </CmsField>
+          <CmsField label={t('cms.settings.smtpPort')} htmlFor="smtpPort">
+            <CmsInput
+              id="smtpPort"
+              inputMode="numeric"
+              placeholder={String(email?.portEffective ?? 587)}
+              value={form.smtpPort}
+              onChange={(e) => set('smtpPort', e.target.value)}
+              autoComplete="off"
+            />
+            {smtpPortError ? (
+              <p className="text-xs text-rose-700">{smtpPortError}</p>
+            ) : (
+              <p className="text-xs text-stone-500">{t('cms.settings.smtpPortHelp')}</p>
+            )}
+          </CmsField>
+          <CmsField label={t('cms.settings.smtpUser')} htmlFor="smtpUser">
+            <CmsInput
+              id="smtpUser"
+              placeholder={email?.userEffective ?? ''}
+              value={form.smtpUser}
+              onChange={(e) => set('smtpUser', e.target.value)}
+              autoComplete="off"
+            />
+          </CmsField>
+          <CmsField label={t('cms.settings.smtpSecurity')} htmlFor="smtpSecurity">
+            <CmsSelect
+              id="smtpSecurity"
+              value={form.smtpSecurity}
+              onChange={(e) => set('smtpSecurity', e.target.value as SmtpSecurity)}
+            >
+              <option value="starttls">{t('cms.settings.smtpSecurityStarttls')}</option>
+              <option value="ssl">{t('cms.settings.smtpSecuritySsl')}</option>
+              <option value="none">{t('cms.settings.smtpSecurityNone')}</option>
+            </CmsSelect>
+            <p className="text-xs text-stone-500">{t('cms.settings.smtpSecurityHelp')}</p>
+          </CmsField>
+        </div>
+
+        {secretField('smtpPassword', t('cms.settings.smtpPassword'), email?.password)}
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <CmsField label={t('cms.settings.mailFromName')} htmlFor="mailFromName">
+            <CmsInput
+              id="mailFromName"
+              placeholder="Prizni"
+              value={form.mailFromName}
+              onChange={(e) => set('mailFromName', e.target.value)}
+            />
+          </CmsField>
           <CmsField label={t('cms.settings.mailFrom')} htmlFor="mailFrom">
             <CmsInput
               id="mailFrom"
-              placeholder={data.email.mailFromEffective}
+              type="email"
+              placeholder="hello@prizni.bg"
               value={form.mailFrom}
               onChange={(e) => set('mailFrom', e.target.value)}
             />
             <p className="text-xs text-stone-500">{t('cms.settings.mailFromHelp')}</p>
           </CmsField>
-          <CmsField label={t('cms.settings.adminInbox')} htmlFor="adminInbox">
+          <CmsField label={t('cms.settings.adminInbox')} htmlFor="adminInbox" className="md:col-span-2">
             <CmsInput
               id="adminInbox"
               type="email"
-              placeholder={data.email.adminNotifyEmailEffective ?? 'editor@prizni.bg'}
+              placeholder={email?.adminNotifyEmailEffective ?? 'editor@prizni.bg'}
               value={form.adminNotifyEmail}
               onChange={(e) => set('adminNotifyEmail', e.target.value)}
             />

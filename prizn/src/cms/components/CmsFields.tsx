@@ -2,6 +2,7 @@ import {
   forwardRef,
   type InputHTMLAttributes,
   type ReactNode,
+  type SelectHTMLAttributes,
   type TextareaHTMLAttributes,
 } from 'react'
 import { Check } from 'lucide-react'
@@ -70,6 +71,17 @@ export const CmsTextarea = forwardRef<
       {...props}
       className={cn(controlClass, 'min-h-[96px] resize-y leading-relaxed', className)}
     />
+  )
+})
+
+export const CmsSelect = forwardRef<
+  HTMLSelectElement,
+  SelectHTMLAttributes<HTMLSelectElement>
+>(function CmsSelect({ className, children, ...props }, ref) {
+  return (
+    <select ref={ref} {...props} className={cn(controlClass, className)}>
+      {children}
+    </select>
   )
 })
 

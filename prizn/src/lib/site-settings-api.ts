@@ -26,6 +26,8 @@ export type SecretStatus = {
   unreadable: boolean
 }
 
+export type SmtpSecurity = 'none' | 'starttls' | 'ssl'
+
 export type CmsSiteSettings = {
   facebookUrl: string
   instagramUrl: string
@@ -44,14 +46,26 @@ export type CmsSiteSettings = {
     mode: 'live' | 'test' | null
   }
   email: {
-    apiKey: SecretStatus
+    enabled: boolean
+    enabledEffective: boolean
+    host: string
+    hostEffective: string | null
+    port: number | null
+    portEffective: number
+    user: string
+    userEffective: string | null
+    password: SecretStatus
+    security: SmtpSecurity | ''
+    securityEffective: SmtpSecurity
     mailFrom: string
+    mailFromName: string
     mailFromEffective: string
     adminNotifyEmail: string
     adminNotifyEmailEffective: string | null
     notifyAdminOnSubmission: boolean
     notifySubmitterOnReceipt: boolean
     notifySubmitterOnDecision: boolean
+    configured: boolean
   }
   updatedAt: string | null
 }
@@ -68,8 +82,14 @@ export type UpdateSiteSettings = Partial<{
   donationPresets: number[]
   stripeSecretKey: string
   stripeWebhookSecret: string
-  resendApiKey: string
+  smtpEnabled: boolean
+  smtpHost: string
+  smtpPort: number | null
+  smtpUser: string
+  smtpPassword: string
+  smtpSecurity: SmtpSecurity
   mailFrom: string
+  mailFromName: string
   adminNotifyEmail: string
   notifyAdminOnSubmission: boolean
   notifySubmitterOnReceipt: boolean
@@ -114,8 +134,12 @@ export function testCmsStripe() {
 }
 
 export function testCmsEmail(to?: string) {
-  return api.post<{ ok: true; to: string; from: string }>(
-    '/cms/settings/test-email',
-    to ? { to } : {},
-  )
+  return api.post<{
+    ok: true
+    to: string
+    from: string
+    host: string
+    port: number
+    security: string
+  }>('/cms/settings/test-email', to ? { to } : {})
 }

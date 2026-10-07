@@ -105,7 +105,7 @@ prizns/
 | Cache / sessions / queues | Redis 7 + BullMQ |
 | Object storage | MinIO (S3-compatible) |
 | Auth | JWT access + refresh cookies, Passport, bcrypt |
-| Email | Resend |
+| Email | SMTP (Nodemailer; configurable in CMS Settings) |
 | Payments | Stripe (donations + shop; COD also supported) |
 | Translation | `google-translate-api-x` |
 | AI | Google Gemini (`@google/generative-ai`) |
@@ -135,7 +135,7 @@ API talks to:
     PostgreSQL   content, users, orders, analytics
     Redis        sessions, BullMQ queues
     MinIO        images, audio, video, uploads
-    Resend       magic links, newsletter, shop receipts, contact
+    SMTP         magic links, newsletter, shop receipts, contact
     Stripe       checkout + webhooks
     Gemini       editorial AI, archive Q&A, embeddings, contact classify
     Google TTS   article narration
@@ -376,7 +376,7 @@ Guards: `JwtAuthGuard` + `RolesGuard`. Endpoints without `@Roles()` allow any au
 
 ### Readers (public)
 
-- Passwordless **magic link** via Resend
+- Passwordless **magic link** via SMTP
 - Separate JWT cookies from staff
 - Saved articles, Story of the Year vote, optional analytics `readerId`
 - Feature flag: `FEATURE_READER_AUTH` (frontend: `VITE_FEATURE_READER_AUTH`)
@@ -412,7 +412,7 @@ Set in root `.env` (string `"true"` / `"false"`):
 | `FEATURE_SHOP` | on | Catalog and checkout (503 if Stripe missing where required) |
 | `FEATURE_READER_AUTH` | on | Magic link + `/me` |
 
-Optional keys (`GEMINI_API_KEY`, `STRIPE_SECRET_KEY`, `RESEND_API_KEY`, Google credentials) disable those integrations when unset rather than crashing local boot — except env validation still requires core infra (DB, Redis, MinIO, JWT).
+Optional keys (`GEMINI_API_KEY`, `STRIPE_SECRET_KEY`, `SMTP_*`, Google credentials) disable those integrations when unset rather than crashing local boot — except env validation still requires core infra (DB, Redis, MinIO, JWT).
 
 ---
 
@@ -511,7 +511,7 @@ Documented in `.env.example`. Groups:
 
 - `GOOGLE_CLOUD_PROJECT`, `GOOGLE_SERVICE_ACCOUNT_JSON` (preferred on Coolify) or `GOOGLE_APPLICATION_CREDENTIALS` (file path), `TTS_LANGUAGE_CODE`, `TTS_VOICE_NAME`
 - `GEMINI_API_KEY`, `GEMINI_MODEL`, `GEMINI_EMBEDDING_MODEL`
-- `RESEND_API_KEY`, `RESEND_FROM`, optional `ADMIN_EMAIL` for contact notify
+- `SMTP_HOST` / `SMTP_USER` / `SMTP_PASSWORD` / `SMTP_FROM` (or CMS → Settings → Email), optional `ADMIN_EMAIL` for contact notify
 - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_CURRENCY` (default `eur`)
 
 Donations UI stays in BGN (лв). The API converts at the official rate **1 EUR = 1.95583 BGN** because Stripe no longer accepts BGN.
