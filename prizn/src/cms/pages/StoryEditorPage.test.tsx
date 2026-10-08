@@ -98,17 +98,45 @@ describe('CmsStoryEditorPage publishing actions', () => {
     queueArticleNarration.mockResolvedValue({ ok: true, queued: true })
   })
 
-  it('shows Review, Save draft, and Publish for a new story', async () => {
+  it('shows Preview, Save draft, and Publish for a new story', async () => {
     renderEditor('/cms/stories/new')
     expect(
-      await screen.findByRole('button', { name: 'cms.editor.review' }),
+      await screen.findByRole('button', { name: /cms.editor.preview/ }),
     ).toBeEnabled()
+    expect(
+      screen.queryByRole('button', { name: 'cms.editor.review' }),
+    ).not.toBeInTheDocument()
     expect(
       screen.getByRole('button', { name: /cms.editor.saveDraft/ }),
     ).toBeEnabled()
     expect(
       screen.getByRole('button', { name: 'cms.editor.publish' }),
     ).toBeEnabled()
+  })
+
+  it('opens a public-style preview tab after saving dirty edits', async () => {
+    const user = userEvent.setup()
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null)
+    getCmsArticle.mockResolvedValue(
+      buildCmsArticle({ id: 'art-1', status: 'DRAFT', titleBg: 'Draft story' }),
+    )
+    updateCmsArticle.mockResolvedValue(
+      buildCmsArticle({ id: 'art-1', status: 'DRAFT', titleBg: 'Draft story edited' }),
+    )
+    renderEditor('/cms/stories/art-1')
+    const title = await screen.findByDisplayValue('Draft story')
+    await user.type(title, ' edited')
+    await user.click(screen.getByRole('button', { name: /cms.editor.preview/ }))
+
+    await waitFor(() => {
+      expect(updateCmsArticle).toHaveBeenCalled()
+      expect(openSpy).toHaveBeenCalledWith(
+        '/cms/stories/art-1/preview',
+        '_blank',
+        'noopener,noreferrer',
+      )
+    })
+    openSpy.mockRestore()
   })
 
   it('lets the editor publish dirty changes on a live story without saving draft first', async () => {

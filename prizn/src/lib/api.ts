@@ -41,10 +41,12 @@ async function parseError(response: Response) {
   try {
     const body = (await response.json()) as {
       message?: string | string[]
+      error?: string | string[]
       retryAfterSeconds?: number
     }
-    if (Array.isArray(body.message)) message = body.message.join(', ')
-    else if (body.message) message = body.message
+    const raw = body.message ?? body.error
+    if (Array.isArray(raw)) message = raw.join(', ')
+    else if (raw) message = raw
     if (typeof body.retryAfterSeconds === 'number') {
       retryAfterSeconds = body.retryAfterSeconds
     }

@@ -113,7 +113,7 @@ export class MailService {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       this.logger.error(`SMTP verify failed: ${message}`)
-      throw new ServiceUnavailableException(`SMTP connection failed: ${message}`)
+      throw new ServiceUnavailableException(this.friendlySmtpError(message))
     }
   }
 
@@ -146,10 +146,39 @@ export class MailService {
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
         this.logger.error(`SMTP failed for ${recipient}: ${message}`)
-        throw new ServiceUnavailableException(`Email send failed: ${message}`)
+        throw new ServiceUnavailableException(this.friendlySmtpError(message))
       }
     }
     return { ids, recipientCount: to.length }
+  }
+
+  private friendlySmtpError(raw: string) {
+    const lower = raw.toLowerCase()
+    if (
+      lower.includes('invalid login') ||
+      lower.includes('username and password not accepted') ||
+      lower.includes('authentication failed') ||
+      lower.includes('badcredentials') ||
+      lower.includes('535')
+    ) {
+      return (
+        'SMTP login failed. For Google Workspace use the primary mailbox ' +
+        '(e.g. team@…) as username and a 16-character App Password — not the ' +
+        'normal Google password. Port 587 must use STARTTLS.'
+      )
+    }
+    if (lower.includes('enotfound') || lower.includes('getaddrinfo')) {
+      return `SMTP host not found: check the hostname (e.g. smtp.gmail.com). (${raw})`
+    }
+    if (lower.includes('econnrefused') || lower.includes('etimedout')) {
+      return `Could not reach the SMTP server (${raw}). Check host/port and firewall.`
+    }
+    if (lower.includes('wrong version number') || lower.includes('ssl')) {
+      return (
+        `TLS/SSL mismatch (${raw}). Use STARTTLS with port 587, or SSL/TLS with port 465.`
+      )
+    }
+    return `SMTP failed: ${raw}`
   }
 
   /** Alert the editorial inbox; silently skipped when email is not set up. */

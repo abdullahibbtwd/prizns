@@ -10,6 +10,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
+  Eye,
   Film,
   Headphones,
   ImagePlus,
@@ -45,6 +46,7 @@ import { StoryBodyEditor } from '@/cms/components/StoryBodyEditor'
 import { StoryRichTextField } from '@/cms/components/StoryRichTextField'
 import { StoryGalleryThumbs } from '@/cms/components/StoryGalleryThumbs'
 import { useImageFileDrop } from '@/cms/hooks/useImageFileDrop'
+import { Alert } from '@/components/ui/Alert'
 import { JournalSelect } from '@/components/ui/JournalSelect'
 import { arrayMove } from '@dnd-kit/sortable'
 import {
@@ -916,6 +918,12 @@ export default function CmsStoryEditorPage() {
 
   const [sendBackOpen, setSendBackOpen] = useState(false)
   const [sendBackNote, setSendBackNote] = useState('')
+  const [previewBusy, setPreviewBusy] = useState(false)
+  const [previewAlert, setPreviewAlert] = useState<{
+    open: boolean
+    variant: 'info' | 'error'
+    message: string
+  }>({ open: false, variant: 'info', message: '' })
   const sendBackMutation = useMutation({
     mutationFn: (note: string) => requestArticleChanges(articleId!, note),
     onSuccess: async (article) => {
@@ -1391,6 +1399,60 @@ export default function CmsStoryEditorPage() {
   }
   submitStatusRef.current = submitStatus
 
+  const showPreviewAlert = (
+    message: string,
+    variant: 'info' | 'error' = 'info',
+  ) => {
+    setPreviewAlert({ open: true, variant, message })
+  }
+
+  const openStoryPreview = async () => {
+    if (previewBusy || editorBusy) return
+    const values = form.getValues()
+    if (!values.titleBg.trim()) {
+      showPreviewAlert(t('cms.editor.previewNeedTitle'))
+      return
+    }
+
+    setPreviewBusy(true)
+    try {
+      let previewId = articleId
+      if (!previewId || editorDirty) {
+        const alreadyLive =
+          Boolean(articleId) && articleQuery.data?.status === 'PUBLISHED'
+        // Never publish via Preview — keep live stories published, otherwise
+        // persist as the current non-published status (or draft).
+        const statusToSave: EditorSaveAction =
+          alreadyLive && values.status === 'PUBLISHED'
+            ? 'PUBLISHED'
+            : values.status === 'PUBLISHED' ||
+                values.status === 'SCHEDULED' ||
+                values.status === 'ARCHIVED'
+              ? 'DRAFT'
+              : (values.status as EditorSaveAction)
+        const saved = await saveMutation.mutateAsync({
+          ...values,
+          status: statusToSave,
+          silent: true,
+        })
+        previewId = saved.id
+      }
+      if (!previewId) {
+        showPreviewAlert(t('cms.editor.previewOpenFailed'), 'error')
+        return
+      }
+      window.open(
+        `${basePath}/${previewId}/preview`,
+        '_blank',
+        'noopener,noreferrer',
+      )
+    } catch {
+      showPreviewAlert(t('cms.editor.previewOpenFailed'), 'error')
+    } finally {
+      setPreviewBusy(false)
+    }
+  }
+
   const persistSilentDraft = async () => {
     if (savingLock.current || saveMutation.isPending || editorBusyRef.current) {
       return
@@ -1601,6 +1663,12 @@ export default function CmsStoryEditorPage() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <Alert
+        open={previewAlert.open}
+        variant={previewAlert.variant}
+        message={previewAlert.message}
+        onClose={() => setPreviewAlert((prev) => ({ ...prev, open: false }))}
+      />
       <div className="mb-4 flex shrink-0 flex-wrap items-center justify-between gap-4 border-b border-[#E8E4DC] pb-4">
         <Link
           to={basePath}
@@ -1659,24 +1727,44 @@ export default function CmsStoryEditorPage() {
           ) : null}
           {showWriterActions ? (
           <>
-          <EditorActionButton
-            type="button"
-            primary={status === 'REVIEW'}
-            onClick={() => submitStatus('REVIEW')}
-            disabled={actionDisabled('REVIEW')}
-            aria-busy={savingAction === 'REVIEW'}
-          >
-            {savingAction === 'REVIEW' ? (
-              <>
-                <Loader2 className="size-4 animate-spin" />
-                {t('cms.editor.saving')}
-              </>
-            ) : canPublish ? (
-              t('cms.editor.review')
-            ) : (
-              t('cms.editor.submitForReview')
-            )}
-          </EditorActionButton>
+          {canPublish ? (
+            <EditorActionButton
+              type="button"
+              primary={false}
+              onClick={() => void openStoryPreview()}
+              disabled={previewBusy || editorBusy}
+              aria-busy={previewBusy}
+            >
+              {previewBusy ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  {t('cms.editor.saving')}
+                </>
+              ) : (
+                <>
+                  <Eye className="size-4" />
+                  {t('cms.editor.preview')}
+                </>
+              )}
+            </EditorActionButton>
+          ) : (
+            <EditorActionButton
+              type="button"
+              primary={status === 'REVIEW'}
+              onClick={() => submitStatus('REVIEW')}
+              disabled={actionDisabled('REVIEW')}
+              aria-busy={savingAction === 'REVIEW'}
+            >
+              {savingAction === 'REVIEW' ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  {t('cms.editor.saving')}
+                </>
+              ) : (
+                t('cms.editor.submitForReview')
+              )}
+            </EditorActionButton>
+          )}
           <EditorActionButton
             type="button"
             primary={status === 'DRAFT'}

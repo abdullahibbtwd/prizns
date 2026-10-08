@@ -464,7 +464,8 @@ export class SettingsService implements OnModuleInit, OnModuleDestroy {
 
   private sealPlainSecret(value: string | undefined, label: string) {
     if (value === undefined) return undefined;
-    const v = value.trim();
+    // Google App Passwords are often copied with spaces — strip them.
+    const v = value.trim().replace(/\s+/g, '');
     if (!v) return null;
     return this.encryptPlain(v, label);
   }
@@ -487,6 +488,27 @@ export class SettingsService implements OnModuleInit, OnModuleDestroy {
       if (!Number.isInteger(dto.smtpPort) || dto.smtpPort < 1 || dto.smtpPort > 65535) {
         throw new BadRequestException('SMTP port: enter a number between 1 and 65535');
       }
+    }
+
+    const nextPort =
+      dto.smtpPort === undefined ? this.row.smtpPort : dto.smtpPort;
+    const nextSecurity =
+      dto.smtpSecurity === undefined
+        ? this.row.smtpSecurity
+        : dto.smtpSecurity || null;
+    const effectivePort = nextPort && nextPort > 0 ? nextPort : DEFAULT_SMTP_PORT;
+    const effectiveSecurity = (
+      (nextSecurity || DEFAULT_SMTP_SECURITY) as string
+    ).toLowerCase();
+    if (effectivePort === 587 && effectiveSecurity === 'ssl') {
+      throw new BadRequestException(
+        'SMTP: port 587 requires STARTTLS (not SSL/TLS). Use SSL/TLS only with port 465.',
+      );
+    }
+    if (effectivePort === 465 && effectiveSecurity === 'starttls') {
+      throw new BadRequestException(
+        'SMTP: port 465 requires SSL/TLS (not STARTTLS). Use STARTTLS with port 587.',
+      );
     }
 
     const data = {

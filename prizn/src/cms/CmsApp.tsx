@@ -7,6 +7,7 @@ import CmsVerifyEmailPage from '@/cms/pages/VerifyEmailPage'
 import CmsDashboard from '@/cms/pages/Dashboard'
 import CmsStoriesPage from '@/cms/pages/StoriesPage'
 import CmsStoryEditorPage from '@/cms/pages/StoryEditorPage'
+import CmsStoryPreviewPage from '@/cms/pages/StoryPreviewPage'
 import CmsAuthorsPage from '@/cms/pages/AuthorsPage'
 import CmsAuthorEditorPage from '@/cms/pages/AuthorEditorPage'
 import CmsSeriesPage from '@/cms/pages/SeriesPage'
@@ -44,6 +45,8 @@ export default function CmsApp() {
         <Route path="verify-email" element={<CmsVerifyEmailPage />} />
 
         <Route element={<RequireAuth />}>
+          {/* Public-style preview (no CMS chrome) for staff who can publish. */}
+          <Route path="stories/:id/preview" element={<CmsStoryPreviewPage />} />
           <Route element={<CmsLayout />}>
             <Route index element={<CmsDashboard />} />
             <Route path="stories" element={<CmsStoriesPage />} />

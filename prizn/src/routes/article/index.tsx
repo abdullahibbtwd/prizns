@@ -1,5 +1,5 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
-import { useLocation, useParams } from 'react-router-dom'
+import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { Link } from '@/components/LocaleLink'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
@@ -100,7 +100,7 @@ function pathsMatch(a: string, b: string) {
   return stripLocalePrefix(decodePath(a)) === stripLocalePrefix(decodePath(b))
 }
 
-function toJournalArticle(api: CmsArticle): JournalArticle {
+export function toJournalArticle(api: CmsArticle): JournalArticle {
   return {
     slug: api.slug,
     sourceId: api.id,
@@ -452,13 +452,14 @@ function RelatedStrip({
   )
 }
 
-function ArticleContent({
+export function ArticleContent({
   article,
   lang,
   setLang,
   section,
   relateCount: initialRelateCount = 0,
   viewerHasRelated: initialHasRelated = false,
+  preview,
 }: {
   article: JournalArticle
   lang: JournalLang
@@ -466,9 +467,15 @@ function ArticleContent({
   section: string
   relateCount?: number
   viewerHasRelated?: boolean
+  /** CMS story preview: banner above the public nav + Back returns to the editor. */
+  preview?: {
+    backTo: string
+    banner?: ReactNode
+  }
 }) {
   const { t } = useTranslation()
   const navigate = useLocalizedNavigate()
+  const rawNavigate = useNavigate()
   const queryClient = useQueryClient()
   const { reader, enabled: readerAuthEnabled, openSignIn } = useReaderAuth()
   const [readingProgress, setReadingProgress] = useState(0)
@@ -561,6 +568,11 @@ function ArticleContent({
   }, [article.slug])
 
   const goBack = () => {
+    if (preview?.backTo) {
+      // CMS paths must not get an `/en` locale prefix.
+      rawNavigate(preview.backTo)
+      return
+    }
     const idx = (window.history.state as { idx?: number } | null)?.idx
     if (typeof idx === 'number' && idx > 0) {
       navigate(-1)
@@ -590,6 +602,11 @@ function ArticleContent({
   return (
     <>
       <div className="fixed inset-x-0 top-0 z-50 print-hidden" data-print-hide>
+        {preview?.banner ? (
+          <div className="border-b border-[#E8E4DC] bg-[#FAF8F3]/95 backdrop-blur-md">
+            {preview.banner}
+          </div>
+        ) : null}
         <div className="h-1 w-full bg-[#EAE6DF]">
           <div
             className="h-full bg-[#0C2686] transition-all duration-150"
@@ -666,13 +683,21 @@ function ArticleContent({
             <MobileNavMenu
               lang={lang}
               setLang={setLang}
-              panelOffsetClassName="top-[73px]"
+              panelOffsetClassName={
+                preview?.banner ? 'top-[140px]' : 'top-[73px]'
+              }
             />
           </div>
         </div>
       </div>
 
-      <article className="article-print mx-auto max-w-3xl px-6 pb-12 pt-28 md:pb-20 md:pt-32">
+      <article
+        className={`article-print mx-auto max-w-3xl px-6 pb-12 md:pb-20 ${
+          preview?.banner
+            ? 'pt-40 md:pt-44'
+            : 'pt-28 md:pt-32'
+        }`}
+      >
         <div className="mb-6 flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1 font-sans text-[10px] uppercase tracking-[0.12em] text-[#1A1A1A]/60 sm:mb-8 sm:gap-x-3 sm:gap-y-2 sm:text-xs sm:tracking-[0.25em]">
           <span className="font-medium text-[#0C2686]">
             {pick(lang, article.category, article.categoryBg)}
