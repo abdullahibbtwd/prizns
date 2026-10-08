@@ -120,10 +120,6 @@
     "multer": "2.4.0",
     "proxy-addr": "2.0.8",
     "@grpc/grpc-js": "1.14.5",
-    "rimraf": {
-      "minimatch": {
-        "brace-expansion": "2.1.7"
-      }
-    }
+    "brace-expansion@2": "2.1.7"
   }
 }
