@@ -101,13 +101,13 @@ const process = [
 ]
 
 const typeOptions = [
-  'Sponsored Stories',
-  'Media Partnerships',
-  'Events',
-  'Campaigns',
-  'Tourism',
-  'Education',
-  'Other',
+  { en: 'Sponsored Stories', bg: 'Спонсорирани истории' },
+  { en: 'Media Partnerships', bg: 'Медийни партньорства' },
+  { en: 'Events', bg: 'Събития' },
+  { en: 'Campaigns', bg: 'Кампании' },
+  { en: 'Tourism', bg: 'Туризъм' },
+  { en: 'Education', bg: 'Образование' },
+  { en: 'Other', bg: 'Друго' },
 ]
 
 export default function PartnershipsPage() {
@@ -353,8 +353,8 @@ export default function PartnershipsPage() {
                       label={lang === 'bg' ? 'Тип партньорство' : 'Partnership type'}
                       placeholder={lang === 'bg' ? 'Изберете тип' : 'Select type'}
                       options={typeOptions.map((opt) => ({
-                        value: opt,
-                        label: opt,
+                        value: opt.en,
+                        label: lang === 'bg' ? opt.bg : opt.en,
                       }))}
                     />
                   </div>

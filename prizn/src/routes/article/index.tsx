@@ -351,9 +351,7 @@ function ArticleBlockView({
     return (
       <blockquote className="my-10 border-l-2 border-[#0C2686] bg-[#0C2686]/5 px-6 py-6 md:px-8 rounded-r-xl">
         <div className="font-sans text-base md:text-lg font-light italic leading-relaxed text-[#1A1A1A]/80">
-          {lang === 'bg' ? '„' : '“'}
           <RichText as="span" html={pick(lang, block.text, block.textBg)} />
-          {lang === 'bg' ? '“' : '”'}
         </div>
         {cite ? (
           <cite className="mt-3 block font-sans text-xs uppercase tracking-widest text-[#0C2686] not-italic">
