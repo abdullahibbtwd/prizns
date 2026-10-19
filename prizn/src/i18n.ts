@@ -248,6 +248,7 @@ const cmsBg = {
     colSection: 'Секция',
     colStatus: 'Статус',
     colTranslation: 'Превод',
+    colViews: 'Прегледи',
     colRelates: 'Свързвам се',
     changesRequested: 'Поискани промени',
     prev: 'Назад',
@@ -493,6 +494,7 @@ const cmsBg = {
     unpublishConfirmBody:
       'Историята ще стане чернова и читателите няма да я виждат, докато не я публикувате отново.',
     liveEditsPending: 'Незапазени промени — натиснете „Обнови публикацията“',
+    viewCount: '{{count}} прегледа',
     schedule: 'Планирай',
     archive: 'Архивирай',
     scheduleAt: 'Публикувай на',
@@ -1739,6 +1741,7 @@ const cmsEn = {
     colSection: 'Section',
     colStatus: 'Status',
     colTranslation: 'Translation',
+    colViews: 'Views',
     colRelates: 'I Relate',
     changesRequested: 'Changes requested',
     prev: 'Previous',
@@ -1984,6 +1987,7 @@ const cmsEn = {
     unpublishConfirmBody:
       'The story becomes a draft and readers will not see it until you publish it again.',
     liveEditsPending: 'Unsaved changes — click “Update live story”',
+    viewCount: '{{count}} views',
     schedule: 'Schedule',
     archive: 'Archive',
     scheduleAt: 'Publish on',

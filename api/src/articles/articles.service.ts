@@ -1279,6 +1279,23 @@ export class ArticlesService {
     return new Map(rows.map((row) => [row.articleId, row._count._all]));
   }
 
+  /** Lifetime pageviews attributed to each article (all-time, not range-limited). */
+  private async viewCountsByArticleIds(ids: string[]) {
+    if (ids.length === 0) return new Map<string, number>();
+    const rows = await this.prisma.pageView.groupBy({
+      by: ['articleId'],
+      where: { articleId: { in: ids } },
+      _count: { _all: true },
+    });
+    return new Map(
+      rows
+        .filter((row): row is typeof row & { articleId: string } =>
+          Boolean(row.articleId),
+        )
+        .map((row) => [row.articleId, row._count._all]),
+    );
+  }
+
   async listCms(filters: {
     section?: string;
     status?: ArticleStatus;
@@ -1330,12 +1347,17 @@ export class ArticlesService {
       }),
     ]);
 
-    const counts = await this.relateCountsByArticleIds(rows.map((r) => r.id));
+    const ids = rows.map((r) => r.id);
+    const [relateCounts, viewCounts] = await Promise.all([
+      this.relateCountsByArticleIds(ids),
+      this.viewCountsByArticleIds(ids),
+    ]);
     const totalPages = Math.max(1, Math.ceil(total / pageSize));
     return {
       items: rows.map((row) => ({
         ...this.toCmsDto(row),
-        relateCount: counts.get(row.id) ?? 0,
+        relateCount: relateCounts.get(row.id) ?? 0,
+        viewCount: viewCounts.get(row.id) ?? 0,
       })),
       total,
       page,
@@ -1440,8 +1462,15 @@ export class ArticlesService {
       include: this.include,
     });
     if (!row) throw new NotFoundException('Article not found');
-    const relate = await this.relateStats(row.id);
-    return { ...this.toCmsDto(row), relateCount: relate.relateCount };
+    const [relate, viewCounts] = await Promise.all([
+      this.relateStats(row.id),
+      this.viewCountsByArticleIds([row.id]),
+    ]);
+    return {
+      ...this.toCmsDto(row),
+      relateCount: relate.relateCount,
+      viewCount: viewCounts.get(row.id) ?? 0,
+    };
   }
 
   async create(dto: CreateArticleDto, opts: { notifyOnSubmit?: boolean } = {}) {

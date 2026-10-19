@@ -164,6 +164,8 @@ export type PublicArticleDto = {
   /** Phase 3 — “I Relate” count (public article). */
   relateCount?: number;
   viewerHasRelated?: boolean;
+  /** Lifetime public pageviews attributed to this article (CMS). */
+  viewCount?: number;
 };
 
 /**

@@ -507,6 +507,12 @@ export default function CmsStoriesPage() {
                   <StatusPill status={story.status} />
                   <ChangesRequestedPill story={story} />
                   <StatusPill status={story.translationStatus} />
+                  {(story.viewCount ?? 0) > 0 ? (
+                    <span className="rounded-full bg-stone-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-stone-700">
+                      {t('cms.stories.colViews')} ·{' '}
+                      {(story.viewCount ?? 0).toLocaleString()}
+                    </span>
+                  ) : null}
                   {(story.relateCount ?? 0) > 0 ? (
                     <span className="rounded-full bg-[#0C2686]/8 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-[#0C2686]">
                       {t('cms.stories.colRelates')} · {story.relateCount}
@@ -574,6 +580,7 @@ export default function CmsStoriesPage() {
                 <th className="px-4 py-3">{t('cms.stories.colSection')}</th>
                 <th className="px-4 py-3">{t('cms.stories.colStatus')}</th>
                 <th className="px-4 py-3">{t('cms.stories.colTranslation')}</th>
+                <th className="px-4 py-3">{t('cms.stories.colViews')}</th>
                 <th className="px-4 py-3">{t('cms.stories.colRelates')}</th>
                 <th className="px-4 py-3" />
               </tr>
@@ -595,6 +602,9 @@ export default function CmsStoriesPage() {
                   </td>
                   <td className="px-4 py-3">
                     <StatusPill status={story.translationStatus} />
+                  </td>
+                  <td className="px-4 py-3 tabular-nums text-stone-600">
+                    {(story.viewCount ?? 0).toLocaleString()}
                   </td>
                   <td className="px-4 py-3 tabular-nums text-stone-600">
                     {story.relateCount ?? 0}

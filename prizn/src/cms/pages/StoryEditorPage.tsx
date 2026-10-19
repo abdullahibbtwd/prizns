@@ -1685,6 +1685,13 @@ export default function CmsStoryEditorPage() {
               {t('cms.editor.liveEditsPending')}
             </span>
           ) : null}
+          {!isNew && articleQuery.data ? (
+            <span className="rounded-full border border-[#E8E4DC] bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-stone-600">
+              {t('cms.editor.viewCount', {
+                count: (articleQuery.data.viewCount ?? 0).toLocaleString(),
+              })}
+            </span>
+          ) : null}
           {articleQuery.data?.translationStatus && (
             <StatusPill status={articleQuery.data.translationStatus} />
           )}

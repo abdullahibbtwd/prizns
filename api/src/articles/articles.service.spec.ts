@@ -82,6 +82,10 @@ describe('ArticlesService', () => {
         findUnique: jest.fn().mockResolvedValue(null),
         create: jest.fn().mockResolvedValue({ id: 'react-1' }),
       },
+      pageView: {
+        groupBy: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
+      },
       articleTag: {
         deleteMany: jest.fn(),
         createMany: jest.fn(),
@@ -542,6 +546,18 @@ describe('ArticlesService', () => {
     const result = await service.listCms({ page: 1, pageSize: 9 });
     expect(result.items).toHaveLength(1);
     expect(result.total).toBe(1);
+  });
+
+  it('includes lifetime view counts on cms list and detail', async () => {
+    prisma.pageView.groupBy = jest.fn().mockResolvedValue([
+      { articleId: article.id, _count: { _all: 42 } },
+    ]);
+
+    const listed = await service.listCms({ page: 1, pageSize: 9 });
+    expect(listed.items[0]?.viewCount).toBe(42);
+
+    const detail = await service.getCmsById(article.id);
+    expect(detail.viewCount).toBe(42);
   });
 
   it('searches public articles by query and caps the result set', async () => {

@@ -175,6 +175,8 @@ export type CmsArticle = {
   } | null;
   relateCount?: number;
   viewerHasRelated?: boolean;
+  /** Lifetime public pageviews attributed to this article. */
+  viewCount?: number;
 };
 
 export type CmsAuthorOption = {
