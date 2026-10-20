@@ -14,24 +14,30 @@ import {
   articlePath,
   preferApi,
   usePublicArticleListing,
-  usePublicSeries,
   usePublicTags,
 } from '@/lib/public-content'
-import { useListingFilters } from '@/lib/listing-filters'
+import { DEFAULT_LISTING_SORT, useListingFilters } from '@/lib/listing-filters'
 import { toPlaceCard } from '@/lib/section-cards'
+import { formatArticleDate } from '@/lib/format-date'
 
 export default function PlacesPage() {
-  const { location, topic, series, page, setPage, setFilters } =
-    useListingFilters()
+  const {
+    location,
+    sort,
+    dateFrom,
+    dateTo,
+    page,
+    setPage,
+    setFilters,
+  } = useListingFilters()
   const listing = usePublicArticleListing('places', {
     location: location || undefined,
-    topic: topic || undefined,
-    series: series || undefined,
+    sort,
+    dateFrom: dateFrom || undefined,
+    dateTo: dateTo || undefined,
     page,
   })
   const locationsQuery = usePublicTags('LOCATION')
-  const topicsQuery = usePublicTags('TOPIC')
-  const seriesQuery = usePublicSeries()
 
   return (
     <JournalShell>
@@ -54,6 +60,7 @@ export default function PlacesPage() {
                   : 'Towns, villages, and trails across the Northwest — the places where our stories live.'
               }
               path="/places"
+              noIndex={sort !== DEFAULT_LISTING_SORT || Boolean(dateFrom || dateTo)}
             />
             <ListingHeader
               lang={lang}
@@ -81,6 +88,11 @@ export default function PlacesPage() {
 
             <ListingFilters
               lang={lang}
+              dateRange={{
+                from: dateFrom,
+                to: dateTo,
+                onChange: (patch) => setFilters(patch),
+              }}
               location={{
                 value: location,
                 options: (locationsQuery.data ?? []).map((tag) => ({
@@ -89,21 +101,9 @@ export default function PlacesPage() {
                 })),
                 onChange: (value) => setFilters({ location: value }),
               }}
-              topic={{
-                value: topic,
-                options: (topicsQuery.data ?? []).map((tag) => ({
-                  value: tag.slug,
-                  label: lang === 'bg' ? tag.nameBg : tag.name,
-                })),
-                onChange: (value) => setFilters({ topic: value }),
-              }}
-              series={{
-                value: series,
-                options: (seriesQuery.data ?? []).map((item) => ({
-                  value: item.slug,
-                  label: lang === 'bg' ? item.titleBg : item.title || item.titleBg,
-                })),
-                onChange: (value) => setFilters({ series: value }),
+              sort={{
+                value: sort,
+                onChange: (value) => setFilters({ sort: value }),
               }}
             />
 
@@ -123,6 +123,12 @@ export default function PlacesPage() {
               >
               <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
                 {places.map((place, index) => {
+                  const dateLabel = formatArticleDate(
+                    lang,
+                    place.date,
+                    place.dateBg,
+                  ).trim()
+                  const metaParts = [dateLabel, place.readTime].filter(Boolean)
                   return (
                     <motion.div
                       key={place.id}
@@ -145,9 +151,11 @@ export default function PlacesPage() {
                         <div className="absolute inset-0 flex flex-col justify-between p-8 text-white md:p-12">
                           <div className="flex items-center justify-between gap-3">
                             <div className="flex flex-wrap items-center gap-2">
-                              <span className="font-sans text-xs uppercase tracking-[0.3em] text-white/70">
-                                {place.readTime}
-                              </span>
+                              {metaParts.length > 0 ? (
+                                <span className="font-sans text-xs uppercase tracking-[0.3em] text-white/70">
+                                  {metaParts.join(' · ')}
+                                </span>
+                              ) : null}
                               {place.sponsored ? (
                                 <SponsoredBadge
                                   lang={lang}

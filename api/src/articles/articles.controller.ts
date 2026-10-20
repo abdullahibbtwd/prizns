@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Header,
   Param,
   Patch,
   Post,
@@ -39,6 +40,10 @@ export class ArticlesController {
   ) {}
 
   @Get('articles')
+  @Header(
+    'Cache-Control',
+    'public, max-age=30, s-maxage=60, stale-while-revalidate=120',
+  )
   listPublic(
     @Query('section') section?: string,
     @Query('series') series?: string,
@@ -48,6 +53,9 @@ export class ArticlesController {
     @Query('categorySlug') categorySlug?: string,
     @Query('hasAudio') hasAudio?: string,
     @Query('q') q?: string,
+    @Query('sort') sort?: string,
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
     @Query('limit') limit?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
@@ -64,6 +72,9 @@ export class ArticlesController {
             ? false
             : undefined,
       q,
+      sort,
+      dateFrom,
+      dateTo,
       limit: limit ? Number(limit) : undefined,
       page: page ? Number(page) : undefined,
       pageSize: pageSize ? Number(pageSize) : undefined,

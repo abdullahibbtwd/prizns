@@ -38,6 +38,8 @@ describe('section-cards', () => {
       buildCmsArticle({
         section: 'human-stories',
         titleBg: 'Maria',
+        date: '2024-03-04',
+        dateBg: '2024-03-04',
         series: {
           id: 'series-1',
           slug: 'voices-of-vidin',
@@ -48,6 +50,8 @@ describe('section-cards', () => {
       }),
     )
 
+    expect(card.date).toBe('2024-03-04')
+    expect(card.dateBg).toBe('2024-03-04')
     expect(card.series).toEqual({
       id: 'series-1',
       slug: 'voices-of-vidin',

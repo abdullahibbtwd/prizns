@@ -86,17 +86,26 @@ describe('StoriesPage', () => {
     expect(screen.getByText('1 stories')).toBeInTheDocument()
   })
 
-  it('does not render location, topic, or series dropdowns', () => {
+  it('renders date range and sort filters, not topic', () => {
     renderPage(<StoriesPage />, { route: '/stories' })
-    expect(screen.queryByText('Location')).not.toBeInTheDocument()
+    expect(screen.getByText('From date')).toBeInTheDocument()
+    expect(screen.getByText('To date')).toBeInTheDocument()
+    expect(screen.getByText('Sort')).toBeInTheDocument()
     expect(screen.queryByText('Topic')).not.toBeInTheDocument()
-    expect(screen.queryByText('Series')).not.toBeInTheDocument()
+    expect(screen.queryByText('Location')).not.toBeInTheDocument()
   })
 
-  it('reads location and page from the URL', () => {
-    renderPage(<StoriesPage />, { route: '/stories?location=vidin&topic=test&page=2' })
+  it('reads date range, sort and page from the URL', () => {
+    renderPage(
+      <StoriesPage />,
+      { route: '/stories?dateFrom=2024-01-01&dateTo=2024-06-30&sort=az&page=2' },
+    )
     expect(usePublicArticleListing).toHaveBeenCalledWith('stories', {
-      location: 'vidin',
+      location: undefined,
+      sort: 'az',
+      dateFrom: '2024-01-01',
+      dateTo: '2024-06-30',
+      q: undefined,
       page: 2,
     })
   })

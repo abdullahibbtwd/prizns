@@ -143,10 +143,11 @@ describe('ArticlesService', () => {
     expect(prisma.article.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         take: 1,
-        orderBy: [{ publishedAt: 'desc' }, { updatedAt: 'desc' }],
+        orderBy: [{ publishedAt: 'desc' }, { id: 'desc' }],
         where: expect.objectContaining({
           status: ArticleStatus.PUBLISHED,
           featured: true,
+          publishedAt: expect.objectContaining({ not: null }),
         }),
       }),
     );
@@ -538,6 +539,102 @@ describe('ArticlesService', () => {
       expect.objectContaining({
         skip: 30,
         take: 30,
+        orderBy: [{ publishedAt: 'desc' }, { id: 'desc' }],
+        where: expect.objectContaining({
+          status: 'PUBLISHED',
+          publishedAt: expect.objectContaining({ not: null }),
+        }),
+      }),
+    );
+  });
+
+  it('orders public lists by oldest with id tiebreak when sort=oldest', async () => {
+    await service.listPublic('stories', undefined, {
+      sort: 'oldest',
+      page: 1,
+      pageSize: 10,
+    });
+    expect(prisma.article.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderBy: [{ publishedAt: 'asc' }, { id: 'asc' }],
+      }),
+    );
+  });
+
+  it('orders public lists alphabetically when sort=az', async () => {
+    await service.listPublic('stories', undefined, {
+      sort: 'az',
+      page: 1,
+      pageSize: 10,
+    });
+    expect(prisma.article.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderBy: [{ titleBg: 'asc' }, { id: 'asc' }],
+      }),
+    );
+  });
+
+  it('filters public lists by publishedAt date range', async () => {
+    await service.listPublic('stories', undefined, {
+      dateFrom: '2024-01-01',
+      dateTo: '2024-06-30',
+      page: 1,
+      pageSize: 10,
+    });
+    expect(prisma.article.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          publishedAt: expect.objectContaining({
+            not: null,
+            gte: new Date('2024-01-01T00:00:00.000Z'),
+            lte: new Date('2024-06-30T23:59:59.999Z'),
+          }),
+        }),
+      }),
+    );
+  });
+
+  it('keeps pagination stable across tied publishedAt values', async () => {
+    const tied = new Date('2024-03-04T12:00:00.000Z');
+    const page1 = [
+      { ...article, id: 'a', publishedAt: tied, slug: 'a' },
+      { ...article, id: 'b', publishedAt: tied, slug: 'b' },
+    ];
+    const page2 = [
+      { ...article, id: 'c', publishedAt: tied, slug: 'c' },
+    ];
+    prisma.article.count = jest.fn().mockResolvedValue(3);
+    prisma.article.findMany = jest
+      .fn()
+      .mockResolvedValueOnce(page1)
+      .mockResolvedValueOnce(page2);
+
+    const first = (await service.listPublic('stories', undefined, {
+      page: 1,
+      pageSize: 2,
+    })) as { items: Array<{ id: string }> };
+    const second = (await service.listPublic('stories', undefined, {
+      page: 2,
+      pageSize: 2,
+    })) as { items: Array<{ id: string }> };
+
+    const ids = [...first.items, ...second.items].map((item) => item.id);
+    expect(ids).toEqual(['a', 'b', 'c']);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(prisma.article.findMany).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        orderBy: [{ publishedAt: 'desc' }, { id: 'desc' }],
+        skip: 0,
+        take: 2,
+      }),
+    );
+    expect(prisma.article.findMany).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        orderBy: [{ publishedAt: 'desc' }, { id: 'desc' }],
+        skip: 2,
+        take: 2,
       }),
     );
   });

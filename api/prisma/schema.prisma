@@ -334,6 +334,7 @@ model Article {
 
   @@unique([section, slug])
   @@index([status, section])
+  @@index([status, section, publishedAt(sort: Desc)])
   @@index([authorId])
   @@map("articles")
 }
@@ -387,6 +388,7 @@ model ArticleTag {
 
   @@id([articleId, tagId])
   @@index([tagId])
+  @@index([tagId, articleId])
   @@map("article_tags")
 }
 

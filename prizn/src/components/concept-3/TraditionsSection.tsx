@@ -9,6 +9,7 @@ import {
   usePublicArticles,
 } from '@/lib/public-content'
 import { toTraditionCard } from '@/lib/section-cards'
+import { formatArticleDate } from '@/lib/format-date'
 import { ResponsiveImage } from '@/components/ResponsiveImage'
 
 interface TraditionsSectionProps {
@@ -50,6 +51,12 @@ export function TraditionsSection({ lang }: TraditionsSectionProps) {
         ) : (
         <div className="grid grid-cols-1 gap-6 md:grid-cols-3 md:gap-8">
           {traditions.map((item, index) => {
+            const dateLabel = formatArticleDate(
+              lang,
+              item.date,
+              item.dateBg,
+            ).trim()
+            const eyebrow = [dateLabel, item.sub].filter(Boolean).join(' · ')
             return (
               <motion.div
                 key={item.id}
@@ -78,9 +85,11 @@ export function TraditionsSection({ lang }: TraditionsSectionProps) {
                       </div>
                     ) : null}
                   </div>
-                  <span className="font-sans text-[10px] uppercase tracking-[0.22em] text-[#1A1A1A]/45">
-                    {item.sub}
-                  </span>
+                  {eyebrow ? (
+                    <span className="font-sans text-[10px] uppercase tracking-[0.22em] text-[#1A1A1A]/45">
+                      {eyebrow}
+                    </span>
+                  ) : null}
                   <h3 className="mt-1 font-heading text-xl font-normal text-[#1A1A1A] transition-colors group-hover:text-[#0C2686] md:text-2xl">
                     {lang === 'bg' ? item.titleBg : item.title}
                   </h3>

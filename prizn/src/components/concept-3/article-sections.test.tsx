@@ -63,6 +63,8 @@ describe('article grid sections', () => {
           path: '/stories/village',
           title: 'Village portrait',
           titleBg: 'Село',
+          date: '2024-03-04',
+          dateBg: '2024-03-04',
         }),
       ],
     })
@@ -70,6 +72,7 @@ describe('article grid sections', () => {
     expect(usePublicArticles).toHaveBeenCalledWith('stories', { limit: 3 })
     expect(screen.getByText('Human Stories')).toBeInTheDocument()
     expect(screen.getByText('Village portrait')).toBeInTheDocument()
+    expect(screen.getByText('4 March 2024')).toBeInTheDocument()
   })
 
   it('OurPlacesSection renders place cards', () => {
@@ -81,12 +84,16 @@ describe('article grid sections', () => {
           path: '/places/vidin-bridge',
           title: 'Danube bridge',
           titleBg: 'Мост',
+          date: '2024-06-12',
+          dateBg: '2024-06-12',
+          readTime: '5 min',
         }),
       ],
     })
     renderSection(<OurPlacesSection lang="en" />)
     expect(screen.getByText('Explore the Region')).toBeInTheDocument()
     expect(screen.getByText('Danube bridge')).toBeInTheDocument()
+    expect(screen.getByText('12 June 2024 · 5 min')).toBeInTheDocument()
   })
 
   it('TraditionsSection renders tradition cards', () => {
@@ -98,12 +105,16 @@ describe('article grid sections', () => {
           path: '/traditions/kukeri',
           title: 'Kukeri ritual',
           titleBg: 'Кукери',
+          subtitle: 'Winter ritual',
+          date: '2023-01-15',
+          dateBg: '2023-01-15',
         }),
       ],
     })
     renderSection(<TraditionsSection lang="en" />)
     expect(screen.getByText('Traditions')).toBeInTheDocument()
     expect(screen.getByText('Kukeri ritual')).toBeInTheDocument()
+    expect(screen.getByText('15 January 2023 · Winter ritual')).toBeInTheDocument()
   })
 
   it('NewsSection returns null when empty', () => {

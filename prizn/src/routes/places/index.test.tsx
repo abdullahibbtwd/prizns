@@ -41,10 +41,13 @@ vi.mock('@/components/concept-3/RegionMap', () => ({
 }))
 
 describe('PlacesPage map', () => {
-  it('renders the regional map and location chips', async () => {
+  it('renders the regional map with date and sort filters', async () => {
     renderPage(<PlacesPage />)
     expect(await screen.findByText('Our Places')).toBeInTheDocument()
     expect(screen.getByTestId('region-map')).toBeInTheDocument()
     expect(screen.getByText('Location')).toBeInTheDocument()
+    expect(screen.getByText('From date')).toBeInTheDocument()
+    expect(screen.getByText('Sort')).toBeInTheDocument()
+    expect(screen.queryByText('Topic')).not.toBeInTheDocument()
   })
 })

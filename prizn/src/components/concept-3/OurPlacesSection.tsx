@@ -11,6 +11,7 @@ import {
   usePublicArticles,
 } from '@/lib/public-content'
 import { toPlaceCard } from '@/lib/section-cards'
+import { formatArticleDate } from '@/lib/format-date'
 import { SectionLoading } from '@/components/concept-3/SectionLoading'
 import { ResponsiveImage } from '@/components/ResponsiveImage'
 
@@ -69,6 +70,12 @@ export function OurPlacesSection({ lang }: OurPlacesSectionProps) {
             </div>
           ) : (
           places.map((place, index) => {
+            const dateLabel = formatArticleDate(
+              lang,
+              place.date,
+              place.dateBg,
+            ).trim()
+            const metaParts = [dateLabel, place.readTime].filter(Boolean)
             return (
               <motion.div
                 key={place.id}
@@ -92,9 +99,11 @@ export function OurPlacesSection({ lang }: OurPlacesSectionProps) {
                   <div className="absolute inset-0 flex flex-col justify-between p-8 text-white md:p-12">
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-sans text-xs uppercase tracking-[0.3em] text-white/70">
-                          {place.readTime}
-                        </span>
+                        {metaParts.length > 0 ? (
+                          <span className="font-sans text-xs uppercase tracking-[0.3em] text-white/70">
+                            {metaParts.join(' · ')}
+                          </span>
+                        ) : null}
                         {place.sponsored ? (
                           <SponsoredBadge
                             lang={lang}

@@ -14,16 +14,22 @@ import {
   preferApi,
   usePublicArticleListing,
 } from '@/lib/public-content'
-import { useListingFilters } from '@/lib/listing-filters'
+import { DEFAULT_LISTING_SORT, useListingFilters } from '@/lib/listing-filters'
 import { toHumanStoryCard } from '@/lib/section-cards'
+import { formatArticleDate } from '@/lib/format-date'
 import { ListingBody, listingCountLabel } from '@/components/concept-3/ListingBody'
+import { ListingFilters } from '@/components/concept-3/ListingFilters'
 
 export default function StoriesPage() {
   const { t } = useTranslation()
-  const { location, page, q, setPage } = useListingFilters()
+  const { location, sort, dateFrom, dateTo, page, q, setPage, setFilters } =
+    useListingFilters()
 
   const listing = usePublicArticleListing(q ? undefined : 'stories', {
     location: q ? undefined : location || undefined,
+    sort: q ? undefined : sort,
+    dateFrom: q ? undefined : dateFrom || undefined,
+    dateTo: q ? undefined : dateTo || undefined,
     q: q || undefined,
     page,
   })
@@ -48,6 +54,10 @@ export default function StoriesPage() {
                 : 'Human stories from Northwestern Bulgaria.'
             }
             path="/stories"
+            noIndex={
+              !q &&
+              (sort !== DEFAULT_LISTING_SORT || Boolean(dateFrom || dateTo))
+            }
           />
           <ListingHeader
             lang={lang}
@@ -66,6 +76,21 @@ export default function StoriesPage() {
               t('storiesCount', { count: listing.total }),
             )}
           />
+
+          {!q ? (
+            <ListingFilters
+              lang={lang}
+              dateRange={{
+                from: dateFrom,
+                to: dateTo,
+                onChange: (patch) => setFilters(patch),
+              }}
+              sort={{
+                value: sort,
+                onChange: (value) => setFilters({ sort: value }),
+              }}
+            />
+          ) : null}
 
           <div className="mx-auto max-w-7xl px-6 py-16 md:px-12 md:py-20">
             <ListingBody
@@ -86,7 +111,13 @@ export default function StoriesPage() {
               cardClassName="aspect-[4/5]"
             >
               <div className="grid grid-cols-1 gap-10 md:grid-cols-2 lg:grid-cols-3">
-                {stories.map((story, index) => (
+                {stories.map((story, index) => {
+                  const dateLabel = formatArticleDate(
+                    lang,
+                    story.date,
+                    story.dateBg,
+                  ).trim()
+                  return (
                   <motion.div
                     key={story.id}
                     initial={{ opacity: 0, y: 20 }}
@@ -124,6 +155,11 @@ export default function StoriesPage() {
                           </div>
                         ) : null}
                       </div>
+                      {dateLabel ? (
+                        <p className="mb-2 font-sans text-[10px] uppercase tracking-[0.2em] text-[#0C2686]">
+                          {dateLabel}
+                        </p>
+                      ) : null}
                       <h2 className="font-heading text-2xl font-normal leading-snug text-[#1A1A1A] transition-colors group-hover:text-[#0C2686]">
                         {lang === 'bg' ? story.titleBg : story.title}
                       </h2>
@@ -143,7 +179,8 @@ export default function StoriesPage() {
                       </div>
                     </Link>
                   </motion.div>
-                ))}
+                  )
+                })}
               </div>
             </ListingBody>
             <ListingPagination

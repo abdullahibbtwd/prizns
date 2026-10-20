@@ -11,10 +11,11 @@ import {
   preferApi,
   usePublicArticleListing,
 } from '@/lib/public-content'
-import { useListingFilters } from '@/lib/listing-filters'
+import { DEFAULT_LISTING_SORT, useListingFilters } from '@/lib/listing-filters'
 import type { CmsArticle } from '@/lib/cms-types'
 import { joinMetaParts } from '@/lib/text-format'
 import { formatArticleDate } from '@/lib/format-date'
+import { ListingFilters } from '@/components/concept-3/ListingFilters'
 
 function toEventsCard(article: CmsArticle) {
   return {
@@ -33,8 +34,14 @@ function toEventsCard(article: CmsArticle) {
 }
 
 export default function EventsPage() {
-  const { page, setPage } = useListingFilters()
-  const listing = usePublicArticleListing('events', { page })
+  const { sort, dateFrom, dateTo, page, setPage, setFilters } =
+    useListingFilters()
+  const listing = usePublicArticleListing('events', {
+    sort,
+    dateFrom: dateFrom || undefined,
+    dateTo: dateTo || undefined,
+    page,
+  })
 
   return (
     <JournalShell>
@@ -54,6 +61,9 @@ export default function EventsPage() {
                   : 'Reports from fairs, trails, and gatherings across Northwestern Bulgaria.'
               }
               path="/events"
+              noIndex={
+                sort !== DEFAULT_LISTING_SORT || Boolean(dateFrom || dateTo)
+              }
             />
             <ListingHeader
               lang={lang}
@@ -73,6 +83,19 @@ export default function EventsPage() {
                   ? `${listing.total} материала`
                   : `${listing.total} pieces`,
               )}
+            />
+
+            <ListingFilters
+              lang={lang}
+              dateRange={{
+                from: dateFrom,
+                to: dateTo,
+                onChange: (patch) => setFilters(patch),
+              }}
+              sort={{
+                value: sort,
+                onChange: (value) => setFilters({ sort: value }),
+              }}
             />
 
             <div className="mx-auto max-w-7xl px-6 py-16 md:px-12 md:py-20">

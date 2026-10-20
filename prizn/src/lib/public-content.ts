@@ -142,6 +142,9 @@ export function usePublicArticleListing(
     categorySlug?: string;
     hasAudio?: boolean;
     q?: string;
+    sort?: "newest" | "oldest" | "az" | "za";
+    dateFrom?: string;
+    dateTo?: string;
     page?: number;
     pageSize?: number;
     enabled?: boolean;
@@ -150,6 +153,12 @@ export function usePublicArticleListing(
   const page = Math.max(1, opts?.page ?? 1);
   const pageSize = opts?.pageSize ?? PUBLIC_LISTING_PAGE_SIZE;
   const q = opts?.q?.trim() || "";
+  const sort =
+    opts?.sort === "oldest" || opts?.sort === "az" || opts?.sort === "za"
+      ? opts.sort
+      : "newest";
+  const dateFrom = opts?.dateFrom?.trim() || "";
+  const dateTo = opts?.dateTo?.trim() || "";
   const query = useQuery({
     queryKey: [
       "public-articles-listing",
@@ -161,6 +170,9 @@ export function usePublicArticleListing(
       opts?.categorySlug || "",
       opts?.hasAudio ? "audio" : "",
       q,
+      sort,
+      dateFrom,
+      dateTo,
       page,
       pageSize,
     ],
@@ -173,6 +185,9 @@ export function usePublicArticleListing(
         categorySlug: opts?.categorySlug,
         hasAudio: opts?.hasAudio,
         q: q || undefined,
+        sort,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
         page,
         pageSize,
       }),

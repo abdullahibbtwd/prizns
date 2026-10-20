@@ -10,6 +10,7 @@ import {
   usePublicArticles,
 } from '@/lib/public-content'
 import { toHumanStoryCard } from '@/lib/section-cards'
+import { formatArticleDate } from '@/lib/format-date'
 import { SectionLoading } from '@/components/concept-3/SectionLoading'
 import { ResponsiveImage } from '@/components/ResponsiveImage'
 
@@ -55,6 +56,11 @@ export function HumanStoriesSection({ lang }: HumanStoriesSectionProps) {
         ) : (
         <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
           {stories.map((story, index) => {
+            const dateLabel = formatArticleDate(
+              lang,
+              story.date,
+              story.dateBg,
+            ).trim()
             return (
               <motion.div
                 key={story.id}
@@ -93,6 +99,11 @@ export function HumanStoriesSection({ lang }: HumanStoriesSectionProps) {
                     ) : null}
                   </div>
 
+                  {dateLabel ? (
+                    <p className="mb-2 font-sans text-[10px] uppercase tracking-[0.2em] text-[#0C2686]">
+                      {dateLabel}
+                    </p>
+                  ) : null}
                   <h3 className="font-heading text-2xl font-normal leading-snug text-[#1A1A1A] transition-colors group-hover:text-[#0C2686]">
                     {lang === 'bg' ? story.titleBg : story.title}
                   </h3>

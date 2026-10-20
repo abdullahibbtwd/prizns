@@ -276,6 +276,9 @@ export type PublicArticleListFilters = {
   categorySlug?: string
   hasAudio?: boolean
   q?: string
+  sort?: "newest" | "oldest" | "az" | "za"
+  dateFrom?: string
+  dateTo?: string
   limit?: number
   page?: number
   pageSize?: number
@@ -291,6 +294,9 @@ function publicArticleQuery(section?: string, opts?: PublicArticleListFilters) {
   if (opts?.categorySlug) params.set("categorySlug", opts.categorySlug);
   if (opts?.hasAudio === true) params.set("hasAudio", "true");
   if (opts?.q?.trim()) params.set("q", opts.q.trim());
+  if (opts?.sort && opts.sort !== "newest") params.set("sort", opts.sort);
+  if (opts?.dateFrom) params.set("dateFrom", opts.dateFrom);
+  if (opts?.dateTo) params.set("dateTo", opts.dateTo);
   if (opts?.limit != null) params.set("limit", String(opts.limit));
   if (opts?.page != null) params.set("page", String(opts.page));
   if (opts?.pageSize != null) params.set("pageSize", String(opts.pageSize));

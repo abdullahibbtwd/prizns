@@ -60,6 +60,9 @@ describe('ArticlesController', () => {
       undefined,
       undefined,
       'vidin',
+      undefined,
+      undefined,
+      undefined,
       '8',
     );
     expect(articles.listPublic).toHaveBeenCalledWith(
@@ -69,7 +72,7 @@ describe('ArticlesController', () => {
     );
   });
 
-  it('passes page and pageSize to listPublic', () => {
+  it('passes sort, date range, page and pageSize to listPublic', () => {
     controller.listPublic(
       'stories',
       undefined,
@@ -79,6 +82,9 @@ describe('ArticlesController', () => {
       undefined,
       undefined,
       undefined,
+      'az',
+      '2024-01-01',
+      '2024-12-31',
       undefined,
       '2',
       '30',
@@ -86,7 +92,13 @@ describe('ArticlesController', () => {
     expect(articles.listPublic).toHaveBeenCalledWith(
       'stories',
       undefined,
-      expect.objectContaining({ page: 2, pageSize: 30 }),
+      expect.objectContaining({
+        sort: 'az',
+        dateFrom: '2024-01-01',
+        dateTo: '2024-12-31',
+        page: 2,
+        pageSize: 30,
+      }),
     );
   });
 

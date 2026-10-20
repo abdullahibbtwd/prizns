@@ -6,19 +6,25 @@ import { ListingHeader } from '@/components/concept-3/ListingHeader'
 import { ListingPagination } from '@/components/concept-3/ListingPagination'
 import { SponsoredBadge } from '@/components/concept-3/SponsoredBadge'
 import { ListingBody, listingCountLabel } from '@/components/concept-3/ListingBody'
+import { ListingFilters } from '@/components/concept-3/ListingFilters'
 import { RegionMap } from '@/components/concept-3/RegionMap'
 import {
   articlePath,
   preferApi,
   usePublicArticleListing,
 } from '@/lib/public-content'
-import { useListingFilters } from '@/lib/listing-filters'
+import { DEFAULT_LISTING_SORT, useListingFilters } from '@/lib/listing-filters'
 import { toTraditionCard } from '@/lib/section-cards'
+import { formatArticleDate } from '@/lib/format-date'
 
 export default function TraditionsPage() {
-  const { location, page, setPage, setFilters } = useListingFilters()
+  const { location, sort, dateFrom, dateTo, page, setPage, setFilters } =
+    useListingFilters()
   const listing = usePublicArticleListing('traditions', {
     location: location || undefined,
+    sort,
+    dateFrom: dateFrom || undefined,
+    dateTo: dateTo || undefined,
     page,
   })
 
@@ -43,6 +49,9 @@ export default function TraditionsPage() {
                   : 'Living customs, crafts, and rituals — the memory the region still holds in its hands.'
               }
               path="/traditions"
+              noIndex={
+                sort !== DEFAULT_LISTING_SORT || Boolean(dateFrom || dateTo)
+              }
             />
             <ListingHeader
               lang={lang}
@@ -68,6 +77,19 @@ export default function TraditionsPage() {
               onSelect={(slug) => setFilters({ location: slug })}
             />
 
+            <ListingFilters
+              lang={lang}
+              dateRange={{
+                from: dateFrom,
+                to: dateTo,
+                onChange: (patch) => setFilters(patch),
+              }}
+              sort={{
+                value: sort,
+                onChange: (value) => setFilters({ sort: value }),
+              }}
+            />
+
             <div className="mx-auto max-w-7xl px-6 py-16 md:px-12 md:py-20">
               <ListingBody
                 lang={lang}
@@ -84,6 +106,12 @@ export default function TraditionsPage() {
               >
               <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
                 {traditions.map((item, index) => {
+                  const dateLabel = formatArticleDate(
+                    lang,
+                    item.date,
+                    item.dateBg,
+                  ).trim()
+                  const eyebrow = [dateLabel, item.sub].filter(Boolean).join(' · ')
                   return (
                     <motion.div
                       key={item.id}
@@ -110,9 +138,11 @@ export default function TraditionsPage() {
                             </div>
                           ) : null}
                         </div>
-                        <span className="font-sans text-[10px] uppercase tracking-[0.22em] text-[#1A1A1A]/45">
-                          {item.sub}
-                        </span>
+                        {eyebrow ? (
+                          <span className="font-sans text-[10px] uppercase tracking-[0.22em] text-[#1A1A1A]/45">
+                            {eyebrow}
+                          </span>
+                        ) : null}
                         <h2 className="mt-1 font-heading text-xl font-normal text-[#1A1A1A] transition-colors group-hover:text-[#0C2686] md:text-2xl">
                           {lang === 'bg' ? item.titleBg : item.title}
                         </h2>

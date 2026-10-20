@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   listingPageFromSearch,
+  parseListingDate,
+  parseListingSort,
   patchListingPage,
   patchListingParams,
 } from './listing-filters'
@@ -27,5 +29,40 @@ describe('listing filters', () => {
     const next = patchListingParams(current, { location: 'montana' })
     expect(next.get('location')).toBe('montana')
     expect(next.get('page')).toBeNull()
+  })
+
+  it('omits default sort from the URL and accepts alphabet sorts', () => {
+    expect(parseListingSort(null)).toBe('newest')
+    expect(parseListingSort('oldest')).toBe('oldest')
+    expect(parseListingSort('az')).toBe('az')
+    expect(parseListingSort('za')).toBe('za')
+    expect(parseListingSort('title')).toBe('newest')
+
+    const withAz = patchListingParams(
+      new URLSearchParams('page=2'),
+      { sort: 'az' },
+    )
+    expect(withAz.get('sort')).toBe('az')
+    expect(withAz.get('page')).toBeNull()
+
+    const cleared = patchListingParams(withAz, { sort: 'newest' })
+    expect(cleared.get('sort')).toBeNull()
+  })
+
+  it('stores valid dateFrom/dateTo and clears invalid dates', () => {
+    expect(parseListingDate('2024-03-04')).toBe('2024-03-04')
+    expect(parseListingDate('nope')).toBe('')
+
+    const ranged = patchListingParams(new URLSearchParams('page=2'), {
+      dateFrom: '2024-01-01',
+      dateTo: '2024-12-31',
+    })
+    expect(ranged.get('dateFrom')).toBe('2024-01-01')
+    expect(ranged.get('dateTo')).toBe('2024-12-31')
+    expect(ranged.get('page')).toBeNull()
+
+    const cleared = patchListingParams(ranged, { dateFrom: '', dateTo: '' })
+    expect(cleared.get('dateFrom')).toBeNull()
+    expect(cleared.get('dateTo')).toBeNull()
   })
 })

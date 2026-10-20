@@ -98,6 +98,10 @@ describe('public content hooks', () => {
       category: undefined,
       categorySlug: undefined,
       hasAudio: undefined,
+      q: undefined,
+      sort: 'newest',
+      dateFrom: undefined,
+      dateTo: undefined,
       page: 2,
       pageSize: 30,
     })

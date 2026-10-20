@@ -25,6 +25,14 @@ import {
   parseDayBoundary,
   type CmsArticleSort,
 } from './cms-list.util';
+import {
+  clampPublicListPage,
+  clampPublicListPageSize,
+  parsePublicArticleSort,
+  publicArticleOrderBy,
+  publicPublishedAtFilter,
+  type PublicArticleSort,
+} from './public-list.util';
 import type {
   PublicArticleDto,
   PublicArticleListDto,
@@ -360,13 +368,28 @@ export class ArticlesService {
     },
   } as const;
 
-  /** Homepage / listing cards need a poster, not the full gallery or body. */
+  /**
+   * Listing cards need poster + author + series — not tags/categories/body.
+   * Body is still a scalar; Prisma select-omit is avoided to keep the DTO path simple.
+   */
   private listInclude = {
-    ...this.include,
+    author: true,
+    heroMedia: true,
+    audioMedia: true,
+    videoMedia: true,
     galleryItems: {
       orderBy: { sortOrder: 'asc' as const },
       take: 2,
       include: { media: true },
+    },
+    seriesEpisodes: {
+      take: 1,
+      orderBy: { sortOrder: 'asc' as const },
+      include: {
+        series: {
+          select: { id: true, slug: true, titleBg: true, titleEn: true },
+        },
+      },
     },
   } as const;
 
@@ -916,13 +939,22 @@ export class ArticlesService {
       categorySlug?: string;
       hasAudio?: boolean;
       q?: string;
+      sort?: string;
+      dateFrom?: string;
+      dateTo?: string;
       limit?: number;
       page?: number;
       pageSize?: number;
     },
   ) {
+    const now = new Date();
     const where: Prisma.ArticleWhereInput = {
       status: ArticleStatus.PUBLISHED,
+      publishedAt: publicPublishedAtFilter(
+        now,
+        filters?.dateFrom,
+        filters?.dateTo,
+      ),
     };
     const featuredFlag = isFeaturedFlagQuery(section);
     if (featuredFlag) {
@@ -990,20 +1022,15 @@ export class ArticlesService {
       ]);
     }
 
-    const orderBy = [
-      { publishedAt: 'desc' as const },
-      { updatedAt: 'desc' as const },
-    ];
+    const sort: PublicArticleSort = parsePublicArticleSort(filters?.sort);
+    const orderBy = publicArticleOrderBy(sort);
     const paginate =
       filters?.page != null || filters?.pageSize != null;
 
     if (paginate) {
-      const page = Math.max(1, Number(filters?.page) || 1);
-      const pageSize = Math.min(
-        50,
-        Math.max(1, Number(filters?.pageSize) || 30),
-      );
-      const [total, rows] = await this.prisma.$transaction([
+      const page = clampPublicListPage(Number(filters?.page) || 1);
+      const pageSize = clampPublicListPageSize(Number(filters?.pageSize) || 30);
+      const [total, rows] = await Promise.all([
         this.prisma.article.count({ where }),
         this.prisma.article.findMany({
           where,
@@ -1014,7 +1041,9 @@ export class ArticlesService {
         }),
       ]);
       return {
-        items: rows.map((row) => this.toPublicListDto(row)),
+        items: rows.map((row) =>
+          this.toPublicListDto(row as ArticleWithRelations),
+        ),
         total,
         page,
         pageSize,
@@ -1036,7 +1065,9 @@ export class ArticlesService {
       orderBy,
       ...(take ? { take } : {}),
     });
-    return rows.map((row) => this.toPublicListDto(row));
+    return rows.map((row) =>
+      this.toPublicListDto(row as ArticleWithRelations),
+    );
   }
 
   async getPublicBySectionSlug(
