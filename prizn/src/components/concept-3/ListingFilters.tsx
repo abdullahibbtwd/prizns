@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { ChevronDown, SlidersHorizontal } from 'lucide-react'
 import type { JournalLang } from '@/components/concept-3/JournalShell'
+import { ListingDateInput } from '@/components/concept-3/ListingDateInput'
 import { JournalSelect } from '@/components/ui/JournalSelect'
 import type { JournalSelectOption } from '@/components/ui/JournalSelect'
 import {
@@ -26,9 +27,6 @@ export type ListingSortField = {
   value: PublicListingSort
   onChange: (value: PublicListingSort) => void
 }
-
-const DATE_INPUT_CLASS =
-  'h-11 w-full rounded-md border border-[#EAE6DF] bg-white px-3 font-sans text-sm text-[#1A1A1A] outline-none transition-colors focus:border-[#0C2686]/40'
 
 export function ListingFilters({
   lang,
@@ -122,32 +120,26 @@ export function ListingFilters({
               <p className="mb-1.5 font-sans text-[11px] uppercase tracking-[0.2em] text-[#1A1A1A]/45">
                 {lang === 'bg' ? 'От дата' : 'From date'}
               </p>
-              <input
-                type="date"
+              <ListingDateInput
+                lang={lang}
                 name="dateFrom"
+                label={lang === 'bg' ? 'От дата' : 'From date'}
                 value={dateRange.from}
                 max={dateRange.to || undefined}
-                onChange={(event) =>
-                  dateRange.onChange({ dateFrom: event.target.value })
-                }
-                className={DATE_INPUT_CLASS}
-                aria-label={lang === 'bg' ? 'От дата' : 'From date'}
+                onChange={(value) => dateRange.onChange({ dateFrom: value })}
               />
             </div>
             <div className="min-w-0">
               <p className="mb-1.5 font-sans text-[11px] uppercase tracking-[0.2em] text-[#1A1A1A]/45">
                 {lang === 'bg' ? 'До дата' : 'To date'}
               </p>
-              <input
-                type="date"
+              <ListingDateInput
+                lang={lang}
                 name="dateTo"
+                label={lang === 'bg' ? 'До дата' : 'To date'}
                 value={dateRange.to}
                 min={dateRange.from || undefined}
-                onChange={(event) =>
-                  dateRange.onChange({ dateTo: event.target.value })
-                }
-                className={DATE_INPUT_CLASS}
-                aria-label={lang === 'bg' ? 'До дата' : 'To date'}
+                onChange={(value) => dateRange.onChange({ dateTo: value })}
               />
             </div>
           </>
