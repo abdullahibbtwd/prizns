@@ -62,23 +62,24 @@ function renderAuth(ui: React.ReactNode, route = '/') {
 
 describe('ReaderAuthProvider', () => {
   beforeEach(() => {
-    document.cookie = 'prizn_reader_access=; Max-Age=0; path=/'
-    document.cookie = 'prizn_reader_refresh=; Max-Age=0; path=/'
     vi.mocked(readerApi.getReaderMe).mockReset()
     vi.mocked(readerApi.refreshReaderSession).mockReset()
+    vi.mocked(readerApi.getReaderMe).mockRejectedValue(new ApiError(401, 'no'))
+    vi.mocked(readerApi.refreshReaderSession).mockRejectedValue(
+      new ApiError(401, 'no'),
+    )
   })
 
-  it('skips /me and /refresh when no session cookie', async () => {
+  it('treats a failed /me bootstrap as anonymous', async () => {
     renderAuth(<Probe />)
     await waitFor(() => {
       expect(screen.getByText('anon')).toBeInTheDocument()
     })
-    expect(readerApi.getReaderMe).not.toHaveBeenCalled()
-    expect(readerApi.refreshReaderSession).not.toHaveBeenCalled()
+    expect(readerApi.getReaderMe).toHaveBeenCalled()
+    expect(readerApi.refreshReaderSession).toHaveBeenCalled()
   })
 
-  it('skips reader bootstrap on CMS routes even with a cookie', async () => {
-    document.cookie = 'prizn_reader_access=test-token'
+  it('skips reader bootstrap on CMS routes', async () => {
     renderAuth(<Probe />, '/cms/stories')
     await waitFor(() => {
       expect(screen.getByText('anon')).toBeInTheDocument()
@@ -87,8 +88,16 @@ describe('ReaderAuthProvider', () => {
     expect(readerApi.refreshReaderSession).not.toHaveBeenCalled()
   })
 
-  it('bootstraps a logged-in reader', async () => {
-    document.cookie = 'prizn_reader_access=test-token'
+  it('skips reader bootstrap on the magic-link verify route', async () => {
+    renderAuth(<Probe />, '/auth/verify')
+    await waitFor(() => {
+      expect(screen.getByText('anon')).toBeInTheDocument()
+    })
+    expect(readerApi.getReaderMe).not.toHaveBeenCalled()
+    expect(readerApi.refreshReaderSession).not.toHaveBeenCalled()
+  })
+
+  it('bootstraps a logged-in reader via httpOnly session cookies', async () => {
     vi.mocked(readerApi.getReaderMe).mockResolvedValue({
       reader: { id: 'r1', email: 'r@x.com', name: null, locale: 'en' },
     })
@@ -100,11 +109,7 @@ describe('ReaderAuthProvider', () => {
     })
   })
 
-  it('opens the modal and authenticates via magic link', async () => {
-    vi.mocked(readerApi.getReaderMe).mockRejectedValue(new ApiError(401, 'no'))
-    vi.mocked(readerApi.refreshReaderSession).mockRejectedValue(
-      new ApiError(401, 'no'),
-    )
+  it('keeps the reader after magic-link auth without relying on document.cookie', async () => {
     vi.mocked(readerApi.requestMagicLink).mockResolvedValue({
       ok: true,
       authenticated: true,

@@ -50,21 +50,14 @@ const FEATURE_ENABLED =
   String(import.meta.env.VITE_FEATURE_READER_AUTH ?? 'true').toLowerCase() !==
   'false'
 
-/** Match api/src/reader-auth/reader-auth.types.ts cookie names. */
-const READER_ACCESS_COOKIE = 'prizn_reader_access'
-const READER_REFRESH_COOKIE = 'prizn_reader_refresh'
-
-function hasReaderSessionCookie(): boolean {
-  if (typeof document === 'undefined') return false
-  const raw = document.cookie || ''
-  return (
-    raw.includes(`${READER_ACCESS_COOKIE}=`) ||
-    raw.includes(`${READER_REFRESH_COOKIE}=`)
-  )
+function isReaderAuthVerifyPath(pathname: string) {
+  return pathname === '/auth/verify' || pathname.endsWith('/auth/verify')
 }
 
 export function ReaderAuthProvider({ children }: { children: ReactNode }) {
   const location = useLocation()
+  const isCms = location.pathname.startsWith('/cms')
+  const isVerify = isReaderAuthVerifyPath(location.pathname)
   const [reader, setReader] = useState<Reader | null>(null)
   const [loading, setLoading] = useState(FEATURE_ENABLED)
   const [modalOpen, setModalOpen] = useState(false)
@@ -72,7 +65,7 @@ export function ReaderAuthProvider({ children }: { children: ReactNode }) {
 
   const refresh = useCallback(async () => {
     if (!FEATURE_ENABLED) return false
-    if (location.pathname.startsWith('/cms')) return false
+    if (isCms) return false
     try {
       await refreshReaderSession()
       const me = await getReaderMe()
@@ -82,7 +75,7 @@ export function ReaderAuthProvider({ children }: { children: ReactNode }) {
       setReader(null)
       return false
     }
-  }, [location.pathname])
+  }, [isCms])
 
   useEffect(() => {
     if (!FEATURE_ENABLED) {
@@ -90,17 +83,21 @@ export function ReaderAuthProvider({ children }: { children: ReactNode }) {
       return
     }
     // CMS staff desk does not use reader sessions — skip probes (no 401 noise).
-    if (location.pathname.startsWith('/cms')) {
+    if (isCms) {
       setReader(null)
       setLoading(false)
       return
     }
-    // Anonymous visitors have no session cookies — skip /me + /refresh.
-    if (!hasReaderSessionCookie()) {
-      setReader(null)
+    // Verify owns session creation; a parallel /me 401 must not race-clear
+    // the reader right after the magic-link POST sets cookies + setReader.
+    if (isVerify) {
       setLoading(false)
       return
     }
+    // Reader cookies are httpOnly (and may live on the API host), so they are
+    // invisible to document.cookie. Always probe /me; credentials:include
+    // still sends the session. Skipping based on document.cookie caused
+    // setReader(null) after every magic-link verify + navigate.
     let cancelled = false
     ;(async () => {
       try {
@@ -120,7 +117,7 @@ export function ReaderAuthProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true
     }
-  }, [location.pathname, refresh])
+  }, [isCms, isVerify, refresh])
 
   const openSignIn = useCallback(
     (opts?: { intent?: MagicLinkIntent; returnUrl?: string }) => {
