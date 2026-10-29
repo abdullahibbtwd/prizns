@@ -209,6 +209,7 @@ function ArticleBlocks({
               <ArticleImageCollage
                 key={`collage-block-${index}`}
                 layout={block.layout}
+                caption={pick(lang, block.caption, block.captionBg).trim()}
                 openLabel={t('viewFullPhoto')}
                 onOpenImage={(itemIndex) =>
                   setLightboxIndex(

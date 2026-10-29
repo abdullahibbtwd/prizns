@@ -297,18 +297,41 @@ describe('groupImagesIntoCollage', () => {
     { type: 'image' as const, mediaId: 'c', url: '/c.jpg', captionBg: 'Three' },
   ]
 
-  it('turns marked extra photos into one collage block', () => {
-    const grouped = groupImagesIntoCollage(body, [1, 3], 'row')
-    expect(grouped).toHaveLength(3)
+  it('turns contiguous extra photos into one collage block in place', () => {
+    const arranged = [
+      { type: 'paragraph' as const, textBg: 'Lead.' },
+      { type: 'image' as const, mediaId: 'a', url: '/a.jpg', captionBg: 'One' },
+      { type: 'image' as const, mediaId: 'b', url: '/b.jpg', captionBg: 'Two' },
+      { type: 'paragraph' as const, textBg: 'Mid.' },
+      { type: 'image' as const, mediaId: 'c', url: '/c.jpg', captionBg: 'Three' },
+    ]
+    const grouped = groupImagesIntoCollage(arranged, [1, 2], 'row')
+    expect(grouped).toHaveLength(4)
     expect(grouped[1]).toMatchObject({
       type: 'collage',
       layout: 'row',
       items: [
         { mediaId: 'a', url: '/a.jpg' },
-        { mediaId: 'c', url: '/c.jpg' },
+        { mediaId: 'b', url: '/b.jpg' },
       ],
     })
-    expect(grouped[2]).toMatchObject({ type: 'image', mediaId: 'b' })
+    expect(grouped[2]).toMatchObject({ type: 'paragraph', textBg: 'Mid.' })
+    expect(grouped[3]).toMatchObject({ type: 'image', mediaId: 'c' })
+  })
+
+  it('does not pull non-adjacent photos into a collage', () => {
+    const grouped = groupImagesIntoCollage(body, [1, 3], 'row')
+    expect(grouped).toEqual(body)
+  })
+
+  it('seeds the collage caption when every photo shares the same caption', () => {
+    const same = [
+      { type: 'paragraph' as const, textBg: 'Lead.' },
+      { type: 'image' as const, mediaId: 'a', url: '/a.jpg', captionBg: 'Yard' },
+      { type: 'image' as const, mediaId: 'b', url: '/b.jpg', captionBg: 'Yard' },
+    ]
+    const grouped = groupImagesIntoCollage(same, [1, 2])
+    expect(grouped[1]).toMatchObject({ type: 'collage', captionBg: 'Yard' })
   })
 
   it('ungroups a collage back into extra photos', () => {

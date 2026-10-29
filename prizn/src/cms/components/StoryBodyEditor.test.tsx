@@ -234,13 +234,51 @@ describe('StoryBodyEditor', () => {
     await user.click(screen.getAllByRole('button', { name: 'cms.editor.collageCreate' })[0]!)
 
     expect(screen.getByTestId('story-collage-editor')).toBeInTheDocument()
-    expect(screen.getByTestId('collage-layout-hero-strip')).toBeInTheDocument()
-    expect(screen.getByTestId('collage-layout-portrait-pair')).toBeInTheDocument()
-    expect(screen.getByTestId('collage-layout-big-stack')).toBeInTheDocument()
+    expect(screen.getByTestId('collage-caption-input')).toBeInTheDocument()
+    expect(screen.getByTestId('collage-layout-landscape')).toBeInTheDocument()
+    expect(screen.getByTestId('collage-layout-portrait')).toBeInTheDocument()
+    expect(screen.getByTestId('collage-layout-square')).toBeInTheDocument()
     expect(screen.getByTestId('collage-layout-mosaic')).toBeInTheDocument()
+    expect(screen.getByTestId('collage-layout-hero-strip')).toBeInTheDocument()
+    expect(screen.getByTestId('collage-layout-big-stack')).toBeInTheDocument()
     expect(screen.getByTestId('collage-layout-filmstrip')).toBeInTheDocument()
-    expect(screen.getByTestId('collage-layout-equal-wide')).toBeInTheDocument()
-    expect(screen.getByTestId('collage-layout-equal-tall')).toBeInTheDocument()
+  })
+
+  it('blocks collage create when selected photos are not adjacent', async () => {
+    const user = userEvent.setup()
+    renderPage(
+      <EditorHarness
+        gallery={[
+          { id: 'hero', url: 'https://example.com/hero.jpg' },
+          { id: 'a', url: 'https://example.com/a.jpg' },
+          { id: 'b', url: 'https://example.com/b.jpg' },
+          { id: 'c', url: 'https://example.com/c.jpg' },
+        ]}
+        body={[
+          { type: 'paragraph', textBg: 'Lead.' },
+          {
+            type: 'image',
+            mediaId: 'a',
+            url: 'https://example.com/a.jpg',
+            captionBg: '',
+          },
+          { type: 'paragraph', textBg: 'Between.' },
+          {
+            type: 'image',
+            mediaId: 'c',
+            url: 'https://example.com/c.jpg',
+            captionBg: '',
+          },
+        ]}
+      />,
+    )
+
+    await user.click(screen.getByTestId('collage-select-1'))
+    await user.click(screen.getByTestId('collage-select-3'))
+    expect(screen.getByTestId('collage-adjacent-hint')).toBeInTheDocument()
+    expect(
+      screen.getAllByRole('button', { name: 'cms.editor.collageCreate' })[0],
+    ).toBeDisabled()
   })
 
   it('asks the gallery to drop extras deleted from the body', async () => {

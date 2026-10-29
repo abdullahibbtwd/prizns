@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { LayoutGrid } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { ArticleImageCollage } from '@/components/concept-3/ArticleImageCollage'
@@ -34,6 +35,8 @@ export function StoryCollageEditor({
   onFocus: () => void
 }) {
   const { t } = useTranslation()
+  // Keep caption local so typing does not remount the body field / collage previews.
+  const [caption, setCaption] = useState(captionBg)
   const slides = items
     .filter((item) => item.url)
     .map((item, index) => ({
@@ -54,6 +57,7 @@ export function StoryCollageEditor({
           openLabel=""
           layout={current}
           density="editor"
+          caption={caption}
           onSwap={onSwap}
         />
       ) : null}
@@ -95,13 +99,23 @@ export function StoryCollageEditor({
         </div>
       </div>
 
-      <input
-        placeholder={t('cms.editor.collageCaption')}
-        className="w-full bg-transparent text-sm outline-none"
-        value={captionBg}
-        onChange={(event) => onCaptionChange(event.target.value)}
-        onFocus={onFocus}
-      />
+      <label className="block space-y-1">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#0C2686]/70">
+          {t('cms.editor.collageCaption')}
+        </span>
+        <input
+          placeholder={t('cms.editor.collageCaption')}
+          className="w-full border-b border-[#E8E4DC] bg-transparent pb-1 text-sm outline-none focus:border-[#0C2686]"
+          value={caption}
+          onChange={(event) => {
+            const next = event.target.value
+            setCaption(next)
+            onCaptionChange(next)
+          }}
+          onFocus={onFocus}
+          data-testid="collage-caption-input"
+        />
+      </label>
 
       <GhostButton type="button" className="px-3 py-1.5 text-xs" onClick={onUngroup}>
         <LayoutGrid className="size-3.5" /> {t('cms.editor.collageUngroup')}

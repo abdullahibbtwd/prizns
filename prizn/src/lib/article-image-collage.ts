@@ -18,13 +18,13 @@ export type CollageCellLayout = {
 }
 
 export type CollageTemplate =
-  | 'hero-strip'
-  | 'portrait-pair'
-  | 'big-stack'
+  | 'landscape'
+  | 'portrait'
+  | 'square'
   | 'mosaic'
+  | 'hero-strip'
+  | 'big-stack'
   | 'filmstrip'
-  | 'equal-wide'
-  | 'equal-tall'
 
 export type CollageLayoutId = CollageTemplate | string
 
@@ -78,14 +78,15 @@ export function segmentBodyForCollage<T extends { type: string; url?: string }>(
   return segments
 }
 
+/** Curated layouts: orientation-first, then editorial mixes. */
 export const COLLAGE_TEMPLATES: CollageTemplate[] = [
-  'hero-strip',
-  'portrait-pair',
-  'big-stack',
+  'landscape',
+  'portrait',
+  'square',
   'mosaic',
+  'hero-strip',
+  'big-stack',
   'filmstrip',
-  'equal-wide',
-  'equal-tall',
 ]
 
 const GRID_COLS: Record<number, string> = {
@@ -116,32 +117,34 @@ const GRID_ROWS: Record<number, string> = {
 
 export function collageTemplate(layout?: string | null): CollageTemplate {
   if (
-    layout === 'hero-strip' ||
     layout === 'landscape' ||
-    layout === 'wide' ||
-    layout === 'row'
+    layout === 'equal-wide' ||
+    layout === 'stack-wide' ||
+    layout === 'landscape-stack' ||
+    layout === 'horizontal' ||
+    layout === 'equal'
   ) {
-    return 'hero-strip'
+    return 'landscape'
   }
   if (
-    layout === 'portrait-pair' ||
     layout === 'portrait' ||
+    layout === 'portrait-pair' ||
+    layout === 'equal-tall' ||
+    layout === 'stack-tall' ||
+    layout === 'portrait-stack' ||
+    layout === 'vertical' ||
     layout === 'stack'
   ) {
-    return 'portrait-pair'
+    return 'portrait'
+  }
+  if (layout === 'square') return 'square'
+  if (layout === 'hero-strip' || layout === 'wide' || layout === 'row') {
+    return 'hero-strip'
   }
   if (layout === 'big-stack' || layout === 'top' || layout === 'hero') {
     return 'big-stack'
   }
   if (layout === 'filmstrip') return 'filmstrip'
-  if (
-    layout === 'equal-wide' ||
-    layout === 'equal' ||
-    layout === 'horizontal'
-  ) {
-    return 'equal-wide'
-  }
-  if (layout === 'equal-tall' || layout === 'vertical') return 'equal-tall'
   return 'mosaic'
 }
 
@@ -258,9 +261,10 @@ export function collageShellClass(
   if (density === 'thumb') return 'my-0 w-full'
   const template = collageTemplate(layout)
   const wide =
+    template === 'landscape' ||
     template === 'hero-strip' ||
     template === 'filmstrip' ||
-    template === 'equal-wide'
+    template === 'big-stack'
   if (density === 'article') {
     return wide
       ? 'mx-auto my-8 w-full max-w-xl sm:max-w-2xl'
@@ -272,15 +276,34 @@ export function collageShellClass(
 }
 
 const FILL = 'min-h-0 h-full w-full'
+const LANDSCAPE_ASPECT = 'aspect-[3/2]'
+const PORTRAIT_ASPECT = 'aspect-[3/4]'
 
 export function collageGridClass(count: number, layout: string = 'mosaic'): string {
   const template = collageTemplate(layout)
   if (template === 'hero-strip' || template === 'filmstrip') return ''
-  if (template === 'equal-wide') return equalTilePlan(count, 'aspect-[3/2]').gridClass
-  if (template === 'equal-tall') return equalTilePlan(count, 'aspect-[3/4]').gridClass
-  if (template === 'portrait-pair') return portraitPairGridClass(count)
+  if (template === 'landscape') return landscapeGridClass(count)
+  if (template === 'portrait') return portraitGridClass(count)
+  if (template === 'square') return equalTilePlan(count, 'aspect-square').gridClass
   if (template === 'big-stack') return bigStackGridClass(count)
   return mosaicGridClass(count)
+}
+
+/** Landscape: 2 stacked; 3+ two-column (odd last row spans full width). */
+function landscapeGridClass(count: number): string {
+  if (count <= 2) return 'grid grid-cols-1 gap-[2px]'
+  return 'grid grid-cols-2 gap-[2px]'
+}
+
+/**
+ * Portrait: 2 side-by-side; 3 magazine (large + two); 4+ two-column tall tiles.
+ */
+function portraitGridClass(count: number): string {
+  if (count === 2) return 'grid grid-cols-2 gap-[2px]'
+  if (count === 3) {
+    return 'grid grid-cols-5 grid-rows-2 aspect-[4/5] gap-[2px]'
+  }
+  return 'grid grid-cols-2 gap-[2px]'
 }
 
 function mosaicGridClass(count: number): string {
@@ -308,19 +331,6 @@ function mosaicGridClass(count: number): string {
   }
 }
 
-function portraitPairGridClass(count: number): string {
-  if (count <= 3) {
-    return `grid ${collageColsClass(count)} grid-rows-1 aspect-[3/4] gap-[2px]`
-  }
-  if (count === 4) {
-    return 'grid grid-cols-2 grid-rows-2 aspect-[3/4] gap-[2px]'
-  }
-  if (count === 5) {
-    return 'grid grid-cols-3 grid-rows-2 aspect-[3/4] gap-[2px]'
-  }
-  return `grid grid-cols-3 ${GRID_ROWS[Math.ceil(count / 3)] ?? 'grid-rows-3'} aspect-[3/4] gap-[2px]`
-}
-
 function bigStackGridClass(count: number): string {
   const rows = Math.max(1, count - 1)
   return `grid grid-cols-5 ${GRID_ROWS[rows] ?? 'grid-rows-2'} aspect-[3/2] gap-[2px]`
@@ -343,12 +353,13 @@ export function collageCellLayout(
       aspectClass: 'aspect-square',
     }
   }
-  if (template === 'equal-wide' || template === 'equal-tall') {
-    const plan = equalTilePlan(
-      count,
-      template === 'equal-wide' ? 'aspect-[3/2]' : 'aspect-[3/4]',
-    )
-    return { className: plan.spanAt(index), aspectClass: FILL }
+  if (template === 'landscape') return landscapeCellLayout(count, index)
+  if (template === 'portrait') return portraitCellLayout(count, index)
+  if (template === 'square') {
+    return {
+      className: equalTilePlan(count, 'aspect-square').spanAt(index),
+      aspectClass: FILL,
+    }
   }
   if (template === 'big-stack') {
     const rows = Math.max(1, count - 1)
@@ -360,13 +371,31 @@ export function collageCellLayout(
     }
     return { className: 'col-span-2', aspectClass: FILL }
   }
-  if (template === 'portrait-pair') {
-    if (count === 5 && index === 4) {
-      return { className: 'col-span-2', aspectClass: FILL }
-    }
-    return { className: '', aspectClass: FILL }
-  }
   return mosaicCellLayout(count, index)
+}
+
+function landscapeCellLayout(count: number, index: number): CollageCellLayout {
+  if (count <= 2) return { className: '', aspectClass: LANDSCAPE_ASPECT }
+  const spansFull = count % 2 === 1 && index === count - 1
+  return {
+    className: spansFull ? 'col-span-2' : '',
+    aspectClass: LANDSCAPE_ASPECT,
+  }
+}
+
+function portraitCellLayout(count: number, index: number): CollageCellLayout {
+  if (count === 2) return { className: '', aspectClass: PORTRAIT_ASPECT }
+  if (count === 3) {
+    if (index === 0) {
+      return { className: 'col-span-3 row-span-2', aspectClass: FILL }
+    }
+    return { className: 'col-span-2', aspectClass: FILL }
+  }
+  const spansFull = count % 2 === 1 && index === count - 1
+  return {
+    className: spansFull ? 'col-span-2' : '',
+    aspectClass: PORTRAIT_ASPECT,
+  }
 }
 
 function rowSpanClass(rows: number): string {

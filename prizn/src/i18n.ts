@@ -531,7 +531,10 @@ const cmsBg = {
     chooseImage: 'Избери снимка',
     insertImage: 'Вмъкни снимка',
     collageCreate: 'Направи колаж',
-    collageHint: 'Маркирайте 2–10 снимки (не главната) и изберете колаж.',
+    collageHint:
+      'Маркирайте 2–10 съседни снимки в тялото (не главната), после създайте колаж.',
+    collageNeedAdjacent:
+      'Избраните снимки трябва да са една след друга в тялото — преместете ги една до друга, после опитайте отново.',
     collageSelected: '{{count}} снимки избрани',
     collageMark: 'Избери за колаж',
     collageUngroup: 'Раздели колажа',
@@ -540,36 +543,49 @@ const cmsBg = {
     collageGroup: 'Колаж',
     collageAuto: 'Автоматичен колаж',
     collageSwapHint: 'Плъзни снимка върху друга, за да ги размениш.',
-    collageLayout_default: 'Списание',
-    collageLayout_landscape: 'Герой + лента',
-    collageLayout_portrait: 'Двойка портрети',
+    collageLayout_default: 'Микс',
+    collageLayout_landscape: 'Пейзаж',
+    collageLayout_portrait: 'Портрет',
+    collageLayout_square: 'Квадрат',
     'collageLayout_hero-strip': 'Герой + лента',
-    'collageLayout_portrait-pair': 'Двойка портрети',
+    'collageLayout_portrait-pair': 'Портрет',
     'collageLayout_big-stack': 'Голяма + малки',
-    collageLayout_mosaic: 'Списание',
+    collageLayout_mosaic: 'Микс',
     collageLayout_filmstrip: 'Филмова лента',
-    'collageLayout_equal-wide': 'Хоризонтална',
-    'collageLayout_equal-tall': 'Вертикална',
+    'collageLayout_equal-wide': 'Пейзаж',
+    'collageLayout_equal-tall': 'Портрет',
+    'collageLayout_stack-wide': 'Пейзаж',
+    'collageLayout_stack-tall': 'Портрет',
+    collageLayoutHint_landscape:
+      'За широки снимки: 2 една под друга; 3+ в две колони (последната ред заема цялата ширина).',
+    collageLayoutHint_portrait:
+      'За високи снимки: 2 една до друга; 3 — голяма + две; 4+ в две колони с еднакъв размер.',
+    collageLayoutHint_square:
+      'Еднакви квадратни кадри в чиста мрежа.',
     'collageLayoutHint_hero-strip':
       'Широка снимка отгоре и по-малки квадратни кадри под нея.',
     'collageLayoutHint_portrait-pair':
-      'Високи портрети един до друг.',
+      'За високи снимки: 2 една до друга; 3 — голяма + две; 4+ в две колони.',
     'collageLayoutHint_big-stack':
-      'Голям портрет от едната страна и по-малки широки кадри от другата.',
+      'Голям кадър от едната страна и по-малки кадри от другата — микс.',
     collageLayoutHint_mosaic:
-      'Висок портрет от едната страна, а останалото е асиметрична мрежа от широки и квадратни кадри.',
+      'Асиметричен микс от високи и широки кадри.',
     collageLayoutHint_filmstrip:
       'Широк герой отгоре и хоризонтална лента от квадратни миниатюри отдолу.',
     'collageLayoutHint_equal-wide':
-      'Еднакви широки кадри в мрежа от 2 или 3 реда, според броя снимки.',
+      'За широки снимки: 2 една под друга; 3+ в две колони.',
     'collageLayoutHint_equal-tall':
-      'Еднакви високи кадри в мрежа от 2 или 3 реда, според броя снимки.',
-    collageLayout_wide: 'Широка + тясна',
-    collageLayout_stack: 'Една под друга',
+      'За високи снимки в две колони с еднакъв размер.',
+    'collageLayoutHint_stack-wide':
+      'За широки снимки: 2 една под друга; 3+ в две колони.',
+    'collageLayoutHint_stack-tall':
+      'За високи снимки в две колони с еднакъв размер.',
+    collageLayout_wide: 'Герой + лента',
+    collageLayout_stack: 'Портрет',
     collageLayout_top: 'Голяма отгоре',
-    collageLayout_row: 'Ред',
+    collageLayout_row: 'Герой + лента',
     collageLayout_hero: 'Голяма + малки',
-    collageLayout_equal: 'Равни',
+    collageLayout_equal: 'Пейзаж',
     dropImages: 'Плъзни снимки тук или кликни, за да добавиш',
     dropImagesHero: 'Първата снимка става главна',
     dropImagesAdd: 'Добавя се към галерията',
@@ -2023,7 +2039,10 @@ const cmsEn = {
     chooseImage: 'Choose image',
     insertImage: 'Insert image',
     collageCreate: 'Create collage',
-    collageHint: 'Mark 2–10 extra photos (not the hero), then create a collage.',
+    collageHint:
+      'Mark 2–10 photos that sit next to each other in the body (not the hero), then create a collage.',
+    collageNeedAdjacent:
+      'Selected photos must sit next to each other in the body — drag them together, then try again.',
     collageSelected: '{{count}} photos selected',
     collageMark: 'Select for collage',
     collageUngroup: 'Ungroup collage',
@@ -2032,36 +2051,49 @@ const cmsEn = {
     collageGroup: 'Collage',
     collageAuto: 'Auto collage',
     collageSwapHint: 'Drag a photo onto another to swap them.',
-    collageLayout_default: 'Magazine',
-    collageLayout_landscape: 'Hero + strip',
-    collageLayout_portrait: 'Portrait pair',
+    collageLayout_default: 'Mix',
+    collageLayout_landscape: 'Landscape',
+    collageLayout_portrait: 'Portrait',
+    collageLayout_square: 'Square',
     'collageLayout_hero-strip': 'Hero + strip',
-    'collageLayout_portrait-pair': 'Portrait pair',
+    'collageLayout_portrait-pair': 'Portrait',
     'collageLayout_big-stack': 'Big + small',
-    collageLayout_mosaic: 'Magazine',
+    collageLayout_mosaic: 'Mix',
     collageLayout_filmstrip: 'Filmstrip',
-    'collageLayout_equal-wide': 'Horizontal',
-    'collageLayout_equal-tall': 'Vertical',
+    'collageLayout_equal-wide': 'Landscape',
+    'collageLayout_equal-tall': 'Portrait',
+    'collageLayout_stack-wide': 'Landscape',
+    'collageLayout_stack-tall': 'Portrait',
+    collageLayoutHint_landscape:
+      'For wide photos: 2 stacked top/bottom; 3+ in two columns (last odd photo spans full width).',
+    collageLayoutHint_portrait:
+      'For tall photos: 2 side by side; 3 as large + two; 4+ equal two-column grid.',
+    collageLayoutHint_square:
+      'Equal square tiles in a clean grid.',
     'collageLayoutHint_hero-strip':
       'A wide image spans the top, with smaller square crops below.',
     'collageLayoutHint_portrait-pair':
-      'Tall images placed side by side.',
+      'For tall photos: 2 side by side; 3 as large + two; 4+ equal two-column grid.',
     'collageLayoutHint_big-stack':
-      'A large portrait on one side, with smaller wide crops stacked on the other.',
+      'A large frame on one side with smaller frames stacked beside it — a mix.',
     collageLayoutHint_mosaic:
-      'A tall portrait anchors one side, with a mix of wide and square images in an asymmetric grid.',
+      'An asymmetric mix of tall and wide frames.',
     collageLayoutHint_filmstrip:
       'A wide hero on top, with a horizontally scrollable row of square thumbnails below.',
     'collageLayoutHint_equal-wide':
-      'Equal wide crops in a 2–3 row grid, based on how many photos you have.',
+      'For wide photos: 2 stacked; 3+ in two columns.',
     'collageLayoutHint_equal-tall':
-      'Equal tall crops in a 2–3 row grid, based on how many photos you have.',
-    collageLayout_wide: 'Wide + narrow',
-    collageLayout_stack: 'Stacked',
+      'For tall photos in an equal two-column grid.',
+    'collageLayoutHint_stack-wide':
+      'For wide photos: 2 stacked; 3+ in two columns.',
+    'collageLayoutHint_stack-tall':
+      'For tall photos in an equal two-column grid.',
+    collageLayout_wide: 'Hero + strip',
+    collageLayout_stack: 'Portrait',
     collageLayout_top: 'Large on top',
-    collageLayout_row: 'Row',
+    collageLayout_row: 'Hero + strip',
     collageLayout_hero: 'Large + small',
-    collageLayout_equal: 'Equal',
+    collageLayout_equal: 'Landscape',
     dropImages: 'Drop images here or click to add',
     dropImagesHero: 'The first image becomes the hero',
     dropImagesAdd: 'Drop to add to the gallery',

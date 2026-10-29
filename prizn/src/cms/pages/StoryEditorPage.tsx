@@ -1859,7 +1859,10 @@ export default function CmsStoryEditorPage() {
         ) : null}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto pb-8">
+      <div
+        data-story-editor-scroll
+        className="min-h-0 flex-1 overflow-x-clip overflow-y-auto overscroll-contain pb-8"
+      >
       <CmsPageHeader
         title={
           isNew

@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { Expand } from 'lucide-react'
 import {
   DndContext,
@@ -6,11 +7,12 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DragStartEvent,
 } from '@dnd-kit/core'
 import {
   SortableContext,
-  rectSortingStrategy,
   useSortable,
+  type SortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { cn } from '@/lib/utils'
@@ -31,6 +33,32 @@ type CollageSlide = {
   alt: string
 }
 
+/** Sibling cells stay put; only the active cell follows the pointer. */
+const staticCellStrategy: SortingStrategy = () => null
+
+function freezeEditorScroll() {
+  const el = document.querySelector(
+    '[data-story-editor-scroll]',
+  ) as HTMLElement | null
+  if (!el) return () => undefined
+  const top = el.scrollTop
+  const prev = el.style.overflowY
+  el.style.overflowY = 'hidden'
+  el.scrollTop = top
+  const onScroll = () => {
+    el.scrollTop = top
+  }
+  const onWheel = (event: Event) => event.preventDefault()
+  el.addEventListener('scroll', onScroll)
+  document.addEventListener('wheel', onWheel, { passive: false, capture: true })
+  return () => {
+    el.removeEventListener('scroll', onScroll)
+    document.removeEventListener('wheel', onWheel, true)
+    el.style.overflowY = prev
+    el.scrollTop = top
+  }
+}
+
 export function ArticleImageCollage({
   items,
   openLabel,
@@ -38,6 +66,7 @@ export function ArticleImageCollage({
   onSwap,
   layout = 'mosaic',
   density = 'article',
+  caption = '',
 }: {
   items: CollageSlide[]
   openLabel: string
@@ -45,21 +74,44 @@ export function ArticleImageCollage({
   onSwap?: (from: number, to: number) => void
   layout?: string
   density?: 'article' | 'editor' | 'thumb'
+  /** Collage-level caption shown under the whole grid. */
+  caption?: string
 }) {
   const count = items.length
   const uniqueCaptions = [
     ...new Set(items.map((item) => item.caption).filter(Boolean)),
   ]
-  const sharedCaption =
+  const sharedItemCaption =
     uniqueCaptions.length === 1 ? uniqueCaptions[0] : undefined
+  const underCaption = caption.trim() || sharedItemCaption
   const compact = density !== 'article'
   const sortable = Boolean(onSwap) && density === 'editor'
   const cellIds = items.map((_, index) => `collage-cell-${index}`)
+  const unfreezeRef = useRef<(() => void) | null>(null)
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
   )
 
+  useEffect(
+    () => () => {
+      unfreezeRef.current?.()
+      unfreezeRef.current = null
+    },
+    [],
+  )
+
+  const onDragStart = (_event: DragStartEvent) => {
+    unfreezeRef.current?.()
+    unfreezeRef.current = freezeEditorScroll()
+  }
+
+  const endDrag = () => {
+    unfreezeRef.current?.()
+    unfreezeRef.current = null
+  }
+
   const onDragEnd = (event: DragEndEvent) => {
+    endDrag()
     if (!onSwap) return
     const { active, over } = event
     if (!over || active.id === over.id) return
@@ -80,7 +132,7 @@ export function ArticleImageCollage({
       count,
       layout,
       compact,
-      sharedCaption,
+      sharedCaption: underCaption,
       openLabel,
       onOpenImage,
       extraClass,
@@ -152,18 +204,24 @@ export function ArticleImageCollage({
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
+          onDragStart={onDragStart}
           onDragEnd={onDragEnd}
+          onDragCancel={endDrag}
+          autoScroll={false}
         >
-          <SortableContext items={cellIds} strategy={rectSortingStrategy}>
+          <SortableContext items={cellIds} strategy={staticCellStrategy}>
             {board}
           </SortableContext>
         </DndContext>
       ) : (
         board
       )}
-      {sharedCaption && !compact ? (
-        <figcaption className="mt-3 text-center font-sans text-xs uppercase tracking-[0.16em] text-[#1A1A1A]/45">
-          {sharedCaption}
+      {underCaption && density !== 'thumb' ? (
+        <figcaption
+          className="mt-3 text-center font-sans text-xs uppercase tracking-[0.16em] text-[#1A1A1A]/45"
+          data-testid="collage-caption"
+        >
+          {underCaption}
         </figcaption>
       ) : null}
     </figure>
@@ -288,26 +346,29 @@ function SortableCollageCell({
     transition,
     isDragging,
     isOver,
-  } = useSortable({ id })
+  } = useSortable({ id, animateLayoutChanges: () => false })
 
   return (
     <div
       ref={setNodeRef}
       data-testid={`collage-cell-${props.index}`}
       style={{
-        transform: CSS.Transform.toString(transform),
+        // Follow the pointer directly — DragOverlay was offset (top-right)
+        // inside the nested editor DnD contexts.
+        transform: CSS.Translate.toString(transform),
         transition,
-        zIndex: isDragging ? 2 : undefined,
+        zIndex: isDragging ? 30 : undefined,
       }}
       className={cn(
         'relative overflow-hidden bg-[#1A1A1A] cursor-grab touch-none active:cursor-grabbing',
         extraClass ?? cn(cell.className, cell.aspectClass),
-        isDragging && 'opacity-40',
+        isDragging && 'opacity-90 shadow-lg ring-2 ring-white/70',
         isOver && !isDragging && 'ring-2 ring-inset ring-white/80',
       )}
       onPointerDown={(event) => event.stopPropagation()}
       {...attributes}
       {...listeners}
+      tabIndex={-1}
     >
       <CellChrome {...props} zoomOnHover={false} />
     </div>

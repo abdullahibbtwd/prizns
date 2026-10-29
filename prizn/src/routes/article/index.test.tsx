@@ -324,6 +324,7 @@ describe('ArticlePage', () => {
     renderArticle()
     await screen.findByRole('heading', { name: 'Village life' })
     expect(screen.getByTestId('article-collage')).toBeInTheDocument()
+    expect(screen.getByTestId('collage-caption')).toHaveTextContent('Yard')
     expect(screen.getByRole('img', { name: 'One' })).toHaveAttribute(
       'src',
       'https://cdn.example/one.jpg',

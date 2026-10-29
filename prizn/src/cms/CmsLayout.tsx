@@ -163,13 +163,13 @@ export function CmsLayout() {
           className={
             isStoryEditor
               ? 'flex min-h-0 flex-1 flex-col overflow-hidden'
-              : 'min-h-0 flex-1 overflow-y-auto'
+              : 'min-h-0 flex-1 overflow-y-auto overscroll-contain'
           }
         >
           <div
             className={
               isStoryEditor
-                ? 'mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col overflow-hidden px-4 py-4 md:px-8 lg:px-10'
+                ? 'mx-auto flex h-full min-h-0 w-full max-w-7xl flex-1 flex-col overflow-hidden px-4 py-4 md:px-8 lg:px-10'
                 : 'mx-auto max-w-7xl px-4 py-8 md:px-8 lg:px-10'
             }
           >

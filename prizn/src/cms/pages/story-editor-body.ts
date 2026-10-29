@@ -373,23 +373,45 @@ export function draftPlainTextForAi(body: BodyBlock[]): string {
 
 type ImageBodyBlock = Extract<BodyBlock, { type: 'image' }>
 
+/** True when indexes form one unbroken run (e.g. 2,3,4 — not 2,4). */
+export function areContiguousIndexes(indexes: number[]): boolean {
+  const sorted = [...new Set(indexes)].sort((a, b) => a - b)
+  if (sorted.length <= 1) return true
+  for (let i = 1; i < sorted.length; i++) {
+    if (sorted[i]! !== sorted[i - 1]! + 1) return false
+  }
+  return true
+}
+
 export function groupImagesIntoCollage(
   body: BodyBlock[],
   indexes: number[],
   layout = 'mosaic',
 ): BodyBlock[] {
   const sorted = [...new Set(indexes)].sort((a, b) => a - b)
+  if (!areContiguousIndexes(sorted)) return body
+
   const items: ImageBodyBlock[] = []
   for (const index of sorted) {
     const block = body[index]
     if (block?.type === 'image') items.push(block)
   }
   if (items.length < COLLAGE_MIN || items.length > COLLAGE_MAX) return body
+  // Contiguous indexes must all resolve to images — gaps (paragraphs between) are refused.
+  if (items.length !== sorted.length) return body
+
+  const itemCaptions = items
+    .map((item) => (item.captionBg ?? '').trim())
+    .filter(Boolean)
+  const captionBg =
+    itemCaptions.length > 0 && new Set(itemCaptions).size === 1
+      ? itemCaptions[0]!
+      : ''
 
   const collage: BodyBlock = {
     type: 'collage',
     layout,
-    captionBg: '',
+    captionBg,
     items: items.map((item) => ({
       mediaId: item.mediaId,
       url: item.url,

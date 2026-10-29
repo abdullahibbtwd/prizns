@@ -6,20 +6,22 @@ import { StoryRichTextField } from '@/cms/components/StoryRichTextField'
 import { sanitizeRichText } from '@/lib/rich-text'
 import {
   DndContext,
-  KeyboardSensor,
+  DragOverlay,
   PointerSensor,
   closestCenter,
   useSensor,
   useSensors,
   type DragEndEvent,
-  type DraggableSyntheticListeners,
+  type DragStartEvent,
 } from '@dnd-kit/core'
 import {
   SortableContext,
-  sortableKeyboardCoordinates,
   useSortable,
-  verticalListSortingStrategy,
+  type SortingStrategy,
 } from '@dnd-kit/sortable'
+
+/** No in-list transforms while dragging — those expand the scroller into blank space. */
+const staticSortingStrategy: SortingStrategy = () => null
 import { CSS } from '@dnd-kit/utilities'
 import { GhostButton } from '@/cms/components/CmsUI'
 import { StoryCollageEditor } from '@/cms/components/StoryCollageEditor'
@@ -27,6 +29,7 @@ import { JournalSelect } from '@/components/ui/JournalSelect'
 import {
   convertBodyBlock,
   emptyTextBlock,
+  areContiguousIndexes,
   groupImagesIntoCollage,
   mediaIdsFromBodyBlock,
   nextBodyMoveIndex,
@@ -79,8 +82,15 @@ export function StoryBodyEditor({
   const rootRef = useRef<HTMLDivElement>(null)
   const imageInputRef = useRef<HTMLInputElement>(null)
   const pendingFocus = useRef<number | null>(null)
+  const scrollLockRef = useRef<{
+    targets: Array<{ el: HTMLElement; top: number; overflowY: string }>
+    onWheel: (event: Event) => void
+    onTouchMove: (event: Event) => void
+    onScroll: () => void
+  } | null>(null)
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null)
   const [selected, setSelected] = useState<number[]>([])
+  const [activeDragId, setActiveDragId] = useState<string | null>(null)
 
   const minIndex = hideFirstParagraph ? 1 : 0
   const heroId = gallery[0]?.id
@@ -101,10 +111,76 @@ export function StoryBodyEditor({
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    }),
   )
+
+  const collectScrollables = () => {
+    const found = new Set<HTMLElement>()
+    const marked = document.querySelector(
+      '[data-story-editor-scroll]',
+    ) as HTMLElement | null
+    if (marked) found.add(marked)
+
+    let node: HTMLElement | null = rootRef.current
+    while (node) {
+      const style = window.getComputedStyle(node)
+      const oy = style.overflowY
+      if (oy === 'auto' || oy === 'scroll' || oy === 'overlay') {
+        found.add(node)
+      }
+      node = node.parentElement
+    }
+    return [...found]
+  }
+
+  const unlockEditorScroll = () => {
+    const lock = scrollLockRef.current
+    if (!lock) return
+    document.removeEventListener('scroll', lock.onScroll, true)
+    document.removeEventListener('wheel', lock.onWheel, true)
+    document.removeEventListener('touchmove', lock.onTouchMove, true)
+    for (const target of lock.targets) {
+      target.el.style.overflowY = target.overflowY
+      target.el.scrollTop = target.top
+    }
+    scrollLockRef.current = null
+  }
+
+  const lockEditorScroll = () => {
+    unlockEditorScroll()
+    const targets = collectScrollables().map((el) => ({
+      el,
+      top: el.scrollTop,
+      overflowY: el.style.overflowY,
+    }))
+    if (targets.length === 0) return
+
+    // Hard-freeze every scrollable ancestor. Browser edge-scroll while dragging
+    // ignores a single scroll listener and keeps pushing the editor into blank space.
+    for (const target of targets) {
+      target.el.style.overflowY = 'hidden'
+      target.el.scrollTop = target.top
+    }
+
+    const onScroll = () => {
+      for (const target of targets) target.el.scrollTop = target.top
+    }
+    const onWheel = (event: Event) => {
+      event.preventDefault()
+    }
+    const onTouchMove = (event: Event) => {
+      event.preventDefault()
+    }
+    document.addEventListener('scroll', onScroll, true)
+    document.addEventListener('wheel', onWheel, {
+      passive: false,
+      capture: true,
+    })
+    document.addEventListener('touchmove', onTouchMove, {
+      passive: false,
+      capture: true,
+    })
+    scrollLockRef.current = { targets, onWheel, onTouchMove, onScroll }
+  }
 
   useLayoutEffect(() => {
     const index = pendingFocus.current
@@ -208,17 +284,84 @@ export function StoryBodyEditor({
     pendingFocus.current = index + chunks.length - 1
   }
 
+  const onDragStart = (event: DragStartEvent) => {
+    setActiveDragId(String(event.active.id))
+    // Focused text/inputs scroll into view when rows move — clear that first.
+    const active = document.activeElement
+    if (active instanceof HTMLElement) active.blur()
+    window.getSelection()?.removeAllRanges()
+    lockEditorScroll()
+  }
+
+  const restoreEditorScroll = (
+    targets: Array<{ el: HTMLElement; top: number }> | null,
+  ) => {
+    if (!targets?.length) return
+    const apply = () => {
+      const focused = document.activeElement
+      if (focused instanceof HTMLElement) focused.blur()
+      for (const target of targets) target.el.scrollTop = target.top
+    }
+    apply()
+    requestAnimationFrame(apply)
+  }
+
+  const finishDrag = () => {
+    const targets = scrollLockRef.current?.targets.map(({ el, top }) => ({
+      el,
+      top,
+    }))
+    setActiveDragId(null)
+    unlockEditorScroll()
+    restoreEditorScroll(targets ?? null)
+  }
+
   const onDragEnd = (event: DragEndEvent) => {
     const { active, over } = event
-    if (!over || active.id === over.id) return
+    if (!over || active.id === over.id) {
+      finishDrag()
+      return
+    }
     const from = fields.findIndex((field) => field.id === active.id)
     const to = fields.findIndex((field) => field.id === over.id)
     const next = nextBodyMoveIndex(from, to, minIndex)
-    if (!next) return
+    if (!next) {
+      finishDrag()
+      return
+    }
+    const targets = scrollLockRef.current?.targets.map(({ el, top }) => ({
+      el,
+      top,
+    }))
     move(next.from, next.to)
-    setFocusedIndex(next.to)
     setSelected([])
+    setActiveDragId(null)
+    unlockEditorScroll()
+    restoreEditorScroll(targets ?? null)
   }
+
+  const onDragCancel = () => {
+    finishDrag()
+  }
+
+  const activeDragIndex =
+    activeDragId == null
+      ? -1
+      : fields.findIndex((field) => field.id === activeDragId)
+  const activeDragType =
+    activeDragIndex >= 0
+      ? form.getValues(`body.${activeDragIndex}.type`)
+      : null
+  const activeDragPreviewUrl =
+    activeDragType === 'image' || activeDragType === 'video'
+      ? form.getValues(`body.${activeDragIndex}.url`) ||
+        gallery.find(
+          (item) =>
+            item.id === form.getValues(`body.${activeDragIndex}.mediaId`),
+        )?.url
+      : activeDragType === 'collage'
+        ? form.getValues(`body.${activeDragIndex}.items`)?.[0]?.url
+        : undefined
 
   const toggleSelected = (index: number) => {
     setSelected((prev) =>
@@ -246,8 +389,11 @@ export function StoryBodyEditor({
     setSelected([])
   }
 
+  const selectionContiguous = areContiguousIndexes(selected)
   const canCollage =
-    selected.length >= COLLAGE_MIN && selected.length <= COLLAGE_MAX
+    selected.length >= COLLAGE_MIN &&
+    selected.length <= COLLAGE_MAX &&
+    selectionContiguous
 
   return (
     <div className="space-y-3">
@@ -305,9 +451,16 @@ export function StoryBodyEditor({
           className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#0C2686]/20 bg-[#0C2686]/5 px-3 py-2"
           data-testid="collage-selection-bar"
         >
-          <span className="text-xs font-medium text-[#0C2686]">
-            {t('cms.editor.collageSelected', { count: selected.length })}
-          </span>
+          <div className="space-y-0.5">
+            <span className="text-xs font-medium text-[#0C2686]">
+              {t('cms.editor.collageSelected', { count: selected.length })}
+            </span>
+            {!selectionContiguous ? (
+              <p className="text-[11px] text-amber-800" data-testid="collage-adjacent-hint">
+                {t('cms.editor.collageNeedAdjacent')}
+              </p>
+            ) : null}
+          </div>
           <div className="flex gap-2">
             <GhostButton
               type="button"
@@ -330,15 +483,21 @@ export function StoryBodyEditor({
         <p className="text-[11px] text-stone-400">{t('cms.editor.collageHint')}</p>
       )}
 
-      <div ref={rootRef} className="rounded-xl border border-[#E8E4DC] bg-white">
+      <div
+        ref={rootRef}
+        className="overflow-clip rounded-xl border border-[#E8E4DC] bg-white"
+      >
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
+          onDragStart={onDragStart}
           onDragEnd={onDragEnd}
+          onDragCancel={onDragCancel}
+          autoScroll={false}
         >
           <SortableContext
             items={sortableIds}
-            strategy={verticalListSortingStrategy}
+            strategy={staticSortingStrategy}
           >
             {fields.map((field, index) => {
               const type = form.watch(`body.${index}.type`)
@@ -371,7 +530,6 @@ export function StoryBodyEditor({
                   focused={focusedIndex === index}
                   dragLabel={t('cms.editor.dragBlock')}
                 >
-                  {(dragListeners) => (
                     <>
                       <div className="mb-1 flex min-w-0 flex-1 items-center justify-between">
                         {type === 'image' || type === 'video' || type === 'collage' ? (
@@ -421,14 +579,17 @@ export function StoryBodyEditor({
                             }),
                           )}
                           layout={form.watch(`body.${index}.layout`) || 'mosaic'}
-                          captionBg={form.watch(`body.${index}.captionBg`) ?? ''}
+                          captionBg={
+                            form.getValues(`body.${index}.captionBg`) ?? ''
+                          }
                           onLayoutChange={(layout) =>
                             applyCollageLayout(index, layout)
                           }
                           onCaptionChange={(caption) => {
-                            const current = form.getValues(`body.${index}`)
-                            if (current.type !== 'collage') return
-                            update(index, { ...current, captionBg: caption })
+                            // setValue keeps the field mounted; useFieldArray.update remounts and steals focus.
+                            form.setValue(`body.${index}.captionBg`, caption, {
+                              shouldDirty: true,
+                            })
                           }}
                           onUngroup={() => splitCollage(index)}
                           onSwap={(from, to) => swapCollagePhotos(index, from, to)}
@@ -450,10 +611,7 @@ export function StoryBodyEditor({
                                   />
                                 </label>
                               ) : null}
-                              <div
-                                className="min-w-0 flex-1 cursor-grab touch-none active:cursor-grabbing"
-                                {...dragListeners}
-                              >
+                              <div className="min-w-0 flex-1">
                                 {type === 'video' ? (
                                   <BodyVideoPreview url={mediaUrl} />
                                 ) : (
@@ -529,11 +687,36 @@ export function StoryBodyEditor({
                         </>
                       )}
                     </>
-                  )}
                 </SortableBodyRow>
               )
             })}
           </SortableContext>
+          <DragOverlay dropAnimation={null}>
+            {activeDragId && activeDragType ? (
+              <div className="flex max-w-md items-center gap-3 rounded-xl border border-[#0C2686]/25 bg-white px-3 py-2 shadow-lg">
+                {activeDragPreviewUrl ? (
+                  <img
+                    src={activeDragPreviewUrl}
+                    alt=""
+                    className="size-12 shrink-0 rounded-md object-cover"
+                  />
+                ) : (
+                  <span className="flex size-12 shrink-0 items-center justify-center rounded-md bg-[#FAF8F3] text-[#0C2686]">
+                    <GripVertical className="size-4" />
+                  </span>
+                )}
+                <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0C2686]/70">
+                  {activeDragType === 'collage'
+                    ? t('cms.editor.collageGroup')
+                    : activeDragType === 'video'
+                      ? t('cms.editor.videoMedia')
+                      : activeDragType === 'image'
+                        ? t('cms.editor.image')
+                        : t(`cms.editor.${activeDragType}`)}
+                </span>
+              </div>
+            ) : null}
+          </DragOverlay>
         </DndContext>
       </div>
     </div>
@@ -553,7 +736,7 @@ function SortableBodyRow({
   type: BodyBlock['type']
   focused: boolean
   dragLabel: string
-  children: (listeners: DraggableSyntheticListeners) => ReactNode
+  children: ReactNode
 }) {
   const {
     attributes,
@@ -562,19 +745,26 @@ function SortableBodyRow({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id })
+  } = useSortable({
+    id,
+    animateLayoutChanges: () => false,
+  })
 
   return (
     <div
       ref={setNodeRef}
       style={{
-        transform: CSS.Transform.toString(transform),
+        // Keep the row in-flow while dragging — pointer follow uses DragOverlay.
+        // Translating the real row expands the editor scroller into blank space.
+        transform: isDragging
+          ? undefined
+          : CSS.Translate.toString(transform),
         transition,
       }}
       className={cn(
         'group relative flex gap-2 border-b border-[#E8E4DC] px-3 py-3 last:border-b-0',
         focused && 'bg-[#FAF8F3]',
-        isDragging && 'z-10 bg-white shadow-md',
+        isDragging && 'z-10 bg-[#E8E4DC]/60 opacity-40',
         type === 'image' || type === 'video' || type === 'collage'
           ? 'bg-[#FAF8F3]/80'
           : undefined,
@@ -592,10 +782,11 @@ function SortableBodyRow({
         data-testid={`drag-block-${index}`}
         {...attributes}
         {...listeners}
+        tabIndex={-1}
       >
         <GripVertical className="size-4" />
       </button>
-      <div className="min-w-0 flex-1">{children(listeners)}</div>
+      <div className="min-w-0 flex-1">{children}</div>
     </div>
   )
 }
