@@ -103,6 +103,10 @@ describe('StoryBodyEditor', () => {
 
     expect(screen.getAllByRole('button', { name: 'cms.editor.dragBlock' })).toHaveLength(3)
     expect(screen.getByTestId('drag-block-1')).toBeInTheDocument()
+    // Images are also draggable from the media itself (not grip-only).
+    expect(screen.getByTestId('drag-media-1')).toBeInTheDocument()
+    // Drop line is reserved for an active drag over a different row.
+    expect(screen.queryByTestId('drop-indicator-1')).not.toBeInTheDocument()
   })
 
   it('hides the hero image from the article body', () => {

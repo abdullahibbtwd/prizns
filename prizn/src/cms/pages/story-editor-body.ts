@@ -31,6 +31,84 @@ export function nextBodyMoveIndex(
   return { from, to: clampedTo }
 }
 
+/**
+ * Resolve a body-block drag drop. Never maps a missing over target to index 0 —
+ * failed id lookups return null so the list stays put.
+ */
+export function resolveBodyDragMove(
+  fields: Array<{ id: string }>,
+  activeId: string | number,
+  overId: string | number | null | undefined,
+  minIndex: number,
+): { from: number; to: number } | null {
+  if (overId == null || activeId === overId) return null
+  const from = fields.findIndex((field) => field.id === activeId)
+  const to = fields.findIndex((field) => field.id === overId)
+  if (from < 0 || to < 0) return null
+  return nextBodyMoveIndex(from, to, minIndex)
+}
+
+/** Only the story editor scroller may auto-scroll during body-block drag. */
+export function canScrollStoryEditor(el: Element): boolean {
+  return el instanceof HTMLElement && el.hasAttribute('data-story-editor-scroll')
+}
+
+export type BodyDragScrollSnapshot = {
+  document: number
+  scrollingElement: number
+  shell: number
+  main: number
+  editor: number
+}
+
+/** Read scrollTop for the layout nodes involved in body-block drag. */
+export function readBodyDragScrollSnapshot(
+  doc: Document = document,
+): BodyDragScrollSnapshot {
+  const editor = doc.querySelector(
+    '[data-story-editor-scroll]',
+  ) as HTMLElement | null
+  const main = editor?.closest('main') as HTMLElement | null
+  let shell: HTMLElement | null = main?.parentElement ?? null
+  while (shell && !shell.className.includes('h-svh')) {
+    shell = shell.parentElement
+  }
+  return {
+    document: doc.documentElement.scrollTop || doc.body.scrollTop || 0,
+    scrollingElement: doc.scrollingElement?.scrollTop ?? 0,
+    shell: shell?.scrollTop ?? 0,
+    main: main?.scrollTop ?? 0,
+    editor: editor?.scrollTop ?? 0,
+  }
+}
+
+/**
+ * Pin every scroll container except [data-story-editor-scroll] back to 0.
+ * Catches scrollIntoView / blur side-effects that canScroll cannot block.
+ */
+export function pinNonEditorScroll(doc: Document = document): BodyDragScrollSnapshot {
+  const editor = doc.querySelector(
+    '[data-story-editor-scroll]',
+  ) as HTMLElement | null
+  const before = readBodyDragScrollSnapshot(doc)
+
+  const reset = (el: Element | null | undefined) => {
+    if (!(el instanceof HTMLElement) || el === editor) return
+    if (el.scrollTop !== 0) el.scrollTop = 0
+  }
+
+  reset(doc.documentElement)
+  reset(doc.body)
+  reset(doc.scrollingElement)
+  let node = editor?.parentElement ?? null
+  while (node) {
+    reset(node)
+    node = node.parentElement
+  }
+
+  return before
+}
+
 export function splitTextAt(
   text: string,
   start: number,

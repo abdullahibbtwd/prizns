@@ -1878,9 +1878,9 @@ export default function CmsStoryEditorPage() {
         onSubmit={onSubmit}
         onInput={() => scheduleAutosaveRef.current()}
         onKeyUp={() => scheduleAutosaveRef.current()}
-        className="grid grid-cols-1 gap-8 overflow-x-hidden xl:grid-cols-[minmax(0,1fr)_320px]"
+        className="grid grid-cols-1 gap-8 overflow-x-clip xl:grid-cols-[minmax(0,1fr)_320px]"
       >
-        <div className="min-w-0 space-y-6 overflow-x-hidden">
+        <div className="min-w-0 space-y-6 overflow-x-clip">
           <CmsCard className="space-y-3 p-5">
             <h2 className="text-sm font-semibold text-stone-800">
               {t('cms.editor.sectionHint')}

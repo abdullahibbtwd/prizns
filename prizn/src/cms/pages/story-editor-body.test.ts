@@ -8,7 +8,11 @@ import {
   estimateReadMinutes,
   groupImagesIntoCollage,
   mediaIdsFromBodyBlock,
+  canScrollStoryEditor,
   nextBodyMoveIndex,
+  pinNonEditorScroll,
+  readBodyDragScrollSnapshot,
+  resolveBodyDragMove,
   remapBodyMediaIds,
   splitPastedParagraphs,
   swapCollageItems,
@@ -243,6 +247,102 @@ describe('nextBodyMoveIndex', () => {
     expect(nextBodyMoveIndex(4, 2, 1)).toEqual({ from: 4, to: 2 })
     expect(nextBodyMoveIndex(3, 0, 1)).toEqual({ from: 3, to: 1 })
     expect(nextBodyMoveIndex(2, 2, 1)).toBeNull()
+  })
+
+  it('allows moves to the first body slot and the last index', () => {
+    expect(nextBodyMoveIndex(5, 1, 1)).toEqual({ from: 5, to: 1 })
+    expect(nextBodyMoveIndex(1, 5, 1)).toEqual({ from: 1, to: 5 })
+    expect(nextBodyMoveIndex(2, 0, 0)).toEqual({ from: 2, to: 0 })
+  })
+
+  it('rejects moves that start in the hidden teaser slot', () => {
+    expect(nextBodyMoveIndex(0, 3, 1)).toBeNull()
+    expect(nextBodyMoveIndex(-1, 2, 0)).toBeNull()
+  })
+})
+
+describe('resolveBodyDragMove', () => {
+  const fields = [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }]
+
+  it('moves by stable field ids, not by a missing over falling through to 0', () => {
+    expect(resolveBodyDragMove(fields, 'd', 'b', 0)).toEqual({ from: 3, to: 1 })
+    expect(resolveBodyDragMove(fields, 'b', 'd', 0)).toEqual({ from: 1, to: 3 })
+  })
+
+  it('returns null when over is missing, same as active, or unknown', () => {
+    expect(resolveBodyDragMove(fields, 'c', null, 0)).toBeNull()
+    expect(resolveBodyDragMove(fields, 'c', 'c', 0)).toBeNull()
+    expect(resolveBodyDragMove(fields, 'c', 'missing', 0)).toBeNull()
+    expect(resolveBodyDragMove(fields, 'missing', 'a', 0)).toBeNull()
+  })
+
+  it('respects the locked teaser slot', () => {
+    expect(resolveBodyDragMove(fields, 'd', 'a', 1)).toEqual({ from: 3, to: 1 })
+    expect(resolveBodyDragMove(fields, 'a', 'c', 1)).toBeNull()
+  })
+})
+
+describe('canScrollStoryEditor', () => {
+  it('allows only the marked editor scroller and rejects the document scroller', () => {
+    const editor = document.createElement('div')
+    editor.setAttribute('data-story-editor-scroll', '')
+    const shell = document.createElement('div')
+    const scrollingElement = document.scrollingElement
+
+    expect(canScrollStoryEditor(editor)).toBe(true)
+    expect(canScrollStoryEditor(shell)).toBe(false)
+    expect(scrollingElement && canScrollStoryEditor(scrollingElement)).toBe(
+      false,
+    )
+  })
+})
+
+describe('pinNonEditorScroll', () => {
+  it('zeros document/shell/main scroll while leaving the editor scroller alone', () => {
+    document.body.innerHTML = `
+      <div class="h-svh max-h-svh overflow-hidden" id="shell">
+        <div>
+          <main id="main">
+            <div data-story-editor-scroll id="editor"></div>
+          </main>
+        </div>
+      </div>
+    `
+    const shell = document.getElementById('shell')!
+    const main = document.getElementById('main')!
+    const editor = document.getElementById('editor')!
+    Object.defineProperty(shell, 'scrollTop', {
+      writable: true,
+      value: 40,
+      configurable: true,
+    })
+    Object.defineProperty(main, 'scrollTop', {
+      writable: true,
+      value: 25,
+      configurable: true,
+    })
+    Object.defineProperty(editor, 'scrollTop', {
+      writable: true,
+      value: 120,
+      configurable: true,
+    })
+    Object.defineProperty(document.documentElement, 'scrollTop', {
+      writable: true,
+      value: 10,
+      configurable: true,
+    })
+
+    const before = pinNonEditorScroll()
+    expect(before.editor).toBe(120)
+    expect(before.shell).toBe(40)
+    expect(before.main).toBe(25)
+    expect(shell.scrollTop).toBe(0)
+    expect(main.scrollTop).toBe(0)
+    expect(document.documentElement.scrollTop).toBe(0)
+    expect(editor.scrollTop).toBe(120)
+    expect(readBodyDragScrollSnapshot().editor).toBe(120)
+
+    document.body.innerHTML = ''
   })
 })
 
